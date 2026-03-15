@@ -15,6 +15,40 @@ import { PatchesModule } from './modules/patches/patches.module';
 import { GatewayModule } from './modules/gateway/gateway.module';
 import { AuditModule } from './modules/audit/audit.module';
 
+import {
+  Tenant,
+  Organization,
+  Device,
+  DeviceMetric,
+  DeviceInventory,
+  Alert,
+  Script,
+  ScriptExecution,
+  SoftwarePackage,
+  SoftwareDeployment,
+  Technician,
+  Session,
+  AuditLog,
+  Patch,
+} from './database/entities';
+
+const entities = [
+  Tenant,
+  Organization,
+  Device,
+  DeviceMetric,
+  DeviceInventory,
+  Alert,
+  Script,
+  ScriptExecution,
+  SoftwarePackage,
+  SoftwareDeployment,
+  Technician,
+  Session,
+  AuditLog,
+  Patch,
+];
+
 // Redis/Bull é opcional — funciona sem ele em produção
 const redisImports: DynamicModule[] = [];
 if (process.env.REDIS_URL || process.env.REDIS_HOST) {
@@ -55,22 +89,22 @@ if (process.env.REDIS_URL || process.env.REDIS_HOST) {
         const databaseUrl = config.get('DATABASE_URL');
         if (databaseUrl) {
           return {
-            type: 'postgres',
+            type: 'postgres' as const,
             url: databaseUrl,
-            entities: [__dirname + '/**/*.entity{.ts,.js}'],
+            entities,
             synchronize: true,
-            logging: config.get('NODE_ENV') === 'development',
+            logging: false,
             ssl: { rejectUnauthorized: false },
           };
         }
         return {
-          type: 'postgres',
-          host: config.get('DATABASE_HOST', 'localhost'),
+          type: 'postgres' as const,
+          host: config.get<string>('DATABASE_HOST', 'localhost'),
           port: config.get<number>('DATABASE_PORT', 5432),
-          username: config.get('DATABASE_USER', 'miconecta'),
-          password: config.get('DATABASE_PASSWORD', 'MiConecta@2026!'),
-          database: config.get('DATABASE_NAME', 'miconecta_rmm'),
-          entities: [__dirname + '/**/*.entity{.ts,.js}'],
+          username: config.get<string>('DATABASE_USER', 'miconecta'),
+          password: config.get<string>('DATABASE_PASSWORD', 'MiConecta@2026!'),
+          database: config.get<string>('DATABASE_NAME', 'miconecta_rmm'),
+          entities,
           synchronize: true,
           logging: config.get('NODE_ENV') === 'development',
         };
