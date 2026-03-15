@@ -1,0 +1,103 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # PostgreSQL - Banco de Dados Principal
+  # ============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: miconecta-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: miconecta_rmm
+      POSTGRES_USER: miconecta
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-MiConecta@2026!}
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U miconecta -d miconecta_rmm']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - miconecta-network
+
+  # ============================================
+  # Redis - Cache e Filas
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: miconecta-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:-MiConectaRedis@2026!}
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD:-MiConectaRedis@2026!}', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - miconecta-network
+
+  # ============================================
+  # Backend API - NestJS
+  # ============================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: miconecta-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://miconecta:${DB_PASSWORD:-MiConecta@2026!}@postgres:5432/miconecta_rmm
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-MiConectaRedis@2026!}
+      JWT_SECRET: ${JWT_SECRET:-miconecta-jwt-secret-change-in-production}
+      PORT: 3000
+      RUSTDESK_SERVER: 136.248.114.218
+      RUSTDESK_KEY: ev3ic04E+VsgunfupaellTSWgSzmHiQL2H5ywzBE+yI=
+    ports:
+      - '3000:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - miconecta-network
+
+  # ============================================
+  # Frontend Dashboard - Next.js
+  # ============================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: miconecta-frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: ${API_URL:-http://localhost:3000}
+      NEXT_PUBLIC_WS_URL: ${WS_URL:-ws://localhost:3000}
+    ports:
+      - '80:3000'
+    depends_on:
+      - backend
+    networks:
+      - miconecta-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  miconecta-network:
+    driver: bridge

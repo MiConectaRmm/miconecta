@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build
+dist/
+.next/
+out/
+build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploads
+uploads/
+
+# Coverage
+coverage/
+
+# Agent build output
+agent/MIConectaAgent/bin/
+agent/MIConectaAgent/obj/
+installer/publish/
+installer/Output/
+
+# Misc
+*.log
+npm-debug.log*
