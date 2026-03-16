@@ -25,8 +25,9 @@ async function bootstrap() {
       }),
     );
 
+    const corsOrigin = process.env.CORS_ORIGIN || '*';
     app.enableCors({
-      origin: process.env.CORS_ORIGIN || '*',
+      origin: corsOrigin === '*' ? '*' : corsOrigin.split(',').map(o => o.trim()),
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
       credentials: true,
     });
