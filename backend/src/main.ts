@@ -51,10 +51,26 @@ async function bootstrap() {
       credentials: true,
     });
 
-    // Health check (fora do prefix /api/v1)
+    // Health checks (fora do prefix /api/v1)
     const httpAdapter = app.getHttpAdapter();
+    const startTime = Date.now();
+
     httpAdapter.get('/health', (req: any, res: any) => {
-      res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '2.0.0' });
+      res.json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        version: '2.0.0',
+        uptime: Math.round((Date.now() - startTime) / 1000),
+        environment: process.env.NODE_ENV || 'development',
+      });
+    });
+
+    httpAdapter.get('/health/live', (req: any, res: any) => {
+      res.json({ status: 'ok', check: 'liveness' });
+    });
+
+    httpAdapter.get('/health/ready', (req: any, res: any) => {
+      res.json({ status: 'ok', check: 'readiness', uptime: Math.round((Date.now() - startTime) / 1000) });
     });
 
     // Swagger — apenas em dev/staging

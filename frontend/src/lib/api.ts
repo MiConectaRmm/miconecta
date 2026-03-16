@@ -224,9 +224,15 @@ export const notificationsApi = {
 // ── Reports ──
 export const reportsApi = {
   executivo: () => api.get('/reports/executivo'),
+  tecnico: () => api.get('/reports/tecnico'),
   disponibilidade: () => api.get('/reports/disponibilidade'),
   agendamentos: () => api.get('/reports/agendamentos'),
   criarAgendamento: (dados: any) => api.post('/reports/agendamentos', dados),
+  exportDispositivos: (formato: 'csv' | 'json') => api.get('/reports/export/dispositivos', { params: { formato }, responseType: formato === 'csv' ? 'blob' : 'json' }),
+  exportTickets: (formato: 'csv' | 'json') => api.get('/reports/export/tickets', { params: { formato }, responseType: formato === 'csv' ? 'blob' : 'json' }),
+  exportSessoes: (formato: 'csv' | 'json') => api.get('/reports/export/sessoes', { params: { formato }, responseType: formato === 'csv' ? 'blob' : 'json' }),
+  exportInventario: (formato: 'csv' | 'json') => api.get('/reports/export/inventario', { params: { formato }, responseType: formato === 'csv' ? 'blob' : 'json' }),
+  exportAudit: (formato: 'csv' | 'json') => api.get('/reports/export/audit', { params: { formato }, responseType: formato === 'csv' ? 'blob' : 'json' }),
 };
 
 // ── Roles ──
@@ -259,7 +265,11 @@ export const storageApi = {
 export const lgpdApi = {
   solicitacoes: () => api.get('/lgpd/solicitacoes'),
   criarSolicitacao: (dados: any) => api.post('/lgpd/solicitacoes', dados),
+  processarSolicitacao: (id: string, dados: any) => api.put(`/lgpd/solicitacoes/${id}/processar`, dados),
   consentimentos: () => api.get('/lgpd/consentimentos'),
+  registrarConsentimento: (dados: any) => api.post('/lgpd/consentimentos', dados),
+  politicasRetencao: () => api.get('/lgpd/retencao/politicas'),
+  executarLimpeza: () => api.post('/lgpd/retencao/executar'),
 };
 
 export default api;
