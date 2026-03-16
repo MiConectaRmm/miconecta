@@ -59,6 +59,14 @@ export class ClientUsersController {
     return this.clientUsersService.desativar(id, tenantId);
   }
 
+  @Put(':id/reativar')
+  @RequirePermissions('users:write')
+  @ApiOperation({ summary: 'Reativar usuário do cliente' })
+  async reativar(@Req() req: any, @Param('id') id: string) {
+    const tenantId = req.tenantId || req.user.tenantId;
+    return this.clientUsersService.reativar(id, tenantId);
+  }
+
   @Post(':id/invite')
   @RequirePermissions('users:invite')
   @ApiOperation({ summary: 'Gerar/reenviar convite' })

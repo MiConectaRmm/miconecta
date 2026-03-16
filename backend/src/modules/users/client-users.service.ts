@@ -75,6 +75,14 @@ export class ClientUsersService {
     return { message: 'Usuário desativado' };
   }
 
+  async reativar(id: string, tenantId: string) {
+    const user = await this.clientUserRepo.findOne({ where: { id, tenantId } });
+    if (!user) throw new NotFoundException('Usuário não encontrado');
+
+    await this.clientUserRepo.update(id, { ativo: true });
+    return this.buscar(id, tenantId);
+  }
+
   async gerarConvite(id: string, tenantId: string) {
     const user = await this.clientUserRepo.findOne({ where: { id, tenantId } });
     if (!user) throw new NotFoundException('Usuário não encontrado');

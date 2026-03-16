@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Monitor, Search } from 'lucide-react'
 import { devicesApi } from '@/lib/api'
 import StatusBadge from '@/components/ui/StatusBadge'
@@ -67,7 +68,7 @@ export default function PortalDevicesPage() {
               <tbody>
                 {filtrados.map((d: any) => (
                   <tr key={d.id} className="border-b border-dark-800/50 hover:bg-dark-800/50 transition-colors">
-                    <td className="py-2.5 px-3 text-white font-medium">{d.hostname}</td>
+                    <td className="py-2.5 px-3"><Link href={`/portal/devices/${d.id}`} className="text-white font-medium hover:text-brand-400">{d.hostname}</Link></td>
                     <td className="py-2.5 px-3 text-dark-400 text-xs">{d.sistemaOperacional}</td>
                     <td className="py-2.5 px-3 text-dark-400 text-xs truncate max-w-[150px]">{d.cpu}</td>
                     <td className="py-2.5 px-3 text-dark-400 text-xs">{d.ramTotalMb ? `${Math.round(d.ramTotalMb / 1024)} GB` : '—'}</td>

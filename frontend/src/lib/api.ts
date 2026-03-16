@@ -76,6 +76,7 @@ export const usersApi = {
   criarCliente: (dados: any) => api.post('/users/clients', dados),
   atualizarCliente: (id: string, dados: any) => api.put(`/users/clients/${id}`, dados),
   desativarCliente: (id: string) => api.delete(`/users/clients/${id}`),
+  reativarCliente: (id: string) => api.put(`/users/clients/${id}/reativar`),
   convidarCliente: (id: string) => api.post(`/users/clients/${id}/invite`),
 };
 

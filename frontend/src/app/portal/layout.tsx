@@ -5,18 +5,20 @@ import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import {
   Monitor, Ticket, MessageSquare, BarChart3,
-  History, Bell, LogOut, Package,
+  History, Bell, LogOut, Package, Radio, Users,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth.store'
 
 const portalMenu = [
-  { href: '/portal', label: 'Visão Geral', icon: Monitor },
-  { href: '/portal/devices', label: 'Inventário', icon: Package },
-  { href: '/portal/tickets', label: 'Chamados', icon: Ticket },
-  { href: '/portal/chat', label: 'Chat', icon: MessageSquare },
-  { href: '/portal/reports', label: 'Relatórios', icon: BarChart3 },
-  { href: '/portal/history', label: 'Histórico', icon: History },
+  { href: '/portal', label: 'Visão Geral', icon: Monitor, roles: null },
+  { href: '/portal/devices', label: 'Inventário', icon: Package, roles: null },
+  { href: '/portal/tickets', label: 'Chamados', icon: Ticket, roles: null },
+  { href: '/portal/chat', label: 'Chat', icon: MessageSquare, roles: null },
+  { href: '/portal/sessions', label: 'Sessões', icon: Radio, roles: ['admin_cliente', 'gestor'] },
+  { href: '/portal/reports', label: 'Relatórios', icon: BarChart3, roles: ['admin_cliente', 'gestor'] },
+  { href: '/portal/history', label: 'Histórico', icon: History, roles: null },
+  { href: '/portal/users', label: 'Usuários', icon: Users, roles: ['admin_cliente'] },
 ]
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
@@ -61,7 +63,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           </Link>
 
           <nav className="flex items-center gap-1">
-            {portalMenu.map(item => {
+            {portalMenu.filter(item => !item.roles || item.roles.includes(user?.role || '')).map(item => {
               const isActive = pathname === item.href ||
                 (item.href !== '/portal' && pathname?.startsWith(item.href))
               const Icon = item.icon
