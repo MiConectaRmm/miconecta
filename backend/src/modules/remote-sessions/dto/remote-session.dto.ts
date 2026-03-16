@@ -1,5 +1,6 @@
-import { IsNotEmpty, IsString, IsOptional, IsBoolean, IsEnum } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsBoolean, IsEnum, IsUUID, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { RemoteSessionLogTipo } from '../../../database/entities/remote-session-log.entity';
 
 // ── Políticas de acesso ──
 
@@ -151,6 +152,72 @@ export class RegistrarEvidenciaDto {
   @ApiPropertyOptional()
   @IsOptional()
   detalhes?: Record<string, any>;
+}
+
+// ── Filtro de listagem ──
+
+export class SessionFilterDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  deviceId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  technicianId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  ticketId?: string;
+}
+
+// ── Iniciar sessão ──
+
+export class IniciarSessaoDto {
+  @ApiPropertyOptional({ description: 'ID externo da sessão (RustDesk, MeshCentral, etc.)' })
+  @IsOptional()
+  @IsString()
+  rustdeskSessionId?: string;
+}
+
+// ── Cancelar sessão ──
+
+export class CancelarSessaoDto {
+  @ApiPropertyOptional({ description: 'Motivo do cancelamento' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  motivo?: string;
+}
+
+// ── Registrar log/ação na sessão ──
+
+export class LogRegistroDto {
+  @ApiProperty({ enum: RemoteSessionLogTipo })
+  @IsNotEmpty()
+  @IsEnum(RemoteSessionLogTipo)
+  tipo: RemoteSessionLogTipo;
+
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
+  descricao: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  detalhes?: Record<string, any>;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  arquivoUrl?: string;
 }
 
 // ── Resposta detalhada de sessão ──

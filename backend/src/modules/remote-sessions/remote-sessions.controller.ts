@@ -4,14 +4,22 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { TenantAccessGuard } from '../../common/guards/tenant-access.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { AgentAuthGuard } from '../auth/guards/agent-auth.guard';
 import { RemoteSessionsService } from './remote-sessions.service';
-import { RemoteSessionLogTipo } from '../../database/entities/remote-session-log.entity';
 import {
   SolicitarSessaoDto,
   ConsentimentoDto,
   FinalizarSessaoDto,
   RegistrarEvidenciaDto,
+  SessionFilterDto,
+  IniciarSessaoDto,
+  CancelarSessaoDto,
+  LogRegistroDto,
 } from './dto/remote-session.dto';
 
 @ApiTags('Remote Sessions')
@@ -20,38 +28,42 @@ export class RemoteSessionsController {
   constructor(private readonly sessionsService: RemoteSessionsService) {}
 
   // ══════════════════════════════════════════════════
-  // ENDPOINTS TÉCNICO (JWT Auth)
+  // ENDPOINTS TÉCNICO (JWT + RBAC)
   // ══════════════════════════════════════════════════
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantAccessGuard, RolesGuard, PermissionsGuard)
+  @Roles('super_admin', 'admin_maginf', 'admin', 'tecnico_senior', 'tecnico')
+  @RequirePermissions('sessions:write')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Solicitar sessão remota (aplica política automática)' })
-  async solicitar(@Req() req: any, @Body() body: SolicitarSessaoDto) {
+  async solicitar(@Req() req: any, @Body() dto: SolicitarSessaoDto) {
     const tenantId = req.tenantId || req.user.tenantId;
     return this.sessionsService.solicitar({
       tenantId,
-      deviceId: body.deviceId,
+      deviceId: dto.deviceId,
       technicianId: req.user.sub,
-      ticketId: body.ticketId,
-      motivo: body.motivo,
+      ticketId: dto.ticketId,
+      motivo: dto.motivo,
       ipTecnico: req.ip,
-      gravarSessao: body.gravarSessao,
+      gravarSessao: dto.gravarSessao,
       userRole: req.user.funcao || req.user.role,
     });
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantAccessGuard, PermissionsGuard)
+  @RequirePermissions('sessions:read')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Listar sessões remotas' })
-  async listar(@Req() req: any, @Query() filtros: any) {
+  async listar(@Req() req: any, @Query() filtros: SessionFilterDto) {
     const tenantId = req.tenantId || req.user.tenantId;
     return this.sessionsService.listar(tenantId, filtros);
   }
 
   @Get('estatisticas')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantAccessGuard, PermissionsGuard)
+  @RequirePermissions('sessions:read')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Estatísticas de sessões remotas' })
   async estatisticas(@Req() req: any) {
@@ -60,18 +72,17 @@ export class RemoteSessionsController {
   }
 
   @Get('device/:deviceId/policy')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantAccessGuard, PermissionsGuard)
+  @RequirePermissions('sessions:read')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Consultar política de acesso para um device' })
   async consultarPolitica(@Param('deviceId') deviceId: string) {
-    const { Device } = await import('../../database/entities/device.entity');
-    const device = await this.sessionsService['deviceRepo'].findOne({ where: { id: deviceId } });
-    if (!device) return { error: 'Dispositivo não encontrado' };
-    return this.sessionsService.getPolicy(device);
+    return this.sessionsService.consultarPoliticaDevice(deviceId);
   }
 
   @Get('device/:deviceId/historico')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantAccessGuard, PermissionsGuard)
+  @RequirePermissions('sessions:read')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Histórico de sessões de um device' })
   async historicoDevice(@Req() req: any, @Param('deviceId') deviceId: string) {
@@ -80,7 +91,8 @@ export class RemoteSessionsController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantAccessGuard, PermissionsGuard)
+  @RequirePermissions('sessions:read')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Buscar sessão por ID' })
   async buscar(@Req() req: any, @Param('id') id: string) {
@@ -89,23 +101,36 @@ export class RemoteSessionsController {
   }
 
   @Put(':id/start')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantAccessGuard, PermissionsGuard)
+  @RequirePermissions('sessions:write')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Marcar sessão como iniciada' })
-  async iniciar(@Param('id') id: string, @Body() body: { rustdeskSessionId?: string }) {
-    return this.sessionsService.iniciar(id, body.rustdeskSessionId);
+  async iniciar(@Param('id') id: string, @Body() dto: IniciarSessaoDto) {
+    return this.sessionsService.iniciar(id, dto.rustdeskSessionId);
   }
 
   @Put(':id/end')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantAccessGuard, PermissionsGuard)
+  @RequirePermissions('sessions:write')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Finalizar sessão remota' })
-  async finalizar(@Param('id') id: string, @Body() body: FinalizarSessaoDto) {
-    return this.sessionsService.finalizar(id, body);
+  async finalizar(@Param('id') id: string, @Body() dto: FinalizarSessaoDto) {
+    return this.sessionsService.finalizar(id, dto);
+  }
+
+  @Put(':id/cancel')
+  @UseGuards(JwtAuthGuard, TenantAccessGuard, PermissionsGuard)
+  @RequirePermissions('sessions:write')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cancelar sessão remota' })
+  async cancelar(@Req() req: any, @Param('id') id: string, @Body() dto: CancelarSessaoDto) {
+    const tenantId = req.tenantId || req.user.tenantId;
+    return this.sessionsService.cancelar(id, tenantId, dto.motivo, req.user.nome);
   }
 
   @Put(':id/error')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantAccessGuard, PermissionsGuard)
+  @RequirePermissions('sessions:write')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Marcar sessão com erro' })
   async marcarErro(@Param('id') id: string, @Body() body: { erro: string }) {
@@ -113,18 +138,17 @@ export class RemoteSessionsController {
   }
 
   @Post(':id/log')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantAccessGuard, PermissionsGuard)
+  @RequirePermissions('sessions:write')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Registrar ação na sessão' })
-  async registrarLog(
-    @Param('id') id: string,
-    @Body() body: { tipo: RemoteSessionLogTipo; descricao: string; detalhes?: Record<string, any>; arquivoUrl?: string },
-  ) {
-    return this.sessionsService.registrarLog(id, body);
+  @ApiOperation({ summary: 'Registrar ação/log na sessão' })
+  async registrarLog(@Param('id') id: string, @Body() dto: LogRegistroDto) {
+    return this.sessionsService.registrarLog(id, dto);
   }
 
   @Get(':id/logs')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantAccessGuard, PermissionsGuard)
+  @RequirePermissions('sessions:read')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Listar todos logs da sessão' })
   async listarLogs(@Param('id') id: string) {
@@ -132,55 +156,56 @@ export class RemoteSessionsController {
   }
 
   @Post(':id/evidencia')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantAccessGuard, PermissionsGuard)
+  @RequirePermissions('sessions:write')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Registrar evidência (screenshot, arquivo, clipboard)' })
-  async registrarEvidencia(@Param('id') id: string, @Body() body: RegistrarEvidenciaDto) {
-    return this.sessionsService.registrarEvidencia(id, body);
+  async registrarEvidencia(@Param('id') id: string, @Body() dto: RegistrarEvidenciaDto) {
+    return this.sessionsService.registrarEvidencia(id, dto);
   }
 
   @Get(':id/evidencias')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantAccessGuard, PermissionsGuard)
+  @RequirePermissions('sessions:read')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Listar evidências da sessão' })
   async listarEvidencias(@Param('id') id: string) {
     return this.sessionsService.listarEvidencias(id);
   }
 
+  @Put(':id/consent')
+  @UseGuards(JwtAuthGuard, TenantAccessGuard, PermissionsGuard)
+  @RequirePermissions('sessions:write')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Registrar consentimento (fallback via painel)' })
+  async consent(@Param('id') id: string, @Body() dto: ConsentimentoDto) {
+    return this.sessionsService.registrarConsentimento(id, dto.consentido, {
+      usuarioLocal: dto.usuarioLocal,
+      hostname: dto.hostname,
+      ip: dto.ip,
+    });
+  }
+
   // ══════════════════════════════════════════════════
-  // ENDPOINTS AGENTE (Agent Auth)
+  // ENDPOINTS AGENTE (Agent Auth — sem RBAC)
   // ══════════════════════════════════════════════════
 
   @Get('agent/pendentes')
   @UseGuards(AgentAuthGuard)
   @ApiOperation({ summary: 'Sessões pendentes de consentimento (polling do agente)' })
   async agentPendentes(@Req() req: any) {
-    // Expirar sessões com timeout antes de retornar
-    await this.sessionsService.expirarSessoesTimeout();
     return this.sessionsService.pendentesParaDevice(req.deviceId);
   }
 
   @Put('agent/:id/consent')
   @UseGuards(AgentAuthGuard)
   @ApiOperation({ summary: 'Registrar consentimento do usuário local (via agente)' })
-  async agentConsent(@Param('id') id: string, @Body() body: ConsentimentoDto) {
-    return this.sessionsService.registrarConsentimento(id, body.consentido, {
-      usuarioLocal: body.usuarioLocal,
-      hostname: body.hostname,
-      ip: body.ip,
-      deviceId: body.deviceId,
-    });
-  }
-
-  @Put(':id/consent')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Registrar consentimento (fallback via painel)' })
-  async consent(@Param('id') id: string, @Body() body: ConsentimentoDto) {
-    return this.sessionsService.registrarConsentimento(id, body.consentido, {
-      usuarioLocal: body.usuarioLocal,
-      hostname: body.hostname,
-      ip: body.ip,
+  async agentConsent(@Param('id') id: string, @Body() dto: ConsentimentoDto) {
+    return this.sessionsService.registrarConsentimento(id, dto.consentido, {
+      usuarioLocal: dto.usuarioLocal,
+      hostname: dto.hostname,
+      ip: dto.ip,
+      deviceId: dto.deviceId,
     });
   }
 }

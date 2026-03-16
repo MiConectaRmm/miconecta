@@ -164,11 +164,15 @@ export const sessionsApi = {
     api.put(`/remote-sessions/${id}/start`, { rustdeskSessionId }),
   finalizar: (id: string, dados?: { resumo?: string; gravacaoUrl?: string }) =>
     api.put(`/remote-sessions/${id}/end`, dados),
+  cancelar: (id: string, motivo?: string) =>
+    api.put(`/remote-sessions/${id}/cancel`, { motivo }),
   marcarErro: (id: string, erro: string) =>
     api.put(`/remote-sessions/${id}/error`, { erro }),
   consent: (id: string, consentido: boolean, dados?: any) =>
     api.put(`/remote-sessions/${id}/consent`, { consentido, ...dados }),
   logs: (id: string) => api.get(`/remote-sessions/${id}/logs`),
+  registrarLog: (id: string, dados: { tipo: string; descricao: string; detalhes?: any; arquivoUrl?: string }) =>
+    api.post(`/remote-sessions/${id}/log`, dados),
   evidencias: (id: string) => api.get(`/remote-sessions/${id}/evidencias`),
   registrarEvidencia: (id: string, dados: any) =>
     api.post(`/remote-sessions/${id}/evidencia`, dados),

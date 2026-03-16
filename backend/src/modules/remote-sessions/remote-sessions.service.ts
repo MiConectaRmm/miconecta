@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { RemoteSession, RemoteSessionStatus, DevicePolicyType } from '../../database/entities/remote-session.entity';
@@ -211,6 +212,13 @@ export class RemoteSessionsService {
 
     const saved = await this.sessionRepo.save(session) as RemoteSession;
 
+    // Audit log: session_requested
+    await this.registrarLog(saved.id, {
+      tipo: RemoteSessionLogTipo.REGISTRO,
+      descricao: `Sessão solicitada por técnico (policy=${saved.policyTipo}, consent=${policy.exigeConsentimento})`,
+      detalhes: { technicianId: dados.technicianId, deviceHostname: device.hostname, ticketId: dados.ticketId, policyTipo: saved.policyTipo },
+    });
+
     this.logger.log(
       `Sessão ${saved.id} solicitada: device=${device.hostname} policy=${saved.policyTipo} consent=${policy.exigeConsentimento}`,
     );
@@ -269,12 +277,22 @@ export class RemoteSessionsService {
         consentidoEm: new Date(),
         ipDispositivo: dados.ip,
       });
+      await this.registrarLog(sessionId, {
+        tipo: RemoteSessionLogTipo.REGISTRO,
+        descricao: `Consentimento APROVADO por ${dados.usuarioLocal || 'usuário local'}`,
+        detalhes: { usuarioLocal: dados.usuarioLocal, ip: dados.ip },
+      });
       this.logger.log(`Sessão ${sessionId} CONSENTIDA por ${dados.usuarioLocal}`);
     } else {
       await this.sessionRepo.update(sessionId, {
         status: RemoteSessionStatus.RECUSADA,
         consentidoPor: dados.usuarioLocal,
         consentidoEm: new Date(),
+      });
+      await this.registrarLog(sessionId, {
+        tipo: RemoteSessionLogTipo.REGISTRO,
+        descricao: `Consentimento RECUSADO por ${dados.usuarioLocal || 'usuário local'}`,
+        detalhes: { usuarioLocal: dados.usuarioLocal },
       });
       this.logger.log(`Sessão ${sessionId} RECUSADA por ${dados.usuarioLocal}`);
     }
@@ -352,7 +370,37 @@ export class RemoteSessionsService {
     await this.registrarLog(sessionId, {
       tipo: RemoteSessionLogTipo.REGISTRO,
       descricao: `Erro na sessão: ${erro}`,
+      detalhes: { erro },
     });
+    this.logger.warn(`Sessão ${sessionId} ERRO: ${erro}`);
+    return this.sessionRepo.findOne({ where: { id: sessionId } });
+  }
+
+  async cancelar(sessionId: string, tenantId: string, motivo?: string, autorNome?: string) {
+    const session = await this.buscar(sessionId, tenantId);
+
+    const estadosCancelaveis = [
+      RemoteSessionStatus.SOLICITADA,
+      RemoteSessionStatus.CONSENTIMENTO_PENDENTE,
+      RemoteSessionStatus.CONSENTIDA,
+    ];
+    if (!estadosCancelaveis.includes(session.status)) {
+      throw new ForbiddenException(`Sessão no estado '${session.status}' não pode ser cancelada`);
+    }
+
+    await this.sessionRepo.update(sessionId, {
+      status: RemoteSessionStatus.EXPIRADA, // reuse expirada as cancelled
+      finalizadaEm: new Date(),
+      resumo: motivo ? `Cancelada: ${motivo}` : 'Sessão cancelada',
+    });
+
+    await this.registrarLog(sessionId, {
+      tipo: RemoteSessionLogTipo.REGISTRO,
+      descricao: `Sessão cancelada${autorNome ? ' por ' + autorNome : ''}${motivo ? ': ' + motivo : ''}`,
+      detalhes: { motivo, autorNome },
+    });
+
+    this.logger.log(`Sessão ${sessionId} CANCELADA${motivo ? ': ' + motivo : ''}`);
     return this.sessionRepo.findOne({ where: { id: sessionId } });
   }
 
@@ -536,10 +584,21 @@ export class RemoteSessionsService {
     };
   }
 
+  // ══════════════════════════════════════════════════
+  // POLICY QUERY (público)
+  // ══════════════════════════════════════════════════
+
+  async consultarPoliticaDevice(deviceId: string) {
+    const device = await this.deviceRepo.findOne({ where: { id: deviceId } });
+    if (!device) throw new NotFoundException('Dispositivo não encontrado');
+    return this.getPolicy(device);
+  }
+
   /**
    * Verificar e expirar sessões com timeout de consentimento.
-   * Chamado periodicamente por um cron job ou no polling do agente.
+   * Executa a cada 30 segundos via cron.
    */
+  @Cron(CronExpression.EVERY_30_SECONDS)
   async expirarSessoesTimeout() {
     const agora = new Date();
     const result = await this.sessionRepo
