@@ -144,10 +144,11 @@ export const ticketsApi = {
 export const chatApi = {
   mensagens: (ticketId: string, limit?: number, offset?: number) =>
     api.get(`/chat/tickets/${ticketId}/messages`, { params: { limit, offset } }),
-  enviar: (ticketId: string, conteudo: string) =>
-    api.post(`/chat/tickets/${ticketId}/messages`, { conteudo }),
+  enviar: (ticketId: string, conteudo: string, arquivoUrl?: string, arquivoNome?: string, arquivoTamanho?: number) =>
+    api.post(`/chat/tickets/${ticketId}/messages`, { conteudo, arquivoUrl, arquivoNome, arquivoTamanho }),
   marcarLida: (id: string) => api.put(`/chat/messages/${id}/read`),
   marcarTodasLidas: (ticketId: string) => api.put(`/chat/tickets/${ticketId}/read-all`),
+  naoLidas: (ticketId: string) => api.get(`/chat/tickets/${ticketId}/unread`),
 };
 
 // ── Remote Sessions ──

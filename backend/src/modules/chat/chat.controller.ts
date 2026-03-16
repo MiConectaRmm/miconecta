@@ -4,17 +4,22 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { TenantAccessGuard } from '../../common/guards/tenant-access.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 import { ChatService } from './chat.service';
 import { ChatRemetenteTipo } from '../../database/entities/chat-message.entity';
+import { SendMessageDto } from './dto/chat-message.dto';
 
 @ApiTags('Chat')
 @Controller('chat')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, TenantAccessGuard, PermissionsGuard)
 @ApiBearerAuth()
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
   @Get('tickets/:ticketId/messages')
+  @RequirePermissions('tickets:read')
   @ApiOperation({ summary: 'Listar mensagens do ticket' })
   async listarMensagens(
     @Param('ticketId') ticketId: string,
@@ -25,11 +30,12 @@ export class ChatController {
   }
 
   @Post('tickets/:ticketId/messages')
-  @ApiOperation({ summary: 'Enviar mensagem no ticket' })
+  @RequirePermissions('tickets:write')
+  @ApiOperation({ summary: 'Enviar mensagem no ticket (REST fallback)' })
   async enviarMensagem(
     @Req() req: any,
     @Param('ticketId') ticketId: string,
-    @Body() body: { conteudo: string; tipo?: string; arquivoUrl?: string; arquivoNome?: string },
+    @Body() dto: SendMessageDto,
   ) {
     const remetenteTipo = req.user.userType === 'client_user'
       ? ChatRemetenteTipo.CLIENT_USER
@@ -40,22 +46,34 @@ export class ChatController {
       remetenteTipo,
       remetenteId: req.user.sub,
       remetenteNome: req.user.nome,
-      conteudo: body.conteudo,
-      arquivoUrl: body.arquivoUrl,
-      arquivoNome: body.arquivoNome,
+      tipo: dto.tipo,
+      conteudo: dto.conteudo,
+      arquivoUrl: dto.arquivoUrl,
+      arquivoNome: dto.arquivoNome,
+      arquivoTamanho: dto.arquivoTamanho,
     });
   }
 
   @Put('messages/:id/read')
+  @RequirePermissions('tickets:read')
   @ApiOperation({ summary: 'Marcar mensagem como lida' })
   async marcarComoLida(@Param('id') id: string) {
     return this.chatService.marcarComoLida(id);
   }
 
   @Put('tickets/:ticketId/read-all')
+  @RequirePermissions('tickets:read')
   @ApiOperation({ summary: 'Marcar todas mensagens do ticket como lidas' })
   async marcarTodasComoLidas(@Req() req: any, @Param('ticketId') ticketId: string) {
     await this.chatService.marcarTodasComoLidas(ticketId, req.user.sub);
     return { message: 'Mensagens marcadas como lidas' };
+  }
+
+  @Get('tickets/:ticketId/unread')
+  @RequirePermissions('tickets:read')
+  @ApiOperation({ summary: 'Contar mensagens não lidas no ticket' })
+  async contarNaoLidas(@Req() req: any, @Param('ticketId') ticketId: string) {
+    const count = await this.chatService.contarNaoLidas(ticketId, req.user.sub);
+    return { ticketId, unread: count };
   }
 }

@@ -9,12 +9,15 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { ChatService } from './chat.service';
 import { ChatRemetenteTipo, ChatMessageTipo } from '../../database/entities/chat-message.entity';
 
 /**
  * WebSocket Gateway para chat em tempo real.
  * Namespace: /chat
+ *
+ * Auth: JWT token via handshake auth.token ou query.token
  *
  * Eventos CLIENT → SERVER:
  *   chat:join_ticket      Entrar na room do ticket
@@ -43,14 +46,35 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private readonly logger = new Logger(ChatGateway.name);
 
-  constructor(private readonly chatService: ChatService) {}
+  constructor(
+    private readonly chatService: ChatService,
+    private readonly jwtService: JwtService,
+  ) {}
 
   handleConnection(client: Socket) {
-    this.logger.log(`Client connected: ${client.id}`);
+    try {
+      const token = (client.handshake.auth as any)?.token
+        || (client.handshake.query as any)?.token;
+
+      if (!token) {
+        this.logger.warn(`WS connection rejected (no token): ${client.id}`);
+        client.emit('error', { message: 'Authentication required' });
+        client.disconnect();
+        return;
+      }
+
+      const payload = this.jwtService.verify(token);
+      (client as any).user = payload;
+      this.logger.log(`WS connected: ${client.id} (user: ${payload.nome || payload.sub})`);
+    } catch (err) {
+      this.logger.warn(`WS connection rejected (invalid token): ${client.id}`);
+      client.emit('error', { message: 'Invalid token' });
+      client.disconnect();
+    }
   }
 
   handleDisconnect(client: Socket) {
-    this.logger.log(`Client disconnected: ${client.id}`);
+    this.logger.log(`WS disconnected: ${client.id}`);
   }
 
   // ── Room Management ──

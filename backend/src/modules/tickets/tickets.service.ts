@@ -63,6 +63,11 @@ export class TicketsService {
     if (filtros?.deviceId) {
       query.andWhere('ticket.deviceId = :deviceId', { deviceId: filtros.deviceId });
     }
+    if (filtros?.busca) {
+      query.andWhere('(ticket.titulo ILIKE :busca OR ticket.descricao ILIKE :busca)', {
+        busca: `%${filtros.busca}%`,
+      });
+    }
 
     return query.orderBy('ticket.criadoEm', 'DESC').take(100).getMany();
   }
