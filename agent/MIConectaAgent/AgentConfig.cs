@@ -2,26 +2,49 @@ namespace MIConectaAgent;
 
 public class AgentConfig
 {
+    // ── Conexão ──
     public string ServerUrl { get; set; } = "http://localhost:3000/api/v1";
     public string TenantId { get; set; } = "";
     public string OrganizationId { get; set; } = "";
     public string DeviceId { get; set; } = "";
     public string DeviceToken { get; set; } = "";
+
+    // ── RustDesk ──
     public string RustDeskServer { get; set; } = "136.248.114.218";
     public string RustDeskKey { get; set; } = "ev3ic04E+VsgunfupaellTSWgSzmHiQL2H5ywzBE+yI=";
+
+    // ── Intervalos (segundos) ──
     public int HeartbeatIntervalSeconds { get; set; } = 60;
     public int CommandPollIntervalSeconds { get; set; } = 30;
+    public int ChatPollIntervalSeconds { get; set; } = 15;
+    public int UpdateCheckIntervalHours { get; set; } = 6;
+    public int ConsentPollIntervalSeconds { get; set; } = 10;
+
+    // ── Funcionalidades ──
+    public bool QueueEnabled { get; set; } = true;
+    public bool AutoUpdateEnabled { get; set; } = true;
+    public bool ChatEnabled { get; set; } = true;
+    public bool ConsentEnabled { get; set; } = true;
+
+    // ── Metadata ──
+    public string AgentVersion { get; set; } = "2.0.0";
+
+    // ── Paths ──
+    public string AppDir { get; private set; }
+    public string LogDir { get; private set; }
 
     private readonly string _configPath;
 
     public AgentConfig()
     {
-        var appData = Path.Combine(
+        AppDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
             "MIConectaRMM"
         );
-        Directory.CreateDirectory(appData);
-        _configPath = Path.Combine(appData, "agent.config");
+        LogDir = Path.Combine(AppDir, "logs");
+        Directory.CreateDirectory(AppDir);
+        Directory.CreateDirectory(LogDir);
+        _configPath = Path.Combine(AppDir, "agent.config");
         Carregar();
     }
 
@@ -47,8 +70,21 @@ public class AgentConfig
                 case "RustDeskServer": RustDeskServer = valor; break;
                 case "RustDeskKey": RustDeskKey = valor; break;
                 case "HeartbeatIntervalSeconds":
-                    if (int.TryParse(valor, out var hb)) HeartbeatIntervalSeconds = hb;
-                    break;
+                    if (int.TryParse(valor, out var hb)) HeartbeatIntervalSeconds = hb; break;
+                case "CommandPollIntervalSeconds":
+                    if (int.TryParse(valor, out var cp)) CommandPollIntervalSeconds = cp; break;
+                case "ChatPollIntervalSeconds":
+                    if (int.TryParse(valor, out var ch)) ChatPollIntervalSeconds = ch; break;
+                case "UpdateCheckIntervalHours":
+                    if (int.TryParse(valor, out var uc)) UpdateCheckIntervalHours = uc; break;
+                case "QueueEnabled":
+                    if (bool.TryParse(valor, out var qe)) QueueEnabled = qe; break;
+                case "AutoUpdateEnabled":
+                    if (bool.TryParse(valor, out var au)) AutoUpdateEnabled = au; break;
+                case "ChatEnabled":
+                    if (bool.TryParse(valor, out var ce)) ChatEnabled = ce; break;
+                case "ConsentEnabled":
+                    if (bool.TryParse(valor, out var co)) ConsentEnabled = co; break;
             }
         }
     }
@@ -64,8 +100,17 @@ public class AgentConfig
             $"DeviceToken={DeviceToken}",
             $"RustDeskServer={RustDeskServer}",
             $"RustDeskKey={RustDeskKey}",
-            $"HeartbeatIntervalSeconds={HeartbeatIntervalSeconds}"
+            $"HeartbeatIntervalSeconds={HeartbeatIntervalSeconds}",
+            $"CommandPollIntervalSeconds={CommandPollIntervalSeconds}",
+            $"ChatPollIntervalSeconds={ChatPollIntervalSeconds}",
+            $"UpdateCheckIntervalHours={UpdateCheckIntervalHours}",
+            $"QueueEnabled={QueueEnabled}",
+            $"AutoUpdateEnabled={AutoUpdateEnabled}",
+            $"ChatEnabled={ChatEnabled}",
+            $"ConsentEnabled={ConsentEnabled}",
         };
         File.WriteAllLines(_configPath, linhas);
     }
+
+    public bool IsRegistered => !string.IsNullOrEmpty(DeviceId) && !string.IsNullOrEmpty(DeviceToken);
 }

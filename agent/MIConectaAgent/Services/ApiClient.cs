@@ -175,4 +175,141 @@ public class ApiClient
             return new List<JsonElement>();
         }
     }
+
+    // ── v2: Sessão Remota / Consentimento ──
+
+    public async Task<List<JsonElement>> ObterSolicitacoesSessao()
+    {
+        try
+        {
+            AdicionarHeaders();
+            var response = await _http.GetAsync("remote-sessions/agent/pendentes");
+            if (!response.IsSuccessStatusCode) return new List<JsonElement>();
+            return await response.Content.ReadFromJsonAsync<List<JsonElement>>() ?? new List<JsonElement>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao obter solicitações de sessão");
+            return new List<JsonElement>();
+        }
+    }
+
+    public async Task<bool> ResponderConsentimento(string sessionId, bool consentido, Dictionary<string, object> info)
+    {
+        try
+        {
+            AdicionarHeaders();
+            var payload = new { consentido, info };
+            var response = await _http.PutAsJsonAsync($"remote-sessions/{sessionId}/consent", payload);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao responder consentimento {SessionId}", sessionId);
+            return false;
+        }
+    }
+
+    // ── v2: Chat ──
+
+    public async Task<List<JsonElement>> ObterMensagensNaoLidas()
+    {
+        try
+        {
+            AdicionarHeaders();
+            var response = await _http.GetAsync("chat/agent/unread");
+            if (!response.IsSuccessStatusCode) return new List<JsonElement>();
+            return await response.Content.ReadFromJsonAsync<List<JsonElement>>() ?? new List<JsonElement>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao obter mensagens não lidas");
+            return new List<JsonElement>();
+        }
+    }
+
+    public async Task<bool> EnviarMensagemChat(string ticketId, string conteudo)
+    {
+        try
+        {
+            AdicionarHeaders();
+            var payload = new { conteudo };
+            var response = await _http.PostAsJsonAsync($"chat/tickets/{ticketId}/messages", payload);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao enviar mensagem no ticket {TicketId}", ticketId);
+            return false;
+        }
+    }
+
+    // ── v2: Auto-Update ──
+
+    public async Task<JsonElement?> VerificarAtualizacaoAgente(string versaoAtual)
+    {
+        try
+        {
+            AdicionarHeaders();
+            var response = await _http.GetAsync($"agents/update/check?versao={versaoAtual}");
+            if (!response.IsSuccessStatusCode) return null;
+
+            var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+            if (json.TryGetProperty("updateAvailable", out var avail) && avail.GetBoolean())
+                return json;
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao verificar atualização");
+            return null;
+        }
+    }
+
+    public async Task<bool> BaixarArquivo(string url, string destino)
+    {
+        try
+        {
+            using var downloadClient = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
+            using var stream = await downloadClient.GetStreamAsync(url);
+            using var file = File.Create(destino);
+            await stream.CopyToAsync(file);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao baixar arquivo de {Url}", url);
+            return false;
+        }
+    }
+
+    // ── v2: Queue Fallback ──
+
+    public async Task<bool> EnviarPayloadGenerico(string endpoint, string jsonPayload)
+    {
+        try
+        {
+            AdicionarHeaders();
+            var content = new StringContent(jsonPayload, System.Text.Encoding.UTF8, "application/json");
+            var response = await _http.PostAsync(endpoint, content);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao enviar payload para {Endpoint}", endpoint);
+            return false;
+        }
+    }
+
+    // ── v2: Connectivity Check ──
+
+    public async Task<bool> TestarConexao()
+    {
+        try
+        {
+            var response = await _http.GetAsync("health");
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
 }

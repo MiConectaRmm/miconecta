@@ -2,29 +2,71 @@ using MIConectaAgent;
 using MIConectaAgent.Services;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+using Serilog;
 
-var builder = Host.CreateApplicationBuilder(args);
+// ── Serilog ──
+var logPath = Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+    "MIConectaRMM", "logs", "agent-.log"
+);
 
-// Configurar como Windows Service
-builder.Services.AddWindowsService(options =>
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .WriteTo.Console()
+    .WriteTo.File(logPath,
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 30,
+        fileSizeLimitBytes: 10 * 1024 * 1024,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+    .WriteTo.EventLog("MIConectaRMM Agent", manageEventSource: false)
+    .Enrich.WithProperty("Agent", "MIConectaRMM")
+    .CreateLogger();
+
+try
 {
-    options.ServiceName = "MIConectaRMM Agent";
-});
+    Log.Information("MIConectaRMM Agent v2.0.0 iniciando...");
 
-// Registrar serviços
-builder.Services.AddSingleton<AgentConfig>();
-builder.Services.AddSingleton<SystemInfoCollector>();
-builder.Services.AddSingleton<MetricsCollector>();
-builder.Services.AddSingleton<SoftwareInventoryCollector>();
-builder.Services.AddSingleton<WindowsUpdateChecker>();
-builder.Services.AddSingleton<ScriptExecutor>();
-builder.Services.AddSingleton<ApiClient>();
-builder.Services.AddHostedService<HeartbeatService>();
-builder.Services.AddHostedService<CommandPollingService>();
+    var builder = Host.CreateApplicationBuilder(args);
+    builder.Services.AddSerilog();
 
-builder.Logging.AddConsole();
-builder.Logging.AddEventLog();
+    // Windows Service
+    builder.Services.AddWindowsService(options =>
+    {
+        options.ServiceName = "MIConectaRMM Agent";
+    });
 
-var host = builder.Build();
-host.Run();
+    // ── Core Services ──
+    builder.Services.AddSingleton<AgentConfig>();
+    builder.Services.AddSingleton<ApiClient>();
+    builder.Services.AddSingleton<LocalQueue>();
+
+    // ── Collectors ──
+    builder.Services.AddSingleton<SystemInfoCollector>();
+    builder.Services.AddSingleton<MetricsCollector>();
+    builder.Services.AddSingleton<SoftwareInventoryCollector>();
+    builder.Services.AddSingleton<WindowsUpdateChecker>();
+
+    // ── Executors ──
+    builder.Services.AddSingleton<ScriptExecutor>();
+
+    // ── v2 Services ──
+    builder.Services.AddSingleton<ConsentManager>();
+    builder.Services.AddSingleton<ChatService>();
+    builder.Services.AddSingleton<AutoUpdater>();
+
+    // ── Background Services ──
+    builder.Services.AddHostedService<HeartbeatService>();
+    builder.Services.AddHostedService<CommandPollingService>();
+    builder.Services.AddHostedService<QueueProcessor>();
+
+    var host = builder.Build();
+    host.Run();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "MIConectaRMM Agent falhou ao iniciar");
+}
+finally
+{
+    Log.CloseAndFlush();
+}
