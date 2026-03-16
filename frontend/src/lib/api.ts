@@ -110,14 +110,21 @@ export const ticketsApi = {
   buscar: (id: string) => api.get(`/tickets/${id}`),
   criar: (dados: any) => api.post('/tickets', dados),
   contagem: () => api.get('/tickets/contagem'),
-  timeline: (id: string) => api.get(`/tickets/${id}/timeline`),
+  timeline: (id: string, limit?: number, offset?: number) =>
+    api.get(`/tickets/${id}/timeline`, { params: { limit, offset } }),
+  resumo: (id: string) => api.get(`/tickets/${id}/resumo`),
   atribuir: (id: string, technicianId: string, technicianNome: string) =>
     api.put(`/tickets/${id}/atribuir`, { technicianId, technicianNome }),
   resolver: (id: string) => api.put(`/tickets/${id}/resolver`),
   fechar: (id: string) => api.put(`/tickets/${id}/fechar`),
   reabrir: (id: string) => api.put(`/tickets/${id}/reabrir`),
+  cancelar: (id: string) => api.put(`/tickets/${id}/cancelar`),
+  aguardarCliente: (id: string) => api.put(`/tickets/${id}/aguardar-cliente`),
+  aguardarTecnico: (id: string) => api.put(`/tickets/${id}/aguardar-tecnico`),
   comentar: (id: string, conteudo: string, visivelCliente?: boolean) =>
     api.post(`/tickets/${id}/comentario`, { conteudo, visivelCliente }),
+  notaInterna: (id: string, conteudo: string) =>
+    api.post(`/tickets/${id}/nota-interna`, { conteudo }),
   avaliar: (id: string, nota: number, comentario?: string) =>
     api.post(`/tickets/${id}/avaliar`, { nota, comentario }),
 };
