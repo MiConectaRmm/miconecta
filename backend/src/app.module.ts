@@ -1,64 +1,53 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 
-// Módulos existentes (v1)
+// ── Middlewares ──
+import { CorrelationIdMiddleware } from './common/middlewares/correlation-id.middleware';
+
+// ── Módulos Core ──
 import { AuthModule } from './modules/auth/auth.module';
+import { RolesModule } from './modules/roles/roles.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
+import { UsersModule } from './modules/users/users.module';
 import { DevicesModule } from './modules/devices/devices.module';
+import { AgentsModule } from './modules/agents/agents.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { AlertsModule } from './modules/alerts/alerts.module';
-import { ScriptsModule } from './modules/scripts/scripts.module';
-import { SoftwareModule } from './modules/software/software.module';
-import { PatchesModule } from './modules/patches/patches.module';
-import { GatewayModule } from './modules/gateway/gateway.module';
-import { AuditModule } from './modules/audit/audit.module';
-
-// Módulos novos (v2)
 import { TicketsModule } from './modules/tickets/tickets.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { RemoteSessionsModule } from './modules/remote-sessions/remote-sessions.module';
-import { UsersModule } from './modules/users/users.module';
-import { AgentsModule } from './modules/agents/agents.module';
+import { ScriptsModule } from './modules/scripts/scripts.module';
+import { SoftwareModule } from './modules/software/software.module';
+import { PatchesModule } from './modules/patches/patches.module';
+import { AuditModule } from './modules/audit/audit.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { ReportsModule } from './modules/reports/reports.module';
+import { StorageModule } from './modules/storage/storage.module';
+import { LgpdModule } from './modules/lgpd/lgpd.module';
+import { GatewayModule } from './modules/gateway/gateway.module';
 
-// Entidades existentes (v1)
+// ── Entidades ──
 import {
-  Tenant,
-  Organization,
-  Device,
-  DeviceMetric,
-  DeviceInventory,
-  Alert,
-  Script,
-  ScriptExecution,
-  SoftwarePackage,
-  SoftwareDeployment,
-  Technician,
-  Session,
-  AuditLog,
-  Patch,
-} from './database/entities';
-
-// Entidades novas (v2)
-import { ClientUser } from './database/entities/client-user.entity';
-import { Ticket } from './database/entities/ticket.entity';
-import { TicketComment } from './database/entities/ticket-comment.entity';
-import { ChatMessage } from './database/entities/chat-message.entity';
-import { RemoteSession } from './database/entities/remote-session.entity';
-import { RemoteSessionLog } from './database/entities/remote-session-log.entity';
-import { ConsentRecord } from './database/entities/consent-record.entity';
-import { Notification } from './database/entities/notification.entity';
-
-const entities = [
-  // v1
   Tenant, Organization, Device, DeviceMetric, DeviceInventory,
   Alert, Script, ScriptExecution, SoftwarePackage, SoftwareDeployment,
   Technician, Session, AuditLog, Patch,
-  // v2
   ClientUser, Ticket, TicketComment, ChatMessage,
   RemoteSession, RemoteSessionLog, ConsentRecord, Notification,
+  FileAttachment, LgpdRequest, ReportSchedule,
+} from './database/entities';
+
+// ── Subscriber ──
+import { TenantValidationSubscriber } from './database/subscribers/tenant-validation.subscriber';
+
+const entities = [
+  Tenant, Organization, Device, DeviceMetric, DeviceInventory,
+  Alert, Script, ScriptExecution, SoftwarePackage, SoftwareDeployment,
+  Technician, Session, AuditLog, Patch,
+  ClientUser, Ticket, TicketComment, ChatMessage,
+  RemoteSession, RemoteSessionLog, ConsentRecord, Notification,
+  FileAttachment, LgpdRequest, ReportSchedule,
 ];
 
 @Module({
@@ -77,6 +66,7 @@ const entities = [
           type: 'postgres' as const,
           url: databaseUrl,
           entities,
+          subscribers: [TenantValidationSubscriber],
           synchronize: true,
           logging: false,
           ssl: useSsl ? { rejectUnauthorized: false } : false,
@@ -88,25 +78,35 @@ const entities = [
 
     ScheduleModule.forRoot(),
 
-    // v1 modules
+    // Core
     AuthModule,
+    RolesModule,
+
+    // Domain
     TenantsModule,
+    UsersModule,
     DevicesModule,
+    AgentsModule,
     MetricsModule,
     AlertsModule,
-    ScriptsModule,
-    SoftwareModule,
-    PatchesModule,
-    GatewayModule,
-    AuditModule,
-
-    // v2 modules
     TicketsModule,
     ChatModule,
     RemoteSessionsModule,
-    UsersModule,
-    AgentsModule,
+    ScriptsModule,
+    SoftwareModule,
+    PatchesModule,
+
+    // Platform
+    AuditModule,
     NotificationsModule,
+    ReportsModule,
+    StorageModule,
+    LgpdModule,
+    GatewayModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(CorrelationIdMiddleware).forRoutes('*');
+  }
+}

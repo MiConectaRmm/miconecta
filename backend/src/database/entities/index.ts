@@ -20,3 +20,6 @@ export { RemoteSession, RemoteSessionStatus } from './remote-session.entity';
 export { RemoteSessionLog, RemoteSessionLogTipo } from './remote-session-log.entity';
 export { ConsentRecord, ConsentTipo } from './consent-record.entity';
 export { Notification, NotificationType } from './notification.entity';
+export { FileAttachment } from './file-attachment.entity';
+export { LgpdRequest, LgpdRequestTipo, LgpdRequestStatus } from './lgpd-request.entity';
+export { ReportSchedule, ReportTipo, ReportFrequencia } from './report-schedule.entity';
