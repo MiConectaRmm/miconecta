@@ -1,4 +1,4 @@
-export { Tenant } from './tenant.entity';
+export { Tenant, TenantPlano, TenantStatus } from './tenant.entity';
 export { Organization } from './organization.entity';
 export { Device, DeviceStatus } from './device.entity';
 export { DeviceMetric } from './device-metric.entity';
@@ -12,3 +12,11 @@ export { Technician, TechnicianRole } from './technician.entity';
 export { Session, SessionType } from './session.entity';
 export { AuditLog } from './audit-log.entity';
 export { Patch, PatchStatus, PatchSeverity } from './patch.entity';
+export { ClientUser, ClientUserRole } from './client-user.entity';
+export { Ticket, TicketStatus, TicketPrioridade, TicketOrigem } from './ticket.entity';
+export { TicketComment, TicketCommentTipo } from './ticket-comment.entity';
+export { ChatMessage, ChatMessageTipo, ChatRemetenteTipo } from './chat-message.entity';
+export { RemoteSession, RemoteSessionStatus } from './remote-session.entity';
+export { RemoteSessionLog, RemoteSessionLogTipo } from './remote-session-log.entity';
+export { ConsentRecord, ConsentTipo } from './consent-record.entity';
+export { Notification, NotificationType } from './notification.entity';

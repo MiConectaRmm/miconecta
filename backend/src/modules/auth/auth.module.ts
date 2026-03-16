@@ -4,6 +4,7 @@ import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Technician } from '../../database/entities/technician.entity';
+import { ClientUser } from '../../database/entities/client-user.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
 import { Device } from '../../database/entities/device.entity';
 import { Tenant } from '../../database/entities/tenant.entity';
@@ -14,7 +15,7 @@ import { AgentAuthGuard } from './guards/agent-auth.guard';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Technician, AuditLog, Device, Tenant]),
+    TypeOrmModule.forFeature([Technician, ClientUser, AuditLog, Device, Tenant]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
