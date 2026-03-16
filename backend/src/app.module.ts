@@ -50,7 +50,8 @@ const entities = [
         const databaseUrl = config.get('DATABASE_URL');
 
         if (dbHost) {
-          console.log(`TypeORM: conectando via DB_HOST em ${dbHost}`);
+          const needsSsl = dbHost.includes('supabase') || dbHost.includes('neon') || dbHost.includes('amazonaws');
+          console.log(`TypeORM: conectando via DB_HOST em ${dbHost} (ssl=${needsSsl})`);
           return {
             type: 'postgres' as const,
             host: dbHost,
@@ -61,7 +62,7 @@ const entities = [
             entities,
             synchronize: true,
             logging: false,
-            ssl: { rejectUnauthorized: false },
+            ssl: needsSsl ? { rejectUnauthorized: false } : false,
             retryAttempts: 5,
             retryDelay: 3000,
             connectTimeoutMS: 30000,
@@ -71,7 +72,8 @@ const entities = [
         if (databaseUrl) {
           try {
             const url = new URL(databaseUrl);
-            console.log(`TypeORM: conectando via URL em ${url.hostname}`);
+            const needsSsl = url.hostname.includes('supabase') || url.hostname.includes('neon') || url.hostname.includes('amazonaws');
+            console.log(`TypeORM: conectando via URL em ${url.hostname} (ssl=${needsSsl})`);
             return {
               type: 'postgres' as const,
               host: url.hostname,
@@ -82,7 +84,7 @@ const entities = [
               entities,
               synchronize: true,
               logging: false,
-              ssl: { rejectUnauthorized: false },
+              ssl: needsSsl ? { rejectUnauthorized: false } : false,
               retryAttempts: 5,
               retryDelay: 3000,
               connectTimeoutMS: 30000,
