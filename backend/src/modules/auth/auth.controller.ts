@@ -24,6 +24,12 @@ export class AuthController {
     return this.authService.register(dto);
   }
 
+  @Post('bootstrap')
+  @ApiOperation({ summary: 'Criar tenant + admin inicial (remover após uso)' })
+  async bootstrap() {
+    return this.authService.bootstrap();
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
