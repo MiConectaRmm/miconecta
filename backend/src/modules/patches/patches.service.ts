@@ -39,7 +39,7 @@ export class PatchesService {
       .select('patch.status', 'status')
       .addSelect('patch.severidade', 'severidade')
       .addSelect('COUNT(*)', 'total')
-      .where('device.tenant_id = :tenantId', { tenantId })
+      .where('device.tenantId = :tenantId', { tenantId })
       .groupBy('patch.status')
       .addGroupBy('patch.severidade')
       .getRawMany();

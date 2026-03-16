@@ -58,18 +58,18 @@ export class DevicesService {
   async listarDispositivos(tenantId: string, filtros?: any) {
     const query = this.deviceRepo.createQueryBuilder('device')
       .leftJoinAndSelect('device.organization', 'organization')
-      .where('device.tenant_id = :tenantId', { tenantId });
+      .where('device.tenantId = :tenantId', { tenantId });
 
     if (filtros?.status) {
       query.andWhere('device.status = :status', { status: filtros.status });
     }
 
     if (filtros?.organizationId) {
-      query.andWhere('device.organization_id = :orgId', { orgId: filtros.organizationId });
+      query.andWhere('device.organizationId = :orgId', { orgId: filtros.organizationId });
     }
 
     if (filtros?.busca) {
-      query.andWhere('(device.hostname ILIKE :busca OR device.ip_local ILIKE :busca)', {
+      query.andWhere('(device.hostname ILIKE :busca OR device.ipLocal ILIKE :busca)', {
         busca: `%${filtros.busca}%`,
       });
     }

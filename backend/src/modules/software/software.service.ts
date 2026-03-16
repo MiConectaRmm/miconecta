@@ -71,8 +71,8 @@ export class SoftwareService {
       .createQueryBuilder('deploy')
       .leftJoinAndSelect('deploy.softwarePackage', 'package')
       .leftJoinAndSelect('deploy.device', 'device')
-      .where('device.tenant_id = :tenantId', { tenantId })
-      .orderBy('deploy.criado_em', 'DESC')
+      .where('device.tenantId = :tenantId', { tenantId })
+      .orderBy('deploy.criadoEm', 'DESC')
       .take(100)
       .getMany();
   }

@@ -86,12 +86,12 @@ export class ScriptsService {
     const query = this.execRepo.createQueryBuilder('exec')
       .leftJoinAndSelect('exec.script', 'script')
       .leftJoinAndSelect('exec.device', 'device')
-      .where('device.tenant_id = :tenantId', { tenantId });
+      .where('device.tenantId = :tenantId', { tenantId });
 
     if (filtros?.deviceId) {
-      query.andWhere('exec.device_id = :deviceId', { deviceId: filtros.deviceId });
+      query.andWhere('exec.deviceId = :deviceId', { deviceId: filtros.deviceId });
     }
 
-    return query.orderBy('exec.criado_em', 'DESC').take(100).getMany();
+    return query.orderBy('exec.criadoEm', 'DESC').take(100).getMany();
   }
 }

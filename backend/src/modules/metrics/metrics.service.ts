@@ -46,13 +46,13 @@ export class MetricsService {
 
     const resultado = await this.metricRepo
       .createQueryBuilder('m')
-      .select('AVG(m.cpu_percent)', 'cpu_media')
-      .addSelect('AVG(m.ram_percent)', 'ram_media')
-      .addSelect('AVG(m.disco_percent)', 'disco_media')
-      .addSelect('MAX(m.cpu_percent)', 'cpu_max')
-      .addSelect('MAX(m.ram_percent)', 'ram_max')
-      .where('m.device_id = :deviceId', { deviceId })
-      .andWhere('m.criado_em >= :inicio', { inicio })
+      .select('AVG(m.cpuPercent)', 'cpu_media')
+      .addSelect('AVG(m.ramPercent)', 'ram_media')
+      .addSelect('AVG(m.discoPercent)', 'disco_media')
+      .addSelect('MAX(m.cpuPercent)', 'cpu_max')
+      .addSelect('MAX(m.ramPercent)', 'ram_max')
+      .where('m.deviceId = :deviceId', { deviceId })
+      .andWhere('m.criadoEm >= :inicio', { inicio })
       .getRawOne();
 
     return resultado;

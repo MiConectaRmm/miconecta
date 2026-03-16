@@ -18,7 +18,7 @@ export class AlertsService {
   async listarAlertas(tenantId: string, filtros?: any) {
     const query = this.alertRepo.createQueryBuilder('alert')
       .leftJoinAndSelect('alert.device', 'device')
-      .where('alert.tenant_id = :tenantId', { tenantId });
+      .where('alert.tenantId = :tenantId', { tenantId });
 
     if (filtros?.status) {
       query.andWhere('alert.status = :status', { status: filtros.status });
@@ -28,7 +28,7 @@ export class AlertsService {
       query.andWhere('alert.severidade = :severidade', { severidade: filtros.severidade });
     }
 
-    return query.orderBy('alert.criado_em', 'DESC').take(100).getMany();
+    return query.orderBy('alert.criadoEm', 'DESC').take(100).getMany();
   }
 
   async contarAlertas(tenantId: string) {

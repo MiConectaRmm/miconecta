@@ -17,16 +17,16 @@ export class AuditService {
 
   async listar(tenantId: string, filtros?: any) {
     const query = this.auditRepo.createQueryBuilder('log')
-      .where('log.tenant_id = :tenantId', { tenantId });
+      .where('log.tenantId = :tenantId', { tenantId });
 
     if (filtros?.acao) {
       query.andWhere('log.acao = :acao', { acao: filtros.acao });
     }
 
     if (filtros?.usuarioId) {
-      query.andWhere('log.usuario_id = :usuarioId', { usuarioId: filtros.usuarioId });
+      query.andWhere('log.usuarioId = :usuarioId', { usuarioId: filtros.usuarioId });
     }
 
-    return query.orderBy('log.criado_em', 'DESC').take(200).getMany();
+    return query.orderBy('log.criadoEm', 'DESC').take(200).getMany();
   }
 }
