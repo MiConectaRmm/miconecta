@@ -47,13 +47,17 @@ const entities = [
       useFactory: (config: ConfigService) => {
         const databaseUrl = config.get('DATABASE_URL');
         if (databaseUrl) {
+          console.log('TypeORM: conectando via DATABASE_URL');
           return {
             type: 'postgres' as const,
             url: databaseUrl,
             entities,
             synchronize: true,
-            logging: config.get('NODE_ENV') !== 'production',
+            logging: false,
             ssl: { rejectUnauthorized: false },
+            retryAttempts: 5,
+            retryDelay: 3000,
+            connectTimeoutMS: 30000,
           };
         }
         return {

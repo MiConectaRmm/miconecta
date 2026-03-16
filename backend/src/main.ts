@@ -1,52 +1,52 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const logger = new Logger('Bootstrap');
 
-  // Prefixo global da API
-  app.setGlobalPrefix('api/v1');
+  try {
+    logger.log('Iniciando MIConectaRMM API...');
+    logger.log(`NODE_ENV: ${process.env.NODE_ENV}`);
+    logger.log(`DATABASE_URL: ${process.env.DATABASE_URL ? 'definida' : 'NAO DEFINIDA'}`);
 
-  // Validação global
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
+    const app = await NestFactory.create(AppModule, {
+      logger: ['error', 'warn', 'log'],
+    });
 
-  // CORS
-  app.enableCors({
-    origin: process.env.CORS_ORIGIN || '*',
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true,
-  });
+    app.setGlobalPrefix('api/v1');
 
-  // Swagger / Documentação da API
-  const config = new DocumentBuilder()
-    .setTitle('MIConectaRMM Enterprise API')
-    .setDescription('API da plataforma RMM da Maginf Tecnologia')
-    .setVersion('1.0.0')
-    .addBearerAuth()
-    .addTag('autenticação', 'Endpoints de autenticação')
-    .addTag('tenants', 'Gestão de tenants/clientes')
-    .addTag('dispositivos', 'Gestão de dispositivos')
-    .addTag('métricas', 'Monitoramento e métricas')
-    .addTag('alertas', 'Motor de alertas')
-    .addTag('scripts', 'Execução remota de scripts')
-    .addTag('software', 'Deploy de software')
-    .addTag('patches', 'Gerenciamento de patches')
-    .build();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+    app.enableCors({
+      origin: process.env.CORS_ORIGIN || '*',
+      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+      credentials: true,
+    });
 
-  const port = process.env.PORT || 3000;
-  await app.listen(port);
-  console.log(`🚀 MIConectaRMM API rodando na porta ${port}`);
-  console.log(`📖 Documentação: http://localhost:${port}/api/docs`);
+    const config = new DocumentBuilder()
+      .setTitle('MIConectaRMM Enterprise API')
+      .setDescription('API da plataforma RMM da Maginf Tecnologia')
+      .setVersion('1.0.0')
+      .addBearerAuth()
+      .build();
+
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document);
+
+    const port = process.env.PORT || 3000;
+    await app.listen(port, '0.0.0.0');
+    logger.log(`MIConectaRMM API rodando na porta ${port}`);
+  } catch (error) {
+    console.error('FATAL: Falha ao iniciar aplicacao:', error);
+    process.exit(1);
+  }
 }
 bootstrap();
