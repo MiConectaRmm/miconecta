@@ -20,7 +20,14 @@ export enum RemoteSessionStatus {
   RECUSADA = 'recusada',
   ATIVA = 'ativa',
   FINALIZADA = 'finalizada',
+  EXPIRADA = 'expirada',
+  TIMEOUT_CONSENTIMENTO = 'timeout_consentimento',
   ERRO = 'erro',
+}
+
+export enum DevicePolicyType {
+  SERVIDOR = 'servidor',
+  ESTACAO = 'estacao',
 }
 
 @Entity('remote_sessions')
@@ -74,6 +81,30 @@ export class RemoteSession {
 
   @Column({ type: 'text', nullable: true })
   resumo: string;
+
+  // ── Gravação ──
+  @Column({ name: 'gravacao_solicitada', default: false })
+  gravacaoSolicitada: boolean;
+
+  @Column({ name: 'gravacao_url', type: 'text', nullable: true })
+  gravacaoUrl: string;
+
+  @Column({ name: 'gravacao_tamanho', type: 'bigint', nullable: true })
+  gravacaoTamanho: number;
+
+  // ── Política aplicada ──
+  @Column({ name: 'policy_tipo', type: 'varchar', length: 50, nullable: true })
+  policyTipo: string;
+
+  @Column({ name: 'consentimento_exigido', default: true })
+  consentimentoExigido: boolean;
+
+  @Column({ name: 'consentimento_timeout', type: 'int', default: 120 })
+  consentimentoTimeout: number;
+
+  // ── Expiração ──
+  @Column({ name: 'expira_em', type: 'timestamp', nullable: true })
+  expiraEm: Date;
 
   @CreateDateColumn({ name: 'criado_em' })
   criadoEm: Date;

@@ -143,9 +143,23 @@ export const chatApi = {
 export const sessionsApi = {
   listar: (filtros?: any) => api.get('/remote-sessions', { params: filtros }),
   buscar: (id: string) => api.get(`/remote-sessions/${id}`),
-  solicitar: (deviceId: string, ticketId?: string, motivo?: string) =>
-    api.post('/remote-sessions', { deviceId, ticketId, motivo }),
+  solicitar: (dados: { deviceId: string; ticketId?: string; motivo?: string; gravarSessao?: boolean }) =>
+    api.post('/remote-sessions', dados),
+  estatisticas: () => api.get('/remote-sessions/estatisticas'),
+  policy: (deviceId: string) => api.get(`/remote-sessions/device/${deviceId}/policy`),
+  historicoDevice: (deviceId: string) => api.get(`/remote-sessions/device/${deviceId}/historico`),
+  iniciar: (id: string, rustdeskSessionId?: string) =>
+    api.put(`/remote-sessions/${id}/start`, { rustdeskSessionId }),
+  finalizar: (id: string, dados?: { resumo?: string; gravacaoUrl?: string }) =>
+    api.put(`/remote-sessions/${id}/end`, dados),
+  marcarErro: (id: string, erro: string) =>
+    api.put(`/remote-sessions/${id}/error`, { erro }),
+  consent: (id: string, consentido: boolean, dados?: any) =>
+    api.put(`/remote-sessions/${id}/consent`, { consentido, ...dados }),
   logs: (id: string) => api.get(`/remote-sessions/${id}/logs`),
+  evidencias: (id: string) => api.get(`/remote-sessions/${id}/evidencias`),
+  registrarEvidencia: (id: string, dados: any) =>
+    api.post(`/remote-sessions/${id}/evidencia`, dados),
 };
 
 // ── Scripts ──
