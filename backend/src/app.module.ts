@@ -2,6 +2,7 @@ import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule } from '@nestjs/throttler';
 
 // ── Middlewares ──
 import { CorrelationIdMiddleware } from './common/middlewares/correlation-id.middleware';
@@ -77,6 +78,11 @@ const entities = [
     }),
 
     ScheduleModule.forRoot(),
+
+    ThrottlerModule.forRoot([{
+      ttl: 60000,
+      limit: 100,
+    }]),
 
     // Core
     AuthModule,

@@ -79,6 +79,17 @@ export const usersApi = {
   convidarCliente: (id: string) => api.post(`/users/clients/${id}/invite`),
 };
 
+// ── Technicians (Técnicos Maginf) ──
+export const techniciansApi = {
+  listar: (filtros?: any) => api.get('/users/technicians', { params: filtros }),
+  buscar: (id: string) => api.get(`/users/technicians/${id}`),
+  criar: (dados: any) => api.post('/users/technicians', dados),
+  atualizar: (id: string, dados: any) => api.put(`/users/technicians/${id}`, dados),
+  desativar: (id: string) => api.delete(`/users/technicians/${id}`),
+  reativar: (id: string) => api.put(`/users/technicians/${id}/reativar`),
+  contagem: () => api.get('/users/technicians/contagem'),
+};
+
 // ── Devices ──
 export const devicesApi = {
   listar: (filtros?: any) => api.get('/devices', { params: filtros }),

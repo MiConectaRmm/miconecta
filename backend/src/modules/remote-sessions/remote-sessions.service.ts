@@ -186,7 +186,7 @@ export class RemoteSessionsService {
     const consentTimeout = policy.consentimentoTimeoutSegundos;
     const expiraEm = policy.exigeConsentimento && consentTimeout > 0
       ? new Date(Date.now() + consentTimeout * 1000)
-      : null;
+      : undefined;
 
     const session = this.sessionRepo.create({
       tenantId: dados.tenantId,
@@ -209,7 +209,7 @@ export class RemoteSessionsService {
       session.consentidoEm = new Date();
     }
 
-    const saved = await this.sessionRepo.save(session);
+    const saved = await this.sessionRepo.save(session) as RemoteSession;
 
     this.logger.log(
       `Sessão ${saved.id} solicitada: device=${device.hostname} policy=${saved.policyTipo} consent=${policy.exigeConsentimento}`,
@@ -297,7 +297,7 @@ export class RemoteSessionsService {
     await this.sessionRepo.update(sessionId, {
       status: RemoteSessionStatus.ATIVA,
       iniciadaEm: new Date(),
-      rustdeskSessionId: rustdeskSessionId || null,
+      rustdeskSessionId: rustdeskSessionId || undefined,
     });
 
     // Log automático: sessão iniciada
@@ -551,7 +551,7 @@ export class RemoteSessionsService {
       .andWhere('expiraEm < :agora', { agora })
       .execute();
 
-    if (result.affected > 0) {
+    if ((result.affected || 0) > 0) {
       this.logger.warn(`${result.affected} sessão(ões) expirada(s) por timeout de consentimento`);
     }
     return result.affected;
