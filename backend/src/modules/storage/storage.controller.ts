@@ -20,7 +20,7 @@ export class StorageController {
   @UseInterceptors(FileInterceptor('file'))
   async upload(
     @Req() req: any,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: any,
     @Query('entidadeTipo') entidadeTipo: string,
     @Query('entidadeId') entidadeId: string,
   ) {

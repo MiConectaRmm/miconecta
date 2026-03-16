@@ -111,9 +111,12 @@ export class DevicesService {
     return this.inventoryRepo.save(itens);
   }
 
-  async listarInventario(deviceId: string) {
+  async listarInventario(deviceId: string, tipo?: string) {
+    const where: any = { deviceId };
+    if (tipo) where.tipo = tipo;
+
     return this.inventoryRepo.find({
-      where: { deviceId },
+      where,
       order: { nome: 'ASC' },
     });
   }

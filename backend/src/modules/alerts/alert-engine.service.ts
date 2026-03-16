@@ -87,7 +87,7 @@ export class AlertEngine {
     const offlineDevices = await this.deviceRepo
       .createQueryBuilder('device')
       .where('device.status = :status', { status: DeviceStatus.ONLINE })
-      .andWhere('device.last_seen < :limite', { limite })
+      .andWhere('device.lastSeen < :limite', { limite })
       .getMany();
 
     for (const device of offlineDevices) {

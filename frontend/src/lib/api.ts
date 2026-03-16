@@ -97,7 +97,7 @@ export const devicesApi = {
   resumo: () => api.get('/devices/resumo'),
   atualizar: (id: string, dados: any) => api.put(`/devices/${id}`, dados),
   remover: (id: string) => api.delete(`/devices/${id}`),
-  inventario: (id: string) => api.get(`/devices/${id}/inventario`),
+  inventario: (id: string, tipo?: string) => api.get(`/devices/${id}/inventario`, { params: tipo ? { tipo } : {} }),
 };
 
 // ── Metrics ──

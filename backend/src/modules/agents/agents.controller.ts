@@ -1,10 +1,16 @@
 import {
-  Controller, Get, Post, Body, Param, Req,
+  Controller, Post, Body, Req,
   UseGuards, Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { TenantAccessGuard } from '../../common/guards/tenant-access.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 import { AgentsService } from './agents.service';
+import { AgentRegisterDto, AgentHeartbeatDto, AgentInventoryDto } from './dto/agent.dto';
 
 @ApiTags('Agents')
 @Controller('agents')
@@ -12,7 +18,9 @@ export class AgentsController {
   constructor(private readonly agentsService: AgentsService) {}
 
   @Post('provision')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantAccessGuard, RolesGuard, PermissionsGuard)
+  @Roles('super_admin', 'admin_maginf', 'admin')
+  @RequirePermissions('devices:write')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Gerar token de provisionamento para tenant' })
   async provision(@Req() req: any) {
@@ -21,48 +29,33 @@ export class AgentsController {
   }
 
   @Post('register')
-  @ApiOperation({ summary: 'Registrar agente (usa provision token)' })
+  @ApiOperation({ summary: 'Registrar agente (usa provision token, sem auth JWT)' })
   async register(
     @Headers('x-agent-provision-token') provisionToken: string,
-    @Body() body: {
-      hostname: string;
-      sistemaOperacional?: string;
-      cpu?: string;
-      ramTotalMb?: number;
-      discoTotalMb?: number;
-      discoDisponivelMb?: number;
-      ipLocal?: string;
-      ipExterno?: string;
-      modeloMaquina?: string;
-      numeroSerie?: string;
-      agentVersion?: string;
-    },
+    @Body() dto: AgentRegisterDto,
   ) {
-    return this.agentsService.registrar(provisionToken, body);
+    return this.agentsService.registrar(provisionToken, dto);
   }
 
   @Post('heartbeat')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Heartbeat do agente com metricas' })
-  async heartbeat(
+  @ApiOperation({ summary: 'Heartbeat do agente com métricas' })
+  async heartbeat(@Req() req: any, @Body() dto: AgentHeartbeatDto) {
+    const tenantId = req.user.tenantId;
+    return this.agentsService.heartbeat(dto.deviceId, tenantId, dto);
+  }
+
+  @Post('inventory')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Agente envia inventário (software + hardware)' })
+  async inventory(
     @Req() req: any,
-    @Body() body: {
-      deviceId: string;
-      cpuPercent?: number;
-      ramPercent?: number;
-      ramUsadaMb?: number;
-      discoPercent?: number;
-      discoUsadoMb?: number;
-      temperatura?: number;
-      uptimeSegundos?: number;
-      redeEntradaBytes?: number;
-      redeSaidaBytes?: number;
-      antivirusStatus?: string;
-      antivirusNome?: string;
-    },
+    @Headers('x-device-id') deviceId: string,
+    @Body() dto: AgentInventoryDto,
   ) {
     const tenantId = req.user.tenantId;
-    return this.agentsService.heartbeat(body.deviceId, tenantId, body);
+    return this.agentsService.atualizarInventario(deviceId, tenantId, dto);
   }
 }

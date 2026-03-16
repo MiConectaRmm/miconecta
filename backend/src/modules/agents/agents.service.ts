@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -6,9 +6,14 @@ import { v4 as uuidv4 } from 'uuid';
 import { Device, DeviceStatus } from '../../database/entities/device.entity';
 import { Tenant } from '../../database/entities/tenant.entity';
 import { DeviceMetric } from '../../database/entities/device-metric.entity';
+import { DeviceInventory } from '../../database/entities/device-inventory.entity';
+import { AlertEngine } from '../alerts/alert-engine.service';
+import { AgentRegisterDto, AgentHeartbeatDto, AgentInventoryDto } from './dto/agent.dto';
 
 @Injectable()
 export class AgentsService {
+  private readonly logger = new Logger(AgentsService.name);
+
   constructor(
     @InjectRepository(Device)
     private readonly deviceRepo: Repository<Device>,
@@ -16,7 +21,10 @@ export class AgentsService {
     private readonly tenantRepo: Repository<Tenant>,
     @InjectRepository(DeviceMetric)
     private readonly metricRepo: Repository<DeviceMetric>,
+    @InjectRepository(DeviceInventory)
+    private readonly inventoryRepo: Repository<DeviceInventory>,
     private readonly jwtService: JwtService,
+    private readonly alertEngine: AlertEngine,
   ) {}
 
   async gerarProvisionToken(tenantId: string) {
@@ -35,19 +43,7 @@ export class AgentsService {
     return { provisionToken: token, expiresAt: expires, tenantId };
   }
 
-  async registrar(provisionToken: string, dados: {
-    hostname: string;
-    sistemaOperacional?: string;
-    cpu?: string;
-    ramTotalMb?: number;
-    discoTotalMb?: number;
-    discoDisponivelMb?: number;
-    ipLocal?: string;
-    ipExterno?: string;
-    modeloMaquina?: string;
-    numeroSerie?: string;
-    agentVersion?: string;
-  }) {
+  async registrar(provisionToken: string, dados: AgentRegisterDto) {
     // Validar provision token
     const tenant = await this.tenantRepo.findOne({
       where: { provisionToken },
@@ -62,43 +58,42 @@ export class AgentsService {
       where: { tenantId: tenant.id, hostname: dados.hostname },
     });
 
+    const deviceData = {
+      sistemaOperacional: dados.sistemaOperacional,
+      versaoWindows: dados.versaoWindows,
+      cpu: dados.cpu,
+      ramTotalMb: dados.ramTotalMb,
+      discoTotalMb: dados.discoTotalMb,
+      discoDisponivelMb: dados.discoDisponivelMb,
+      ipLocal: dados.ipLocal,
+      ipExterno: dados.ipExterno,
+      modeloMaquina: dados.modeloMaquina,
+      numeroSerie: dados.numeroSerie,
+      agentVersion: dados.agentVersion,
+      rustdeskId: dados.rustdeskId,
+      antivirusNome: dados.antivirusNome,
+      antivirusStatus: dados.antivirusStatus,
+      status: DeviceStatus.ONLINE,
+      lastSeen: new Date(),
+    };
+
     if (device) {
-      // Atualizar device existente
-      await this.deviceRepo.update(device.id, {
-        sistemaOperacional: dados.sistemaOperacional,
-        cpu: dados.cpu,
-        ramTotalMb: dados.ramTotalMb,
-        discoTotalMb: dados.discoTotalMb,
-        discoDisponivelMb: dados.discoDisponivelMb,
-        ipLocal: dados.ipLocal,
-        ipExterno: dados.ipExterno,
-        modeloMaquina: dados.modeloMaquina,
-        numeroSerie: dados.numeroSerie,
-        agentVersion: dados.agentVersion,
-        status: DeviceStatus.ONLINE,
-        lastSeen: new Date(),
-      });
+      await this.deviceRepo.update(device.id, deviceData);
+      this.logger.log(`Device re-registrado: ${dados.hostname} (${device.id})`);
     } else {
-      // Criar novo device
+      // Buscar primeira organização do tenant como default
+      const defaultOrgId = await this.getDefaultOrganizationId(tenant.id);
+
       device = await this.deviceRepo.save({
         tenantId: tenant.id,
+        organizationId: defaultOrgId,
         hostname: dados.hostname,
-        sistemaOperacional: dados.sistemaOperacional,
-        cpu: dados.cpu,
-        ramTotalMb: dados.ramTotalMb,
-        discoTotalMb: dados.discoTotalMb,
-        discoDisponivelMb: dados.discoDisponivelMb,
-        ipLocal: dados.ipLocal,
-        ipExterno: dados.ipExterno,
-        modeloMaquina: dados.modeloMaquina,
-        numeroSerie: dados.numeroSerie,
-        agentVersion: dados.agentVersion,
-        status: DeviceStatus.ONLINE,
-        lastSeen: new Date(),
+        ...deviceData,
       });
+      this.logger.log(`Novo device registrado: ${dados.hostname} (${device.id})`);
     }
 
-    // Gerar device token (JWT permanente)
+    // Gerar device token (JWT 365d)
     const deviceToken = this.jwtService.sign(
       { sub: device.id, tenantId: tenant.id, type: 'agent' },
       { expiresIn: '365d' },
@@ -110,47 +105,83 @@ export class AgentsService {
       tenantId: tenant.id,
       configuracoes: {
         heartbeatIntervalMs: 60000,
+        metricsIntervalMs: 60000,
         inventoryIntervalMs: 21600000,
       },
     };
   }
 
-  async heartbeat(deviceId: string, tenantId: string, metricas: {
-    cpuPercent?: number;
-    ramPercent?: number;
-    ramUsadaMb?: number;
-    discoPercent?: number;
-    discoUsadoMb?: number;
-    temperatura?: number;
-    uptimeSegundos?: number;
-    redeEntradaBytes?: number;
-    redeSaidaBytes?: number;
-    antivirusStatus?: string;
-    antivirusNome?: string;
-  }) {
-    // Atualizar status do device
-    await this.deviceRepo.update(deviceId, {
+  async heartbeat(deviceId: string, tenantId: string, dto: AgentHeartbeatDto) {
+    const device = await this.deviceRepo.findOne({ where: { id: deviceId, tenantId } });
+    if (!device) throw new NotFoundException('Dispositivo não encontrado');
+
+    // Atualizar status e campos do device
+    const updateData: Partial<Device> = {
       status: DeviceStatus.ONLINE,
       lastSeen: new Date(),
-    });
+    };
+    if (dto.antivirusNome) updateData.antivirusNome = dto.antivirusNome;
+    if (dto.antivirusStatus) updateData.antivirusStatus = dto.antivirusStatus;
+    if (dto.uptimeSegundos) updateData.uptime_segundos = dto.uptimeSegundos;
+    if (dto.discoDisponivelMb) updateData.discoDisponivelMb = dto.discoDisponivelMb;
 
-    // Registrar métricas
-    if (metricas.cpuPercent !== undefined || metricas.ramPercent !== undefined) {
+    await this.deviceRepo.update(deviceId, updateData);
+
+    // Resolver alertas de offline ativos para este device
+    await this.alertEngine.resolverAlertaOffline(deviceId);
+
+    // Registrar métricas se presentes
+    if (dto.cpuPercent !== undefined || dto.ramPercent !== undefined) {
       await this.metricRepo.save({
         deviceId,
-        cpuPercent: metricas.cpuPercent,
-        ramPercent: metricas.ramPercent,
-        ramUsadaMb: metricas.ramUsadaMb,
-        discoPercent: metricas.discoPercent,
-        discoUsadoMb: metricas.discoUsadoMb,
-        temperatura: metricas.temperatura,
-        uptimeSegundos: metricas.uptimeSegundos,
-        redeEntradaBytes: metricas.redeEntradaBytes,
-        redeSaidaBytes: metricas.redeSaidaBytes,
+        cpuPercent: dto.cpuPercent,
+        ramPercent: dto.ramPercent,
+        ramUsadaMb: dto.ramUsadaMb,
+        discoPercent: dto.discoPercent,
+        discoUsadoMb: dto.discoUsadoMb,
+        temperatura: dto.temperatura,
+        uptimeSegundos: dto.uptimeSegundos,
+        redeEntradaBytes: dto.redeEntradaBytes,
+        redeSaidaBytes: dto.redeSaidaBytes,
       });
+
+      // Avaliar thresholds de alerta
+      await this.alertEngine.avaliarMetricas(deviceId, tenantId, dto);
     }
 
-    // Buscar comandos pendentes (futuro: tabela de comandos)
-    return { status: 'ok', commands: [] };
+    // Retornar comandos pendentes (placeholder para futuro)
+    return { status: 'ok', commands: [], timestamp: new Date().toISOString() };
+  }
+
+  async atualizarInventario(deviceId: string, tenantId: string, dto: AgentInventoryDto) {
+    const device = await this.deviceRepo.findOne({ where: { id: deviceId, tenantId } });
+    if (!device) throw new NotFoundException('Dispositivo não encontrado');
+
+    // Remover inventário antigo
+    await this.inventoryRepo.delete({ deviceId });
+
+    // Inserir novo inventário
+    const itens = dto.itens.map(item =>
+      this.inventoryRepo.create({
+        deviceId,
+        nome: item.nome,
+        versao: item.versao,
+        fabricante: item.fabricante,
+        tamanho: item.tamanho,
+        tipo: item.tipo || 'software',
+        dataInstalacao: item.dataInstalacao ? new Date(item.dataInstalacao) : undefined,
+      }),
+    );
+
+    const saved = await this.inventoryRepo.save(itens);
+    this.logger.log(`Inventário atualizado: device=${deviceId}, itens=${saved.length}`);
+    return { count: saved.length };
+  }
+
+  private async getDefaultOrganizationId(tenantId: string): Promise<string> {
+    const org = await this.deviceRepo.manager
+      .getRepository('Organization')
+      .findOne({ where: { tenantId }, order: { criadoEm: 'ASC' } });
+    return org?.id || tenantId;
   }
 }
