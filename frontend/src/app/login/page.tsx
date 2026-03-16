@@ -2,11 +2,13 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Monitor, Eye, EyeOff } from 'lucide-react'
+import { Monitor, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { authApi } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth.store'
 
 export default function LoginPage() {
   const router = useRouter()
+  const login = useAuthStore((s) => s.login)
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
   const [mostrarSenha, setMostrarSenha] = useState(false)
@@ -20,11 +22,20 @@ export default function LoginPage() {
 
     try {
       const { data } = await authApi.login(email, senha)
-      localStorage.setItem('miconecta_token', data.access_token)
-      localStorage.setItem('miconecta_user', JSON.stringify(data.tecnico))
-      router.push('/dashboard')
+      login(data.access_token, data.refresh_token || '', {
+        id: data.user?.id || data.tecnico?.id,
+        nome: data.user?.nome || data.tecnico?.nome,
+        email: data.user?.email || data.tecnico?.email,
+        userType: data.user?.userType || 'technician',
+        role: data.user?.role || data.tecnico?.funcao || 'admin',
+        tenantId: data.user?.tenantId || data.tecnico?.tenantId,
+        permissions: data.user?.permissions || [],
+      })
+
+      const userType = data.user?.userType || 'technician'
+      router.push(userType === 'client_user' ? '/portal' : '/dashboard')
     } catch (err: any) {
-      setErro(err.response?.data?.message || 'Erro ao fazer login')
+      setErro(err.response?.data?.message || 'Credenciais inválidas')
     } finally {
       setCarregando(false)
     }
@@ -33,16 +44,14 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-dark-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-600 rounded-2xl mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-600 rounded-2xl mb-4 shadow-lg shadow-brand-600/20">
             <Monitor className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-white">MIConectaRMM</h1>
           <p className="text-dark-400 mt-1">by Maginf Tecnologia</p>
         </div>
 
-        {/* Form */}
         <div className="card">
           <h2 className="text-xl font-semibold text-white mb-6">Entrar na plataforma</h2>
 
@@ -54,9 +63,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-dark-300 mb-1.5">
-                E-mail
-              </label>
+              <label className="block text-sm font-medium text-dark-300 mb-1.5">E-mail</label>
               <input
                 type="email"
                 value={email}
@@ -64,13 +71,12 @@ export default function LoginPage() {
                 className="input w-full"
                 placeholder="seu@email.com"
                 required
+                autoComplete="email"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-dark-300 mb-1.5">
-                Senha
-              </label>
+              <label className="block text-sm font-medium text-dark-300 mb-1.5">Senha</label>
               <div className="relative">
                 <input
                   type={mostrarSenha ? 'text' : 'password'}
@@ -79,6 +85,7 @@ export default function LoginPage() {
                   className="input w-full pr-10"
                   placeholder="••••••••"
                   required
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
@@ -93,15 +100,20 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={carregando}
-              className="btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {carregando ? 'Entrando...' : 'Entrar'}
+              {carregando ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Entrando...
+                </>
+              ) : 'Entrar'}
             </button>
           </form>
         </div>
 
         <p className="text-center text-dark-600 text-xs mt-6">
-          MIConectaRMM Enterprise v1.0.0 — Maginf Tecnologia © 2026
+          MIConectaRMM Enterprise v2.0.0 — Maginf Tecnologia © 2026
         </p>
       </div>
     </div>
