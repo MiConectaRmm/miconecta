@@ -1,0 +1,30 @@
+databases:
+  - name: miconectarmm-db
+    plan: free
+    databaseName: miconectarmm
+    region: oregon
+
+services:
+  - type: web
+    name: miconectarmm-api
+    plan: free
+    runtime: node
+    region: oregon
+    rootDir: ./
+    buildCommand: npm install && npm run build
+    startCommand: npm run start:prod
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: miconectarmm-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRATION
+        value: 24h
+      - key: AGENT_AUTH_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: https://miconectarmm.vercel.app
