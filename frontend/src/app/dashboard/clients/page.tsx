@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Building2, Plus, Users, Search, Monitor, Mail } from 'lucide-react'
+import { Building2, Plus, Search, Monitor, Mail, Loader2 } from 'lucide-react'
 import { tenantsApi } from '@/lib/api'
 import StatusBadge from '@/components/ui/StatusBadge'
 import Modal from '@/components/ui/Modal'
@@ -11,8 +11,15 @@ export default function ClientsPage() {
   const [tenants, setTenants] = useState<any[]>([])
   const [busca, setBusca] = useState('')
   const [showModal, setShowModal] = useState(false)
-  const [novoCliente, setNovoCliente] = useState({ nome: '', slug: '', email: '', cnpj: '', plano: 'basico' })
+  const [novoCliente, setNovoCliente] = useState({
+    nome: '', razaoSocial: '', slug: '', email: '', cnpj: '', telefone: '',
+    contatoPrincipal: '', cep: '', logradouro: '', numero: '', complemento: '',
+    bairro: '', cidade: '', uf: '', atividadePrincipal: '', naturezaJuridica: '',
+    porte: '', situacaoCadastral: '', plano: 'basico',
+  })
   const [carregando, setCarregando] = useState(true)
+  const [cnpjLoading, setCnpjLoading] = useState(false)
+  const [cnpjError, setCnpjError] = useState('')
 
   useEffect(() => { carregar() }, [])
 
@@ -31,16 +38,72 @@ export default function ClientsPage() {
     try {
       await tenantsApi.criar({ ...novoCliente, ativo: true })
       setShowModal(false)
-      setNovoCliente({ nome: '', slug: '', email: '', cnpj: '', plano: 'basico' })
+      resetForm()
       carregar()
     } catch (err) {
       console.error('Erro:', err)
     }
   }
 
+  const resetForm = () => {
+    setNovoCliente({
+      nome: '', razaoSocial: '', slug: '', email: '', cnpj: '', telefone: '',
+      contatoPrincipal: '', cep: '', logradouro: '', numero: '', complemento: '',
+      bairro: '', cidade: '', uf: '', atividadePrincipal: '', naturezaJuridica: '',
+      porte: '', situacaoCadastral: '', plano: 'basico',
+    })
+    setCnpjError('')
+  }
+
+  const consultarCnpj = useCallback(async (cnpj: string) => {
+    const limpo = cnpj.replace(/[^\d]/g, '')
+    if (limpo.length !== 14) return
+
+    setCnpjLoading(true)
+    setCnpjError('')
+    try {
+      const { data } = await tenantsApi.consultarCnpj(limpo)
+      const fantasia = data.nomeFantasia || data.razaoSocial || ''
+      setNovoCliente(prev => ({
+        ...prev,
+        nome: fantasia || prev.nome,
+        razaoSocial: data.razaoSocial || '',
+        slug: (fantasia || prev.nome).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/, ''),
+        email: data.email || prev.email,
+        telefone: data.telefone || prev.telefone,
+        cep: data.cep || '',
+        logradouro: data.logradouro || '',
+        numero: data.numero || '',
+        complemento: data.complemento || '',
+        bairro: data.bairro || '',
+        cidade: data.cidade || '',
+        uf: data.uf || '',
+        atividadePrincipal: data.atividadePrincipal || '',
+        naturezaJuridica: data.naturezaJuridica || '',
+        porte: data.porte || '',
+        situacaoCadastral: data.situacaoCadastral || '',
+      }))
+    } catch (err: any) {
+      setCnpjError(err.response?.data?.message || 'CNPJ não encontrado')
+    } finally {
+      setCnpjLoading(false)
+    }
+  }, [])
+
+  const handleCnpjChange = (value: string) => {
+    const formatted = formatCnpjInput(value)
+    setNovoCliente(prev => ({ ...prev, cnpj: formatted }))
+    setCnpjError('')
+    const limpo = formatted.replace(/[^\d]/g, '')
+    if (limpo.length === 14) {
+      consultarCnpj(limpo)
+    }
+  }
+
   const filtrados = tenants.filter(t =>
     !busca || t.nome?.toLowerCase().includes(busca.toLowerCase()) ||
     t.slug?.toLowerCase().includes(busca.toLowerCase()) ||
+    t.cnpj?.includes(busca) ||
     t.email?.toLowerCase().includes(busca.toLowerCase())
   )
 
@@ -51,7 +114,7 @@ export default function ClientsPage() {
           <h1 className="text-2xl font-bold text-white">Clientes</h1>
           <p className="text-dark-400 text-sm mt-1">Gerencie tenants e organizações</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="btn-primary flex items-center gap-2">
+        <button onClick={() => { resetForm(); setShowModal(true) }} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" /> Novo Cliente
         </button>
       </div>
@@ -61,7 +124,7 @@ export default function ClientsPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-500" />
           <input
             type="text"
-            placeholder="Buscar por nome, slug ou email..."
+            placeholder="Buscar por nome, slug, CNPJ ou email..."
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             className="input w-full pl-9"
@@ -89,6 +152,9 @@ export default function ClientsPage() {
                   <p className="text-dark-500 text-xs">{tenant.slug}</p>
                 </div>
               </div>
+              {tenant.cnpj && (
+                <p className="text-dark-400 text-xs mb-1 font-mono">{tenant.cnpj}</p>
+              )}
               {tenant.email && (
                 <div className="flex items-center gap-2 text-xs text-dark-400 mb-2">
                   <Mail className="w-3 h-3" /> {tenant.email}
@@ -97,8 +163,8 @@ export default function ClientsPage() {
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-3">
                   <span className="flex items-center gap-1 text-dark-400 text-xs">
-                    <Users className="w-3.5 h-3.5" />
-                    {tenant.organizations?.length || 0} orgs
+                    <Monitor className="w-3.5 h-3.5" />
+                    {tenant.organizacoes?.length || 0} orgs
                   </span>
                   {tenant.plano && (
                     <span className="text-dark-500 text-xs capitalize">{tenant.plano}</span>
@@ -112,10 +178,32 @@ export default function ClientsPage() {
       </div>
 
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Novo Cliente" size="lg">
-        <div className="space-y-4">
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+          {/* CNPJ - primeiro campo */}
+          <div>
+            <label className="block text-sm font-medium text-dark-300 mb-1.5">CNPJ</label>
+            <div className="relative">
+              <input
+                type="text"
+                value={novoCliente.cnpj}
+                onChange={(e) => handleCnpjChange(e.target.value)}
+                className="input w-full pr-10"
+                placeholder="00.000.000/0000-00"
+                maxLength={18}
+              />
+              {cnpjLoading && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-400 animate-spin" />
+              )}
+            </div>
+            {cnpjError && <p className="text-red-400 text-xs mt-1">{cnpjError}</p>}
+            {!cnpjError && novoCliente.razaoSocial && (
+              <p className="text-green-400 text-xs mt-1">CNPJ encontrado - dados preenchidos automaticamente</p>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-dark-300 mb-1.5">Nome</label>
+              <label className="block text-sm font-medium text-dark-300 mb-1.5">Nome Fantasia</label>
               <input
                 type="text"
                 value={novoCliente.nome}
@@ -125,17 +213,28 @@ export default function ClientsPage() {
               />
             </div>
             <div>
+              <label className="block text-sm font-medium text-dark-300 mb-1.5">Razão Social</label>
+              <input
+                type="text"
+                value={novoCliente.razaoSocial}
+                onChange={(e) => setNovoCliente({ ...novoCliente, razaoSocial: e.target.value })}
+                className="input w-full"
+                placeholder="Razão Social Completa"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
               <label className="block text-sm font-medium text-dark-300 mb-1.5">Slug</label>
               <input
                 type="text"
                 value={novoCliente.slug}
-                onChange={(e) => setNovoCliente({ ...novoCliente, slug: e.target.value.toLowerCase().replace(/\s/g, '-') })}
+                onChange={(e) => setNovoCliente({ ...novoCliente, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
                 className="input w-full"
                 placeholder="empresa"
               />
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-dark-300 mb-1.5">E-mail</label>
               <input
@@ -146,17 +245,70 @@ export default function ClientsPage() {
                 placeholder="contato@empresa.com"
               />
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-dark-300 mb-1.5">CNPJ</label>
+              <label className="block text-sm font-medium text-dark-300 mb-1.5">Telefone</label>
               <input
                 type="text"
-                value={novoCliente.cnpj}
-                onChange={(e) => setNovoCliente({ ...novoCliente, cnpj: e.target.value })}
+                value={novoCliente.telefone}
+                onChange={(e) => setNovoCliente({ ...novoCliente, telefone: e.target.value })}
                 className="input w-full"
-                placeholder="00.000.000/0000-00"
+                placeholder="(11) 99999-0000"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-dark-300 mb-1.5">Contato Principal</label>
+              <input
+                type="text"
+                value={novoCliente.contatoPrincipal}
+                onChange={(e) => setNovoCliente({ ...novoCliente, contatoPrincipal: e.target.value })}
+                className="input w-full"
+                placeholder="Nome do responsável"
               />
             </div>
           </div>
+
+          {/* Endereço */}
+          <div className="border-t border-dark-700 pt-4 mt-4">
+            <p className="text-xs uppercase tracking-wider text-dark-500 font-semibold mb-3">Endereço</p>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-1.5">CEP</label>
+                <input type="text" value={novoCliente.cep} onChange={(e) => setNovoCliente({ ...novoCliente, cep: e.target.value })} className="input w-full" placeholder="00000-000" />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-dark-300 mb-1.5">Logradouro</label>
+                <input type="text" value={novoCliente.logradouro} onChange={(e) => setNovoCliente({ ...novoCliente, logradouro: e.target.value })} className="input w-full" placeholder="Rua / Avenida" />
+              </div>
+            </div>
+            <div className="grid grid-cols-4 gap-4 mt-3">
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-1.5">Nº</label>
+                <input type="text" value={novoCliente.numero} onChange={(e) => setNovoCliente({ ...novoCliente, numero: e.target.value })} className="input w-full" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-1.5">Compl.</label>
+                <input type="text" value={novoCliente.complemento} onChange={(e) => setNovoCliente({ ...novoCliente, complemento: e.target.value })} className="input w-full" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-1.5">Bairro</label>
+                <input type="text" value={novoCliente.bairro} onChange={(e) => setNovoCliente({ ...novoCliente, bairro: e.target.value })} className="input w-full" />
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-dark-300 mb-1.5">Cidade</label>
+                  <input type="text" value={novoCliente.cidade} onChange={(e) => setNovoCliente({ ...novoCliente, cidade: e.target.value })} className="input w-full" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-dark-300 mb-1.5">UF</label>
+                  <input type="text" value={novoCliente.uf} onChange={(e) => setNovoCliente({ ...novoCliente, uf: e.target.value.toUpperCase() })} className="input w-full" maxLength={2} />
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-dark-300 mb-1.5">Plano</label>
             <select
@@ -170,6 +322,7 @@ export default function ClientsPage() {
               <option value="enterprise">Enterprise</option>
             </select>
           </div>
+
           <div className="flex justify-end gap-3 pt-2">
             <button onClick={() => setShowModal(false)} className="btn-secondary">Cancelar</button>
             <button onClick={criarCliente} className="btn-primary" disabled={!novoCliente.nome || !novoCliente.slug || !novoCliente.email}>
@@ -180,4 +333,13 @@ export default function ClientsPage() {
       </Modal>
     </div>
   )
+}
+
+function formatCnpjInput(value: string): string {
+  const digits = value.replace(/[^\d]/g, '').slice(0, 14)
+  if (digits.length <= 2) return digits
+  if (digits.length <= 5) return `${digits.slice(0,2)}.${digits.slice(2)}`
+  if (digits.length <= 8) return `${digits.slice(0,2)}.${digits.slice(2,5)}.${digits.slice(5)}`
+  if (digits.length <= 12) return `${digits.slice(0,2)}.${digits.slice(2,5)}.${digits.slice(5,8)}/${digits.slice(8)}`
+  return `${digits.slice(0,2)}.${digits.slice(2,5)}.${digits.slice(5,8)}/${digits.slice(8,12)}-${digits.slice(12,14)}`
 }

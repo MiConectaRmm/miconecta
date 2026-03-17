@@ -65,6 +65,7 @@ export const tenantsApi = {
   criar: (dados: any) => api.post('/tenants', dados),
   atualizar: (id: string, dados: any) => api.put(`/tenants/${id}`, dados),
   remover: (id: string) => api.delete(`/tenants/${id}`),
+  consultarCnpj: (cnpj: string) => api.get(`/tenants/cnpj/${cnpj.replace(/[^\d]/g, '')}`),
   listarOrgs: (tenantId: string) => api.get(`/tenants/${tenantId}/organizacoes`),
   criarOrg: (tenantId: string, dados: any) => api.post(`/tenants/${tenantId}/organizacoes`, dados),
 };
@@ -246,6 +247,8 @@ export const rolesApi = {
 export const agentsApi = {
   provision: () => api.post('/agents/provision'),
   downloadInfo: () => api.get('/agents/download-info'),
+  installScript: (tenantId: string, format: 'bat' | 'ps1' = 'bat') =>
+    api.get(`/agents/install-script/${tenantId}`, { params: { format } }),
 };
 
 // ── Storage ──

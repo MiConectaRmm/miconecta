@@ -30,10 +30,13 @@ export class Tenant {
   @Column({ length: 255 })
   nome: string;
 
+  @Column({ name: 'razao_social', length: 255, nullable: true })
+  razaoSocial: string;
+
   @Column({ length: 255, unique: true })
   slug: string;
 
-  @Column({ length: 14, nullable: true })
+  @Column({ length: 18, nullable: true })
   cnpj: string;
 
   @Column({ length: 255, nullable: true })
@@ -42,11 +45,50 @@ export class Tenant {
   @Column({ length: 20, nullable: true })
   telefone: string;
 
+  @Column({ name: 'contato_principal', length: 255, nullable: true })
+  contatoPrincipal: string;
+
+  @Column({ length: 10, nullable: true })
+  cep: string;
+
+  @Column({ length: 255, nullable: true })
+  logradouro: string;
+
+  @Column({ length: 20, nullable: true })
+  numero: string;
+
+  @Column({ length: 255, nullable: true })
+  complemento: string;
+
+  @Column({ length: 100, nullable: true })
+  bairro: string;
+
+  @Column({ length: 100, nullable: true })
+  cidade: string;
+
+  @Column({ length: 2, nullable: true })
+  uf: string;
+
   @Column({ type: 'text', nullable: true })
   endereco: string;
 
-  @Column({ name: 'contato_principal', length: 255, nullable: true })
-  contatoPrincipal: string;
+  @Column({ name: 'inscricao_estadual', length: 30, nullable: true })
+  inscricaoEstadual: string;
+
+  @Column({ name: 'atividade_principal', length: 255, nullable: true })
+  atividadePrincipal: string;
+
+  @Column({ name: 'natureza_juridica', length: 255, nullable: true })
+  naturezaJuridica: string;
+
+  @Column({ length: 50, nullable: true })
+  porte: string;
+
+  @Column({ name: 'data_abertura', type: 'date', nullable: true })
+  dataAbertura: Date;
+
+  @Column({ name: 'situacao_cadastral', length: 50, nullable: true })
+  situacaoCadastral: string;
 
   @Column({ default: true })
   ativo: boolean;

@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsOptional, IsEmail, IsBoolean, MaxLength, Matches } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsEmail, IsBoolean, MaxLength, Matches, IsDateString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateTenantDto {
@@ -8,7 +8,13 @@ export class CreateTenantDto {
   @MaxLength(255)
   nome: string;
 
-  @ApiProperty({ example: 'empresa-abc', description: 'Slug único (lowercase, sem espaços)' })
+  @ApiPropertyOptional({ example: 'Empresa ABC Comércio e Serviços Ltda' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  razaoSocial?: string;
+
+  @ApiProperty({ example: 'empresa-abc' })
   @IsNotEmpty()
   @IsString()
   @MaxLength(100)
@@ -35,13 +41,101 @@ export class CreateTenantDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MaxLength(255)
+  contatoPrincipal?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  cep?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  logradouro?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  numero?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  complemento?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  bairro?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  cidade?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(2)
+  uf?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
   @MaxLength(500)
   endereco?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  inscricaoEstadual?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  atividadePrincipal?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  naturezaJuridica?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  porte?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  dataAbertura?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  situacaoCadastral?: string;
 
   @ApiPropertyOptional({ default: true })
   @IsOptional()
   @IsBoolean()
   ativo?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  plano?: string;
 }
 
 export class UpdateTenantDto {
@@ -50,6 +144,12 @@ export class UpdateTenantDto {
   @IsString()
   @MaxLength(255)
   nome?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  razaoSocial?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -71,13 +171,114 @@ export class UpdateTenantDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MaxLength(255)
+  contatoPrincipal?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  cep?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  logradouro?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  numero?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  complemento?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  bairro?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  cidade?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(2)
+  uf?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
   @MaxLength(500)
   endereco?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  inscricaoEstadual?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  atividadePrincipal?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  naturezaJuridica?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  porte?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  dataAbertura?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  situacaoCadastral?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsBoolean()
   ativo?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  plano?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  statusContrato?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  maxDispositivos?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  maxUsuarios?: number;
 }
 
 export class CreateOrganizationDto {
@@ -87,7 +288,7 @@ export class CreateOrganizationDto {
   @MaxLength(255)
   nome: string;
 
-  @ApiPropertyOptional({ example: 'Escritório de São Paulo' })
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   @MaxLength(500)

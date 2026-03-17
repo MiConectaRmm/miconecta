@@ -1,5 +1,5 @@
 import {
-  Controller, Post, Get, Body, Req,
+  Controller, Post, Get, Body, Req, Param,
   UseGuards, Headers,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -41,6 +41,20 @@ export class AgentsController {
   async provision(@Req() req: any) {
     const tenantId = req.tenantId || req.user.tenantId;
     return this.agentsService.gerarProvisionToken(tenantId);
+  }
+
+  @Get('install-script/:tenantId')
+  @UseGuards(JwtAuthGuard, TenantAccessGuard, RolesGuard, PermissionsGuard)
+  @Roles('super_admin', 'admin_maginf', 'admin')
+  @RequirePermissions('devices:read')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Gerar script de instalação (.bat ou .ps1) para o tenant' })
+  async installScript(
+    @Param('tenantId') tenantId: string,
+    @Req() req: any,
+  ) {
+    const format = (req.query?.format as string) || 'bat';
+    return this.agentsService.generateInstallScript(tenantId, this.configService, format);
   }
 
   @Post('register')

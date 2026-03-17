@@ -62,6 +62,117 @@ export class AgentsService {
     };
   }
 
+  async generateInstallScript(tenantId: string, configService: ConfigService, format: string) {
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    if (!tenant) throw new NotFoundException('Tenant não encontrado');
+
+    let provisionToken = tenant.provisionToken;
+    if (!provisionToken || !tenant.provisionTokenExpires || tenant.provisionTokenExpires < new Date()) {
+      const result = await this.gerarProvisionToken(tenantId);
+      provisionToken = result.provisionToken;
+    }
+
+    const serverUrl = configService.get('API_URL')
+      || (configService.get('RAILWAY_PUBLIC_DOMAIN')
+        ? `https://${configService.get('RAILWAY_PUBLIC_DOMAIN')}/api/v1`
+        : 'http://localhost:3000/api/v1');
+
+    const clientName = tenant.nome.replace(/[^a-zA-Z0-9 ]/g, '').trim();
+
+    if (format === 'ps1') {
+      const script = [
+        `# MIConectaRMM - Script de Instalação`,
+        `# Cliente: ${tenant.nome}`,
+        `# Gerado em: ${new Date().toISOString()}`,
+        `# Execute como Administrador`,
+        ``,
+        `$ErrorActionPreference = "Stop"`,
+        ``,
+        `$MsiPath = Join-Path $PSScriptRoot "MIConectaRMMSetup.msi"`,
+        `if (-not (Test-Path $MsiPath)) {`,
+        `    Write-Host "ERRO: MIConectaRMMSetup.msi nao encontrado na mesma pasta do script." -ForegroundColor Red`,
+        `    Write-Host "Baixe o MSI e coloque na mesma pasta." -ForegroundColor Yellow`,
+        `    pause`,
+        `    exit 1`,
+        `}`,
+        ``,
+        `Write-Host "Instalando MIConectaRMM Agent para: ${tenant.nome}" -ForegroundColor Cyan`,
+        `Write-Host ""`,
+        ``,
+        `$args = @(`,
+        `    "/i"`,
+        `    "`"$MsiPath`""`,
+        `    "/qn"`,
+        `    "SERVER_URL=${serverUrl}"`,
+        `    "TENANT_ID=${tenantId}"`,
+        `    "PROVISION_TOKEN=${provisionToken}"`,
+        `)`,
+        ``,
+        `Start-Process msiexec.exe -ArgumentList $args -Wait -NoNewWindow`,
+        ``,
+        `if ($LASTEXITCODE -eq 0) {`,
+        `    Write-Host ""`,
+        `    Write-Host "Instalacao concluida com sucesso!" -ForegroundColor Green`,
+        `    Write-Host "O dispositivo aparecera no dashboard em ate 1 minuto." -ForegroundColor White`,
+        `} else {`,
+        `    Write-Host ""`,
+        `    Write-Host "Erro na instalacao. Codigo: $LASTEXITCODE" -ForegroundColor Red`,
+        `}`,
+        ``,
+        `pause`,
+      ].join('\r\n');
+
+      return {
+        filename: `instalar-${clientName.replace(/\s+/g, '-').toLowerCase()}.ps1`,
+        content: script,
+        contentType: 'application/octet-stream',
+      };
+    }
+
+    const bat = [
+      `@echo off`,
+      `REM MIConectaRMM - Script de Instalacao`,
+      `REM Cliente: ${tenant.nome}`,
+      `REM Gerado em: ${new Date().toISOString()}`,
+      `REM Execute como Administrador`,
+      ``,
+      `echo.`,
+      `echo ========================================`,
+      `echo   MIConectaRMM - Instalacao do Agente`,
+      `echo   Cliente: ${tenant.nome}`,
+      `echo ========================================`,
+      `echo.`,
+      ``,
+      `if not exist "%~dp0MIConectaRMMSetup.msi" (`,
+      `    echo ERRO: MIConectaRMMSetup.msi nao encontrado na mesma pasta do script.`,
+      `    echo Baixe o MSI e coloque na mesma pasta.`,
+      `    pause`,
+      `    exit /b 1`,
+      `)`,
+      ``,
+      `echo Instalando...`,
+      `msiexec /i "%~dp0MIConectaRMMSetup.msi" /qn SERVER_URL=${serverUrl} TENANT_ID=${tenantId} PROVISION_TOKEN=${provisionToken}`,
+      ``,
+      `if %errorlevel% equ 0 (`,
+      `    echo.`,
+      `    echo Instalacao concluida com sucesso!`,
+      `    echo O dispositivo aparecera no dashboard em ate 1 minuto.`,
+      `) else (`,
+      `    echo.`,
+      `    echo Erro na instalacao. Codigo: %errorlevel%`,
+      `)`,
+      ``,
+      `echo.`,
+      `pause`,
+    ].join('\r\n');
+
+    return {
+      filename: `instalar-${clientName.replace(/\s+/g, '-').toLowerCase()}.bat`,
+      content: bat,
+      contentType: 'application/octet-stream',
+    };
+  }
+
   async gerarProvisionToken(tenantId: string) {
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
     if (!tenant) throw new NotFoundException('Tenant não encontrado');
