@@ -292,6 +292,24 @@ export default function ClientDetailPage() {
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
               <Download className="w-5 h-5 text-brand-400" /> Instalação do Agente
             </h3>
+            <div className="mb-4">
+              {agentInfo?.downloadUrl ? (
+                <a
+                  href={agentInfo.downloadUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Baixar MSI do Agente
+                </a>
+              ) : (
+                <p className="text-xs text-dark-500">
+                  URL do MSI não configurada. Defina <code className="text-brand-400">AGENT_DOWNLOAD_URL</code> no backend.
+                </p>
+              )}
+            </div>
+
             <p className="text-dark-400 text-sm mb-4">
               Baixe o script de instalação já configurado para <span className="text-white font-medium">{tenant.nome}</span>.
               O técnico só precisa colocar o MSI e o script na mesma pasta e executar.
