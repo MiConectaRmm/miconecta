@@ -18,16 +18,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
-    const tecnico = await this.authService.validarToken(payload);
-    if (!tecnico) {
+    const validated = await this.authService.validarToken(payload);
+    if (!validated) {
       throw new UnauthorizedException();
     }
-    return {
-      id: tecnico.id,
-      email: tecnico.email,
-      nome: tecnico.nome,
-      funcao: tecnico.funcao,
-      tenantId: tecnico.tenantId,
-    };
+    return validated;
   }
 }
