@@ -1,8 +1,11 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { HttpService } from '@nestjs/axios';
 import { Repository } from 'typeorm';
-import { Tenant } from '../../database/entities/tenant.entity';
+import { firstValueFrom } from 'rxjs';
+import { Tenant, TenantPlano, TenantStatus } from '../../database/entities/tenant.entity';
 import { Organization } from '../../database/entities/organization.entity';
+import { CreateTenantDto, UpdateTenantDto } from './dto/create-tenant.dto';
 
 @Injectable()
 export class TenantsService {
@@ -13,10 +16,16 @@ export class TenantsService {
     private readonly tenantRepo: Repository<Tenant>,
     @InjectRepository(Organization)
     private readonly orgRepo: Repository<Organization>,
+    private readonly httpService: HttpService,
   ) {}
 
-  async criarTenant(dados: Partial<Tenant>) {
-    const tenant = this.tenantRepo.create(dados);
+  async criarTenant(dados: CreateTenantDto) {
+    const toSave: Partial<Tenant> = {
+      ...dados,
+      dataAbertura: dados.dataAbertura ? new Date(dados.dataAbertura) : undefined,
+      plano: dados.plano as TenantPlano | undefined,
+    };
+    const tenant = this.tenantRepo.create(toSave);
     return this.tenantRepo.save(tenant);
   }
 
@@ -36,9 +45,15 @@ export class TenantsService {
     return tenant;
   }
 
-  async atualizarTenant(id: string, dados: Partial<Tenant>) {
+  async atualizarTenant(id: string, dados: UpdateTenantDto) {
     await this.buscarTenant(id);
-    await this.tenantRepo.update(id, dados);
+    const toUpdate: Partial<Tenant> = {
+      ...dados,
+      dataAbertura: dados.dataAbertura ? new Date(dados.dataAbertura) : undefined,
+      plano: dados.plano as TenantPlano | undefined,
+      statusContrato: dados.statusContrato as TenantStatus | undefined,
+    };
+    await this.tenantRepo.update(id, toUpdate);
     return this.buscarTenant(id);
   }
 
@@ -91,11 +106,11 @@ export class TenantsService {
     }
 
     try {
-      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjLimpo}`);
-      if (!response.ok) {
+      const { data } = await firstValueFrom(
+        this.httpService.get(`https://brasilapi.com.br/api/cnpj/v1/${cnpjLimpo}`),
+      ).catch(() => {
         throw new BadRequestException('CNPJ não encontrado na Receita Federal');
-      }
-      const data = await response.json() as any;
+      });
 
       return {
         razaoSocial: data.razao_social || '',
