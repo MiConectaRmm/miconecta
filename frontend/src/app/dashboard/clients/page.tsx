@@ -15,11 +15,13 @@ export default function ClientsPage() {
     nome: '', razaoSocial: '', slug: '', email: '', cnpj: '', telefone: '',
     contatoPrincipal: '', cep: '', logradouro: '', numero: '', complemento: '',
     bairro: '', cidade: '', uf: '', atividadePrincipal: '', naturezaJuridica: '',
-    porte: '', situacaoCadastral: '', plano: 'basico',
+    porte: '', situacaoCadastral: '', plano: 'basic',
   })
   const [carregando, setCarregando] = useState(true)
   const [cnpjLoading, setCnpjLoading] = useState(false)
   const [cnpjError, setCnpjError] = useState('')
+  const [submitLoading, setSubmitLoading] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   useEffect(() => { carregar() }, [])
 
@@ -36,12 +38,20 @@ export default function ClientsPage() {
 
   const criarCliente = async () => {
     try {
+      setSubmitLoading(true)
+      setSubmitError('')
       await tenantsApi.criar({ ...novoCliente, ativo: true })
       setShowModal(false)
       resetForm()
       carregar()
     } catch (err) {
-      console.error('Erro:', err)
+      console.error('Erro ao criar cliente:', err)
+      const anyErr: any = err
+      const msg = anyErr?.response?.data?.message || 'Erro ao criar cliente. Verifique os campos obrigatórios.'
+      setSubmitError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+    }
+    finally {
+      setSubmitLoading(false)
     }
   }
 
@@ -50,9 +60,10 @@ export default function ClientsPage() {
       nome: '', razaoSocial: '', slug: '', email: '', cnpj: '', telefone: '',
       contatoPrincipal: '', cep: '', logradouro: '', numero: '', complemento: '',
       bairro: '', cidade: '', uf: '', atividadePrincipal: '', naturezaJuridica: '',
-      porte: '', situacaoCadastral: '', plano: 'basico',
+      porte: '', situacaoCadastral: '', plano: 'basic',
     })
     setCnpjError('')
+    setSubmitError('')
   }
 
   const consultarCnpj = useCallback(async (cnpj: string) => {
@@ -316,16 +327,24 @@ export default function ClientsPage() {
               onChange={(e) => setNovoCliente({ ...novoCliente, plano: e.target.value })}
               className="input w-full"
             >
-              <option value="trial">Trial</option>
-              <option value="basico">Básico</option>
-              <option value="profissional">Profissional</option>
+              <option value="basic">Básico</option>
+              <option value="professional">Profissional</option>
               <option value="enterprise">Enterprise</option>
             </select>
           </div>
 
+          {submitError && (
+            <p className="text-red-400 text-xs mt-1">{submitError}</p>
+          )}
+
           <div className="flex justify-end gap-3 pt-2">
             <button onClick={() => setShowModal(false)} className="btn-secondary">Cancelar</button>
-            <button onClick={criarCliente} className="btn-primary" disabled={!novoCliente.nome || !novoCliente.slug || !novoCliente.email}>
+            <button
+              onClick={criarCliente}
+              className="btn-primary flex items-center gap-2"
+              disabled={submitLoading || !novoCliente.nome || !novoCliente.slug || !novoCliente.email}
+            >
+              {submitLoading && <Loader2 className="w-4 h-4 animate-spin" />}
               Criar Cliente
             </button>
           </div>
