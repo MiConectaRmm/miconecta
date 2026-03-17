@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <Package Name="MIConectaRMM Agent"
+           Manufacturer="Maginf Tecnologia"
+           Version="2.0.0.0"
+           UpgradeCode="E7A3B1C2-4D5F-6A7B-8C9D-0E1F2A3B4C5D"
+           Scope="perMachine"
+           Language="1046"
+           Codepage="1252"
+           InstallerVersion="500">
+
+    <SummaryInformation Description="Agente de monitoramento remoto MIConectaRMM"
+                        Manufacturer="Maginf Tecnologia" />
+
+    <MajorUpgrade DowngradeErrorMessage="Uma versão mais recente do MIConectaRMM Agent já está instalada." />
+
+    <Media Id="1" Cabinet="agent.cab" EmbedCab="yes" CompressionLevel="high" />
+
+    <!-- Properties for silent install: msiexec /i Setup.msi SERVER_URL=... TENANT_ID=... PROVISION_TOKEN=... -->
+    <Property Id="SERVER_URL" Value="http://localhost:3000/api/v1" />
+    <Property Id="TENANT_ID" Secure="yes" />
+    <Property Id="PROVISION_TOKEN" Secure="yes" />
+    <Property Id="RUSTDESK_SERVER" Value="136.248.114.218" />
+    <Property Id="RUSTDESK_KEY" Value="ev3ic04E+VsgunfupaellTSWgSzmHiQL2H5ywzBE+yI=" />
+
+    <!-- Install directory -->
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="MIConectaRMM">
+        <Directory Id="LogsFolder" Name="logs" />
+      </Directory>
+    </StandardDirectory>
+
+    <!-- Agent Service executable -->
+    <ComponentGroup Id="AgentComponents" Directory="INSTALLFOLDER">
+      <Component Id="AgentExe" Guid="A1B2C3D4-E5F6-7A8B-9C0D-E1F2A3B4C5D6">
+        <File Id="MIConectaAgentExe"
+              Source="$(var.PublishDir)\agent\MIConectaAgent.exe"
+              KeyPath="yes" />
+
+        <ServiceInstall Id="MIConectaService"
+                        Name="MIConectaRMMAgent"
+                        DisplayName="MIConectaRMM Agent"
+                        Description="Agente de monitoramento remoto MIConectaRMM by Maginf Tecnologia"
+                        Type="ownProcess"
+                        Start="auto"
+                        ErrorControl="normal"
+                        Account="LocalSystem">
+          <util:ServiceConfig FirstFailureActionType="restart"
+                              SecondFailureActionType="restart"
+                              ThirdFailureActionType="restart"
+                              RestartServiceDelayInSeconds="60"
+                              ResetPeriodInDays="1" />
+        </ServiceInstall>
+
+        <ServiceControl Id="StartMIConectaService"
+                        Name="MIConectaRMMAgent"
+                        Start="install"
+                        Stop="both"
+                        Remove="uninstall"
+                        Wait="yes" />
+      </Component>
+
+      <Component Id="TrayExe" Guid="C3D4E5F6-A7B8-9C0D-1E2F-A3B4C5D6E7F8">
+        <File Id="MIConectaTrayExe"
+              Source="$(var.PublishDir)\tray\MIConectaTray.exe"
+              KeyPath="yes" />
+      </Component>
+
+      <Component Id="ConfigScript" Guid="D4E5F6A7-B8C9-0D1E-2F3A-B4C5D6E7F8A9">
+        <File Id="WriteConfigPs1"
+              Source="WriteConfig.ps1"
+              KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- Tray auto-start for all users -->
+    <ComponentGroup Id="RegistryComponents" Directory="INSTALLFOLDER">
+      <Component Id="TrayAutoStart" Guid="E5F6A7B8-C9D0-1E2F-3A4B-C5D6E7F8A9B0">
+        <RegistryValue Root="HKLM"
+                       Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
+                       Name="MIConectaTray"
+                       Type="string"
+                       Value="[INSTALLFOLDER]MIConectaTray.exe"
+                       KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- Start Menu shortcuts -->
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="MIConectaMenuFolder" Name="MIConectaRMM">
+        <Component Id="MenuShortcuts" Guid="F6A7B8C9-D0E1-2F3A-4B5C-D6E7F8A9B0C1">
+          <Shortcut Id="TrayShortcut"
+                    Name="MIConecta RMM"
+                    Target="[INSTALLFOLDER]MIConectaTray.exe"
+                    WorkingDirectory="INSTALLFOLDER"
+                    Icon="TrayIcon" />
+          <RemoveFolder Id="RemoveMenuFolder" On="uninstall" />
+          <RegistryValue Root="HKCU" Key="Software\MIConectaRMM" Name="MenuInstalled" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <Icon Id="TrayIcon" SourceFile="$(var.PublishDir)\tray\MIConectaTray.exe" />
+
+    <!-- Feature tree -->
+    <Feature Id="Complete" Title="MIConectaRMM Agent" Level="1">
+      <ComponentGroupRef Id="AgentComponents" />
+      <ComponentGroupRef Id="RegistryComponents" />
+      <ComponentRef Id="MenuShortcuts" />
+    </Feature>
+
+    <!-- Custom action: write agent.config with install parameters -->
+    <SetProperty Id="RunWriteConfig" Before="RunWriteConfig" Sequence="execute"
+                 Value="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;[INSTALLFOLDER]WriteConfig.ps1&quot; &quot;[INSTALLFOLDER]&quot; &quot;[SERVER_URL]&quot; &quot;[TENANT_ID]&quot; &quot;[PROVISION_TOKEN]&quot; &quot;[RUSTDESK_SERVER]&quot; &quot;[RUSTDESK_KEY]&quot;" />
+
+    <CustomAction Id="RunWriteConfig"
+                  DllEntry="WixQuietExec64"
+                  Execute="deferred"
+                  Impersonate="no"
+                  BinaryRef="Wix4UtilCA_X86" />
+
+    <InstallExecuteSequence>
+      <Custom Action="RunWriteConfig" After="InstallFiles" Condition="NOT REMOVE" />
+    </InstallExecuteSequence>
+
+    <!-- UI -->
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+
+  </Package>
+</Wix>

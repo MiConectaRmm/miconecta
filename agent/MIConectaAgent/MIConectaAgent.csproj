@@ -33,6 +33,9 @@
     <!-- SQLite for local queue -->
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
 
+    <!-- Performance counters -->
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="8.0.0" />
+
     <!-- HTTP resilience -->
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="8.0.0" />
     <PackageReference Include="Polly" Version="8.2.0" />

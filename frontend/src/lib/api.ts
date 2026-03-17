@@ -245,6 +245,7 @@ export const rolesApi = {
 // ── Agents ──
 export const agentsApi = {
   provision: () => api.post('/agents/provision'),
+  downloadInfo: () => api.get('/agents/download-info'),
 };
 
 // ── Storage ──

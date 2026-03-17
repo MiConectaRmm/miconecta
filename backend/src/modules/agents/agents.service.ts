@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException, NotFoundException, Logger } from '@n
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
 import { Device, DeviceStatus } from '../../database/entities/device.entity';
 import { Tenant } from '../../database/entities/tenant.entity';
@@ -26,6 +27,40 @@ export class AgentsService {
     private readonly jwtService: JwtService,
     private readonly alertEngine: AlertEngine,
   ) {}
+
+  async getDownloadInfo(tenantId: string, configService: ConfigService) {
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    if (!tenant) throw new NotFoundException('Tenant não encontrado');
+
+    const apiUrl = configService.get('API_URL') || configService.get('CORS_ORIGIN')?.replace(/\/$/, '');
+    const downloadUrl = configService.get('AGENT_DOWNLOAD_URL') || null;
+    const agentVersion = configService.get('AGENT_VERSION') || '1.0.0';
+
+    let provisionToken = tenant.provisionToken;
+    let provisionExpires = tenant.provisionTokenExpires;
+
+    if (!provisionToken || !provisionExpires || provisionExpires < new Date()) {
+      const result = await this.gerarProvisionToken(tenantId);
+      provisionToken = result.provisionToken;
+      provisionExpires = result.expiresAt;
+    }
+
+    return {
+      downloadUrl,
+      agentVersion,
+      serverUrl: configService.get('API_URL') || `${configService.get('RAILWAY_PUBLIC_DOMAIN') ? 'https://' + configService.get('RAILWAY_PUBLIC_DOMAIN') : 'http://localhost:3000'}/api/v1`,
+      tenantId,
+      tenantNome: tenant.nome,
+      provisionToken,
+      provisionExpires,
+      systemRequirements: {
+        os: 'Windows 10/11 ou Windows Server 2016+',
+        runtime: '.NET 8 Runtime',
+        minRam: '128 MB',
+        minDisk: '100 MB',
+      },
+    };
+  }
 
   async gerarProvisionToken(tenantId: string) {
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });

@@ -18,6 +18,7 @@ import {
   MessageSquare,
   BarChart3,
   Eye,
+  Download,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth.store'
@@ -42,6 +43,7 @@ const menuItems: MenuItem[] = [
   { href: '/dashboard/technicians', label: 'Técnicos', icon: Users, section: 'Administração' },
   { href: '/dashboard/audit', label: 'Auditoria', icon: Eye, section: 'Administração' },
   { href: '/dashboard/reports', label: 'Relatórios', icon: BarChart3, section: 'Administração' },
+  { href: '/dashboard/agent-download', label: 'Download Agente', icon: Download, section: 'Administração' },
 ]
 
 export default function Sidebar() {

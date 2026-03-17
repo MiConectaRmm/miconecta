@@ -1,0 +1,6 @@
+ServerUrl=http://localhost:3000/api/v1
+TenantId=
+ProvisionToken=
+RustDeskServer=136.248.114.218
+RustDeskKey=ev3ic04E+VsgunfupaellTSWgSzmHiQL2H5ywzBE+yI=
+HeartbeatIntervalSeconds=60

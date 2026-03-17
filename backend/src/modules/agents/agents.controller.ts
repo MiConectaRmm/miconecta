@@ -1,7 +1,8 @@
 import {
-  Controller, Post, Body, Req,
+  Controller, Post, Get, Body, Req,
   UseGuards, Headers,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantAccessGuard } from '../../common/guards/tenant-access.guard';
@@ -15,7 +16,21 @@ import { AgentRegisterDto, AgentHeartbeatDto, AgentInventoryDto } from './dto/ag
 @ApiTags('Agents')
 @Controller('agents')
 export class AgentsController {
-  constructor(private readonly agentsService: AgentsService) {}
+  constructor(
+    private readonly agentsService: AgentsService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  @Get('download-info')
+  @UseGuards(JwtAuthGuard, TenantAccessGuard, RolesGuard, PermissionsGuard)
+  @Roles('super_admin', 'admin_maginf', 'admin')
+  @RequirePermissions('devices:read')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Obter informações de download do agente para o tenant' })
+  async downloadInfo(@Req() req: any) {
+    const tenantId = req.tenantId || req.user.tenantId;
+    return this.agentsService.getDownloadInfo(tenantId, this.configService);
+  }
 
   @Post('provision')
   @UseGuards(JwtAuthGuard, TenantAccessGuard, RolesGuard, PermissionsGuard)

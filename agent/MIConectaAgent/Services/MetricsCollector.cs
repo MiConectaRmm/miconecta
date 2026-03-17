@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Management;
+using System.Net.NetworkInformation;
 
 namespace MIConectaAgent.Services;
 

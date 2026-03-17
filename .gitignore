@@ -33,8 +33,15 @@ coverage/
 # Agent build output
 agent/MIConectaAgent/bin/
 agent/MIConectaAgent/obj/
+agent/MIConectaAgent.Tray/bin/
+agent/MIConectaAgent.Tray/obj/
+agent/publish/
 installer/publish/
 installer/Output/
+installer/output/
+installer/wix/bin/
+installer/wix/obj/
+backend/.wix/
 
 # Misc
 *.log
