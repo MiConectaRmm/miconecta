@@ -35,6 +35,14 @@ export class TenantsController {
     return this.service.listarTenants();
   }
 
+  @Get('cnpj/:cnpj')
+  @Roles('super_admin', 'admin_maginf', 'admin')
+  @RequirePermissions('tenants:read')
+  @ApiOperation({ summary: 'Consultar dados do CNPJ na Receita Federal (BrasilAPI)' })
+  consultarCnpj(@Param('cnpj') cnpj: string) {
+    return this.service.consultarCnpj(cnpj);
+  }
+
   @Get(':id')
   @RequirePermissions('tenants:read')
   @ApiOperation({ summary: 'Buscar tenant por ID' })
@@ -56,14 +64,6 @@ export class TenantsController {
   @ApiOperation({ summary: 'Remover tenant (super_admin/admin_maginf)' })
   remover(@Param('id') id: string) {
     return this.service.removerTenant(id);
-  }
-
-  @Get('cnpj/:cnpj')
-  @Roles('super_admin', 'admin_maginf', 'admin')
-  @RequirePermissions('tenants:read')
-  @ApiOperation({ summary: 'Consultar dados do CNPJ na Receita Federal (BrasilAPI)' })
-  consultarCnpj(@Param('cnpj') cnpj: string) {
-    return this.service.consultarCnpj(cnpj);
   }
 
   // ── Organizações ──
