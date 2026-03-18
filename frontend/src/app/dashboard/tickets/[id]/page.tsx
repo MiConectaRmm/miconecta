@@ -151,7 +151,7 @@ export default function TicketDetailPage() {
   }
 
   const enviarMensagem = async () => {
-    if (!newMsg.trim() || !user) return
+    if (!newMsg.trim()) return
     try {
       let arquivoUrl: string | undefined
       let arquivoNome: string | undefined
@@ -183,7 +183,7 @@ export default function TicketDetailPage() {
   }
 
   const criarNotaInterna = async () => {
-    if (!newNote.trim() || !user) return
+    if (!newNote.trim()) return
     try {
       const note = await ticketsApi.notaInterna(id, newNote)
       if (internalFiles.length > 0) {
