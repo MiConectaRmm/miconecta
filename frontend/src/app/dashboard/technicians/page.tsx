@@ -70,7 +70,8 @@ export default function TechniciansPage() {
   const salvar = async () => {
     if (!form.nome || !form.email) return
     if (!editando && (!form.senha || form.senha !== form.confirmarSenha)) return
-    if (!editando && !user?.tenantId) return
+    const tenantId = user?.tenantId
+    if (!editando && !tenantId) return
 
     setSaving(true)
     try {
@@ -82,7 +83,7 @@ export default function TechniciansPage() {
           email: form.email,
           funcao: form.funcao,
           senha: form.senha,
-          tenantId: user.tenantId,
+          tenantId,
         })
       }
       setShowModal(false)
