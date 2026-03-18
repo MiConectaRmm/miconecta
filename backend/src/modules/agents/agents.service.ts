@@ -291,7 +291,7 @@ export class AgentsService {
       antivirusStatus: dados.antivirusStatus,
       status: DeviceStatus.ONLINE,
       lastSeen: new Date(),
-      notas: { fingerprint, macAddress: dados.macAddress, username: dados.username },
+      notas: JSON.stringify({ fingerprint, macAddress: dados.macAddress, username: dados.username }),
     };
 
     if (device) {

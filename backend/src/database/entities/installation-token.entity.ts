@@ -23,7 +23,7 @@ export class InstallationToken {
   tokenPreview: string;
 
   @Column({ length: 255, nullable: true })
-  descricao: string;
+  descricao: string | null;
 
   @Column({ type: 'enum', enum: InstallationTokenStatus, default: InstallationTokenStatus.ATIVO })
   status: InstallationTokenStatus;

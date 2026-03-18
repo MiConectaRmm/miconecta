@@ -219,7 +219,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   emitTicketUpdated(ticketId: string, payload: TicketEventPayload) {
-    this.server.to(`ticket:${ticketId}`).emit('ticket:updated', { ticketId, ...payload });
+    const { ticketId: _ignored, ...rest } = payload as TicketEventPayload & { ticketId?: string };
+    this.server.to(`ticket:${ticketId}`).emit('ticket:updated', { ticketId, ...rest });
   }
 
   emitNotification(tenantId: string, payload: Record<string, unknown>) {
