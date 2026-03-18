@@ -5,6 +5,7 @@ import { Users, Shield, Search, Plus, Mail, ToggleLeft, ToggleRight, Loader2 } f
 import { techniciansApi } from '@/lib/api'
 import Modal from '@/components/ui/Modal'
 import StatusBadge from '@/components/ui/StatusBadge'
+import { useAuthStore } from '@/stores/auth.store'
 
 interface Technician {
   id: string
@@ -18,6 +19,7 @@ interface Technician {
 }
 
 export default function TechniciansPage() {
+  const user = useAuthStore((s) => s.user)
   const [tecnicos, setTecnicos] = useState<Technician[]>([])
   const [busca, setBusca] = useState('')
   const [statusFiltro, setStatusFiltro] = useState<'todos' | 'ativos' | 'inativos'>('todos')
@@ -68,6 +70,7 @@ export default function TechniciansPage() {
   const salvar = async () => {
     if (!form.nome || !form.email) return
     if (!editando && (!form.senha || form.senha !== form.confirmarSenha)) return
+    if (!editando && !user?.tenantId) return
 
     setSaving(true)
     try {
@@ -79,6 +82,7 @@ export default function TechniciansPage() {
           email: form.email,
           funcao: form.funcao,
           senha: form.senha,
+          tenantId: user.tenantId,
         })
       }
       setShowModal(false)

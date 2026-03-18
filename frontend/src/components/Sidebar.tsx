@@ -39,7 +39,6 @@ const menuItems: MenuItem[] = [
   { href: '/dashboard/software', label: 'Software', icon: Package, section: 'RMM' },
   { href: '/dashboard/patches', label: 'Patches', icon: Shield, section: 'RMM' },
   { href: '/dashboard/tickets', label: 'Tickets', icon: Ticket, section: 'Help Desk' },
-  { href: '/dashboard/chat', label: 'Chat', icon: MessageSquare, section: 'Help Desk' },
   { href: '/dashboard/technicians', label: 'Técnicos', icon: Users, section: 'Administração' },
   { href: '/dashboard/audit', label: 'Auditoria', icon: Eye, section: 'Administração' },
   { href: '/dashboard/reports', label: 'Relatórios', icon: BarChart3, section: 'Administração' },
