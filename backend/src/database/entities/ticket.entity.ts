@@ -31,6 +31,13 @@ export enum TicketPrioridade {
   URGENTE = 'urgente',
 }
 
+export enum TicketSlaStatus {
+  DENTRO_PRAZO = 'dentro_prazo',
+  EM_RISCO = 'em_risco',
+  VENCIDO = 'vencido',
+  INDEFINIDO = 'indefinido',
+}
+
 export enum TicketOrigem {
   PORTAL = 'portal',
   PAINEL = 'painel',
@@ -94,6 +101,12 @@ export class Ticket {
 
   @Column({ type: 'timestamp', name: 'sla_resolucao_em', nullable: true })
   slaResolucaoEm: Date;
+
+  @Column({ type: 'timestamp', name: 'sla_primeira_resposta_em', nullable: true })
+  slaPrimeiraRespostaEm: Date;
+
+  @Column({ type: 'enum', enum: TicketSlaStatus, default: TicketSlaStatus.INDEFINIDO, name: 'sla_status' })
+  slaStatus: TicketSlaStatus;
 
   @Column({ type: 'timestamp', name: 'respondido_em', nullable: true })
   respondidoEm: Date;

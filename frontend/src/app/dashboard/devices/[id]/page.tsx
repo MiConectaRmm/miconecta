@@ -50,6 +50,9 @@ export default function DeviceDetailPage() {
   }
 
   const infoItems = [
+    { label: 'Tenant ID', value: device.tenantId, icon: Globe },
+    { label: 'Device ID', value: device.id, icon: Shield },
+    { label: 'Agent ID', value: device.agentId, icon: Terminal },
     { label: 'Hostname', value: device.hostname, icon: Monitor },
     { label: 'Sistema Operacional', value: device.sistemaOperacional || device.versaoWindows, icon: Monitor },
     { label: 'CPU', value: device.cpu, icon: Cpu },
@@ -61,6 +64,8 @@ export default function DeviceDetailPage() {
     { label: 'Nº Série', value: device.numeroSerie, icon: Shield },
     { label: 'Agente', value: device.agentVersion, icon: Terminal },
     { label: 'Última Comunicação', value: device.lastSeen ? new Date(device.lastSeen).toLocaleString('pt-BR') : '—', icon: Clock },
+    { label: 'Último Check-in', value: device.lastCheckin ? new Date(device.lastCheckin).toLocaleString('pt-BR') : '—', icon: Clock },
+    { label: 'RustDesk ID', value: device.rustdeskId, icon: Shield },
   ]
 
   return (

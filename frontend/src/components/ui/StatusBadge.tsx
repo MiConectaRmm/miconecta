@@ -23,6 +23,9 @@ const STATUS_MAP: Record<string, { bg: string; text: string; label: string }> = 
   alta: { bg: 'bg-orange-500/20', text: 'text-orange-400', label: 'Alta' },
   urgente: { bg: 'bg-red-500/20', text: 'text-red-400', label: 'Urgente' },
   critico: { bg: 'bg-red-500/20', text: 'text-red-400', label: 'Crítico' },
+  dentro_prazo: { bg: 'bg-emerald-500/20', text: 'text-emerald-400', label: 'OK' },
+  em_risco: { bg: 'bg-amber-500/20', text: 'text-amber-400', label: 'Warning' },
+  vencido: { bg: 'bg-red-500/20', text: 'text-red-400', label: 'Breached' },
 }
 
 export default function StatusBadge({ status, size = 'sm' }: StatusBadgeProps) {

@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, UnauthorizedException, NotFoundException, Logger, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -8,8 +8,11 @@ import { Device, DeviceStatus } from '../../database/entities/device.entity';
 import { Tenant } from '../../database/entities/tenant.entity';
 import { DeviceMetric } from '../../database/entities/device-metric.entity';
 import { DeviceInventory } from '../../database/entities/device-inventory.entity';
+import { Agent, AgentStatus } from '../../database/entities/agent.entity';
+import { InstallationToken, InstallationTokenStatus } from '../../database/entities/installation-token.entity';
 import { AlertEngine } from '../alerts/alert-engine.service';
-import { AgentRegisterDto, AgentHeartbeatDto, AgentInventoryDto } from './dto/agent.dto';
+import { AgentRegisterDto, AgentHeartbeatDto, AgentInventoryDto, InstallationTokenCreateDto } from './dto/agent.dto';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class AgentsService {
@@ -24,9 +27,56 @@ export class AgentsService {
     private readonly metricRepo: Repository<DeviceMetric>,
     @InjectRepository(DeviceInventory)
     private readonly inventoryRepo: Repository<DeviceInventory>,
+    @InjectRepository(Agent)
+    private readonly agentRepo: Repository<Agent>,
+    @InjectRepository(InstallationToken)
+    private readonly installationTokenRepo: Repository<InstallationToken>,
     private readonly jwtService: JwtService,
     private readonly alertEngine: AlertEngine,
   ) {}
+
+  async criarInstallationToken(tenantId: string, dto: InstallationTokenCreateDto) {
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    if (!tenant) throw new NotFoundException('Tenant não encontrado');
+
+    const rawToken = this.gerarTokenSeguro(32);
+    const tokenHash = this.hashToken(rawToken);
+    const preview = rawToken.slice(0, 8);
+    const expiresAt = dto.expiresAt ? new Date(dto.expiresAt) : null;
+
+    const token = await this.installationTokenRepo.save({
+      tenantId,
+      tokenHash,
+      tokenPreview: preview,
+      descricao: dto.descricao || null,
+      status: InstallationTokenStatus.ATIVO,
+      expiresAt,
+    });
+
+    return { ...token, token: rawToken };
+  }
+
+  async listarInstallationTokens(tenantId: string) {
+    return this.installationTokenRepo.find({
+      where: { tenantId },
+      order: { criadoEm: 'DESC' },
+    });
+  }
+
+  async revogarInstallationToken(tenantId: string, tokenId: string) {
+    const token = await this.installationTokenRepo.findOne({ where: { id: tokenId, tenantId } });
+    if (!token) throw new NotFoundException('Token não encontrado');
+    token.status = InstallationTokenStatus.INATIVO;
+    return this.installationTokenRepo.save(token);
+  }
+
+  async listarAgentes(tenantId: string) {
+    return this.agentRepo.find({
+      where: { tenantId },
+      relations: ['device', 'tenant'],
+      order: { criadoEm: 'DESC' },
+    });
+  }
 
   async getDownloadInfo(tenantId: string, configService: ConfigService) {
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
@@ -207,21 +257,24 @@ export class AgentsService {
   }
 
   async registrar(provisionToken: string, dados: AgentRegisterDto) {
-    // Validar provision token
-    const tenant = await this.tenantRepo.findOne({
-      where: { provisionToken },
-    });
-
-    if (!tenant || !tenant.provisionTokenExpires || tenant.provisionTokenExpires < new Date()) {
-      throw new UnauthorizedException('Token de provisionamento inválido ou expirado');
+    const installationToken = await this.installationTokenRepo.findOne({ where: { tokenHash: this.hashToken(provisionToken) }, relations: ['tenant'] });
+    if (!installationToken || installationToken.status !== InstallationTokenStatus.ATIVO || (installationToken.expiresAt && installationToken.expiresAt < new Date())) {
+      throw new UnauthorizedException('Token de instalação inválido ou expirado');
     }
 
-    // Verificar se device já existe
-    let device = await this.deviceRepo.findOne({
-      where: { tenantId: tenant.id, hostname: dados.hostname },
-    });
+    const tenant = installationToken.tenant;
+    if (!tenant) throw new UnauthorizedException('Tenant não identificado');
 
-    const deviceData = {
+    const fingerprint = this.calcularFingerprint(dados);
+    let device = null as Device | null;
+    if (dados.numeroSerie) {
+      device = await this.deviceRepo.findOne({ where: { tenantId: tenant.id, numeroSerie: dados.numeroSerie } });
+    }
+    if (!device) {
+      device = await this.deviceRepo.findOne({ where: { tenantId: tenant.id, hostname: dados.hostname } });
+    }
+
+    const deviceData: Partial<Device> = {
       sistemaOperacional: dados.sistemaOperacional,
       versaoWindows: dados.versaoWindows,
       cpu: dados.cpu,
@@ -238,6 +291,7 @@ export class AgentsService {
       antivirusStatus: dados.antivirusStatus,
       status: DeviceStatus.ONLINE,
       lastSeen: new Date(),
+      notas: { fingerprint, macAddress: dados.macAddress, username: dados.username },
     };
 
     if (device) {
@@ -256,15 +310,38 @@ export class AgentsService {
       this.logger.log(`Novo device registrado: ${dados.hostname} (${device.id})`);
     }
 
-    // Gerar device token (JWT 365d)
-    const deviceToken = this.jwtService.sign(
-      { sub: device.id, tenantId: tenant.id, type: 'agent' },
+    const agentTokenPlain = this.gerarTokenSeguro(48);
+    const agent = await this.agentRepo.save({
+      tenantId: tenant.id,
+      deviceId: device.id,
+      installationTokenId: installationToken.id,
+      agentTokenHash: this.hashToken(agentTokenPlain),
+      agentTokenPreview: agentTokenPlain.slice(0, 8),
+      status: AgentStatus.ONLINE,
+      agentVersion: dados.agentVersion || null,
+      lastSeen: new Date(),
+      remoteStatus: dados.rustdeskId ? 'ready' : null,
+    });
+
+    await this.deviceRepo.update(device.id, {
+      agentId: agent.id,
+      agentVersion: dados.agentVersion || device.agentVersion,
+      rustdeskId: dados.rustdeskId || device.rustdeskId,
+      lastCheckin: new Date(),
+    } as any);
+
+    installationToken.status = InstallationTokenStatus.INATIVO;
+    await this.installationTokenRepo.save(installationToken);
+
+    const agentToken = this.jwtService.sign(
+      { sub: agent.id, tenantId: tenant.id, deviceId: device.id, type: 'agent', role: 'agent' },
       { expiresIn: '365d' },
     );
 
     return {
       deviceId: device.id,
-      deviceToken,
+      agentId: agent.id,
+      agentToken,
       tenantId: tenant.id,
       configuracoes: {
         heartbeatIntervalMs: 60000,
@@ -274,8 +351,13 @@ export class AgentsService {
     };
   }
 
-  async heartbeat(deviceId: string, tenantId: string, dto: AgentHeartbeatDto) {
-    const device = await this.deviceRepo.findOne({ where: { id: deviceId, tenantId } });
+  async heartbeat(agentToken: string, dto: AgentHeartbeatDto) {
+    if (!agentToken) throw new UnauthorizedException('Agent token ausente');
+    const payload = this.jwtService.verify<{ sub: string; tenantId: string; deviceId: string }>(agentToken);
+    const agent = await this.agentRepo.findOne({ where: { id: payload.sub, tenantId: payload.tenantId, deviceId: payload.deviceId }, relations: ['device'] });
+    if (!agent) throw new UnauthorizedException('Agente não autorizado');
+
+    const device = await this.deviceRepo.findOne({ where: { id: dto.deviceId, tenantId: payload.tenantId } });
     if (!device) throw new NotFoundException('Dispositivo não encontrado');
 
     // Atualizar status e campos do device
@@ -287,16 +369,26 @@ export class AgentsService {
     if (dto.antivirusStatus) updateData.antivirusStatus = dto.antivirusStatus;
     if (dto.uptimeSegundos) updateData.uptime_segundos = dto.uptimeSegundos;
     if (dto.discoDisponivelMb) updateData.discoDisponivelMb = dto.discoDisponivelMb;
+    if (dto.remoteStatus) updateData.rustdeskId = dto.remoteStatus;
 
-    await this.deviceRepo.update(deviceId, updateData);
+    await this.deviceRepo.update(device.id, {
+      ...updateData,
+      lastCheckin: new Date(),
+    } as any);
+    await this.agentRepo.update(agent.id, {
+      status: dto.status === 'offline' ? AgentStatus.OFFLINE : AgentStatus.ONLINE,
+      lastSeen: new Date(),
+      agentVersion: dto.agentVersion || agent.agentVersion,
+      remoteStatus: dto.remoteStatus || agent.remoteStatus,
+    } as any);
 
     // Resolver alertas de offline ativos para este device
-    await this.alertEngine.resolverAlertaOffline(deviceId);
+    await this.alertEngine.resolverAlertaOffline(device.id);
 
     // Registrar métricas se presentes
     if (dto.cpuPercent !== undefined || dto.ramPercent !== undefined) {
       await this.metricRepo.save({
-        deviceId,
+        deviceId: device.id,
         cpuPercent: dto.cpuPercent,
         ramPercent: dto.ramPercent,
         ramUsadaMb: dto.ramUsadaMb,
@@ -309,11 +401,11 @@ export class AgentsService {
       });
 
       // Avaliar thresholds de alerta
-      await this.alertEngine.avaliarMetricas(deviceId, tenantId, dto);
+      await this.alertEngine.avaliarMetricas(device.id, payload.tenantId, dto);
     }
 
     // Retornar comandos pendentes (placeholder para futuro)
-    return { status: 'ok', commands: [], timestamp: new Date().toISOString() };
+    return { status: 'ok', agentId: agent.id, deviceId: device.id, tenantId: payload.tenantId, commands: [], timestamp: new Date().toISOString() };
   }
 
   async atualizarInventario(deviceId: string, tenantId: string, dto: AgentInventoryDto) {
@@ -346,5 +438,24 @@ export class AgentsService {
       .getRepository('Organization')
       .findOne({ where: { tenantId }, order: { criadoEm: 'ASC' } });
     return org?.id || tenantId;
+  }
+
+  private gerarTokenSeguro(bytes: number): string {
+    return crypto.randomBytes(bytes).toString('hex');
+  }
+
+  private hashToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
+  }
+
+  private calcularFingerprint(dados: AgentRegisterDto): string {
+    return this.hashToken([
+      dados.hostname,
+      dados.username || '',
+      dados.sistemaOperacional || '',
+      dados.versaoWindows || '',
+      dados.numeroSerie || '',
+      dados.macAddress || '',
+    ].join('|'));
   }
 }

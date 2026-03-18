@@ -1,43 +1,55 @@
 'use client'
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useMemo, useCallback } from 'react'
 import { io, Socket } from 'socket.io-client'
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:3000'
+const sockets = new Map<string, Socket>()
+
+function getSocket(namespace: string) {
+  const existing = sockets.get(namespace)
+  if (existing) return existing
+
+  const token = typeof window !== 'undefined' ? localStorage.getItem('miconecta_token') : null
+  if (!token) return null
+
+  const socket = io(`${WS_URL}${namespace}`, {
+    auth: { token },
+    transports: ['websocket', 'polling'],
+    reconnection: true,
+    reconnectionAttempts: 10,
+    reconnectionDelayMax: 5000,
+  })
+
+  sockets.set(namespace, socket)
+  socket.on('disconnect', () => {
+    if (!socket.connected) return
+  })
+  return socket
+}
 
 export function useSocket(namespace: string = '/chat') {
-  const socketRef = useRef<Socket | null>(null)
+  const socket = useMemo(() => getSocket(namespace), [namespace])
 
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('miconecta_token') : null
-    if (!token) return
-
-    const socket = io(`${WS_URL}${namespace}`, {
-      auth: { token },
-      transports: ['websocket', 'polling'],
-    })
-
-    socket.on('connect', () => console.log(`[WS] Connected to ${namespace}`))
-    socket.on('disconnect', () => console.log(`[WS] Disconnected from ${namespace}`))
-
-    socketRef.current = socket
-
+    if (!socket) return
     return () => {
-      socket.disconnect()
-      socketRef.current = null
+      // Mantém a conexão compartilhada para evitar múltiplos sockets por página.
     }
-  }, [namespace])
+  }, [socket])
 
-  const emit = useCallback((event: string, data: any) => {
-    socketRef.current?.emit(event, data)
-  }, [])
+  const emit = useCallback((event: string, data: unknown) => {
+    socket?.emit(event, data)
+  }, [socket])
 
-  const on = useCallback((event: string, handler: (...args: any[]) => void) => {
-    socketRef.current?.on(event, handler)
-    return () => { socketRef.current?.off(event, handler) }
-  }, [])
+  const on = useCallback((event: string, handler: (...args: unknown[]) => void) => {
+    socket?.on(event, handler)
+    return () => {
+      socket?.off(event, handler)
+    }
+  }, [socket])
 
-  return { socket: socketRef.current, emit, on }
+  return { socket, emit, on }
 }
 
 export function useChatSocket(ticketId: string | null) {
@@ -45,13 +57,25 @@ export function useChatSocket(ticketId: string | null) {
 
   useEffect(() => {
     if (!ticketId || !socket) return
-    emit('chat:join_ticket', { ticketId })
-    return () => { emit('chat:leave_ticket', { ticketId }) }
+    emit('ticket:join', { ticketId })
+    return () => {
+      emit('ticket:leave', { ticketId })
+    }
   }, [ticketId, socket, emit])
 
-  const sendMessage = useCallback((conteudo: string, remetenteId: string, remetenteNome: string, remetenteTipo: string) => {
+  const sendMessage = useCallback((content: string) => {
     if (!ticketId) return
-    emit('chat:send_message', { ticketId, conteudo, remetenteId, remetenteNome, remetenteTipo })
+    emit('message:send', { ticketId, content })
+  }, [ticketId, emit])
+
+  const sendFile = useCallback((payload: {
+    arquivoUrl: string
+    arquivoNome: string
+    arquivoTamanho: number
+    conteudo?: string
+  }) => {
+    if (!ticketId) return
+    emit('chat:send_file', { ticketId, ...payload })
   }, [ticketId, emit])
 
   const sendTyping = useCallback((userId: string, nome: string, isTyping: boolean) => {
@@ -59,5 +83,5 @@ export function useChatSocket(ticketId: string | null) {
     emit('chat:typing', { ticketId, userId, nome, isTyping })
   }, [ticketId, emit])
 
-  return { on, sendMessage, sendTyping }
+  return { socket, on, sendMessage, sendFile, sendTyping }
 }

@@ -13,7 +13,7 @@ import { TicketsService } from './tickets.service';
 import { UnifiedTimelineService } from './unified-timeline.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { AtribuirTicketDto, ComentarioDto, NotaInternaDto, AvaliarTicketDto, TicketFilterDto } from './dto/ticket-actions.dto';
-import { TicketStatus } from '../../database/entities/ticket.entity';
+import { TicketStatus, TicketPrioridade } from '../../database/entities/ticket.entity';
 
 @ApiTags('Tickets')
 @Controller('tickets')
@@ -90,6 +90,14 @@ export class TicketsController {
     return this.timelineService.gerarResumo(id, tenantId);
   }
 
+  @Get(':id/ia')
+  @RequirePermissions('tickets:read')
+  @ApiOperation({ summary: 'Sugerir resposta, resumo e prioridade via IA' })
+  async sugerirIA(@Req() req: any, @Param('id') id: string) {
+    const tenantId = req.tenantId || req.user.tenantId;
+    return this.ticketsService.sugerirIA(id, tenantId);
+  }
+
   // ── Transições de Status ──
 
   @Put(':id/atribuir')
@@ -144,10 +152,50 @@ export class TicketsController {
 
   @Put(':id/aguardar-tecnico')
   @RequirePermissions('tickets:write')
-  @ApiOperation({ summary: 'Marcar como aguardando técnico' })
+  @ApiOperation({ summary: 'Marcar como aguardando terceiro' })
   async aguardarTecnico(@Req() req: any, @Param('id') id: string) {
     const tenantId = req.tenantId || req.user.tenantId;
     return this.ticketsService.atualizarStatus(id, tenantId, TicketStatus.AGUARDANDO_TECNICO, req.user.nome);
+  }
+
+  @Put(':id/aguardar-terceiro')
+  @RequirePermissions('tickets:write')
+  @ApiOperation({ summary: 'Marcar como aguardando terceiro' })
+  async aguardarTerceiro(@Req() req: any, @Param('id') id: string) {
+    const tenantId = req.tenantId || req.user.tenantId;
+    return this.ticketsService.atualizarStatus(id, tenantId, TicketStatus.AGUARDANDO_TECNICO, req.user.nome);
+  }
+
+  @Put(':id/remover-atribuicao')
+  @RequirePermissions('tickets:assign')
+  @ApiOperation({ summary: 'Remover atribuição do técnico' })
+  async removerAtribuicao(@Req() req: any, @Param('id') id: string) {
+    const tenantId = req.tenantId || req.user.tenantId;
+    return this.ticketsService.removerAtribuicao(id, tenantId, req.user.nome);
+  }
+
+  @Put(':id/prioridade/:prioridade')
+  @RequirePermissions('tickets:write')
+  @ApiOperation({ summary: 'Alterar prioridade do ticket' })
+  async atualizarPrioridade(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Param('prioridade') prioridade: TicketPrioridade,
+  ) {
+    const tenantId = req.tenantId || req.user.tenantId;
+    return this.ticketsService.atualizarPrioridade(id, tenantId, prioridade, req.user.nome);
+  }
+
+  @Put(':id/categoria')
+  @RequirePermissions('tickets:write')
+  @ApiOperation({ summary: 'Alterar categoria do ticket' })
+  async atualizarCategoria(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body('categoriaId') categoriaId?: string,
+  ) {
+    const tenantId = req.tenantId || req.user.tenantId;
+    return this.ticketsService.atualizarCategoria(id, tenantId, categoriaId || null, req.user.nome);
   }
 
   // ── Comentários e Notas ──

@@ -1,6 +1,8 @@
 export { Tenant, TenantPlano, TenantStatus } from './tenant.entity';
 export { Organization } from './organization.entity';
 export { Device, DeviceStatus } from './device.entity';
+export { Agent, AgentStatus } from './agent.entity';
+export { InstallationToken, InstallationTokenStatus } from './installation-token.entity';
 export { DeviceMetric } from './device-metric.entity';
 export { DeviceInventory } from './device-inventory.entity';
 export { Alert, AlertSeverity, AlertStatus, AlertType } from './alert.entity';
@@ -13,7 +15,7 @@ export { Session, SessionType } from './session.entity';
 export { AuditLog } from './audit-log.entity';
 export { Patch, PatchStatus, PatchSeverity } from './patch.entity';
 export { ClientUser, ClientUserRole } from './client-user.entity';
-export { Ticket, TicketStatus, TicketPrioridade, TicketOrigem } from './ticket.entity';
+export { Ticket, TicketStatus, TicketPrioridade, TicketOrigem, TicketSlaStatus } from './ticket.entity';
 export { TicketComment, TicketCommentTipo } from './ticket-comment.entity';
 export { ChatMessage, ChatMessageTipo, ChatRemetenteTipo } from './chat-message.entity';
 export { RemoteSession, RemoteSessionStatus } from './remote-session.entity';

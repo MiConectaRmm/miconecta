@@ -36,7 +36,7 @@ import {
   Technician, Session, AuditLog, Patch,
   ClientUser, Ticket, TicketComment, ChatMessage,
   RemoteSession, RemoteSessionLog, ConsentRecord, Notification,
-  FileAttachment, LgpdRequest, ReportSchedule,
+  FileAttachment, LgpdRequest, ReportSchedule, Agent, InstallationToken,
 } from './database/entities';
 
 // ── Subscriber ──
@@ -48,7 +48,7 @@ const entities = [
   Technician, Session, AuditLog, Patch,
   ClientUser, Ticket, TicketComment, ChatMessage,
   RemoteSession, RemoteSessionLog, ConsentRecord, Notification,
-  FileAttachment, LgpdRequest, ReportSchedule,
+  FileAttachment, LgpdRequest, ReportSchedule, Agent, InstallationToken,
 ];
 
 @Module({

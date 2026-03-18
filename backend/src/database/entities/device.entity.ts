@@ -84,6 +84,12 @@ export class Device {
   @Column({ length: 50, name: 'agent_version', nullable: true })
   agentVersion: string;
 
+  @Column({ name: 'agent_id', type: 'uuid', nullable: true })
+  agentId: string | null;
+
+  @Column({ name: 'last_checkin', type: 'timestamp', nullable: true })
+  lastCheckin: Date | null;
+
   @Column({ length: 255, name: 'antivirus_status', nullable: true })
   antivirusStatus: string;
 

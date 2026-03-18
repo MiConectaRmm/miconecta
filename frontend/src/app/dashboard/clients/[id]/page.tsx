@@ -61,6 +61,10 @@ export default function ClientDetailPage() {
   const [copied, setCopied] = useState<string | null>(null)
   const [agentInfo, setAgentInfo] = useState<any>(null)
   const [devices, setDevices] = useState<any[]>([])
+  const [agents, setAgents] = useState<any[]>([])
+  const [installationTokens, setInstallationTokens] = useState<any[]>([])
+  const [newTokenDescription, setNewTokenDescription] = useState('')
+  const [newTokenExpiresAt, setNewTokenExpiresAt] = useState('')
   const [editing, setEditing] = useState(false)
   const [editData, setEditData] = useState<Partial<TenantDetail>>({})
   const [saving, setSaving] = useState(false)
@@ -89,6 +93,15 @@ export default function ClientDetailPage() {
       try {
         const devRes = await devicesApi.listar({ tenantId: id })
         setDevices(Array.isArray(devRes.data) ? devRes.data : devRes.data?.items || [])
+      } catch {}
+
+      try {
+        const [agentsRes, tokensRes] = await Promise.all([
+          agentsApi.listarAgentes(),
+          agentsApi.listarInstallationTokens(),
+        ])
+        setAgents(Array.isArray(agentsRes.data) ? agentsRes.data : [])
+        setInstallationTokens(Array.isArray(tokensRes.data) ? tokensRes.data : [])
       } catch {}
     } catch (err: any) {
       setError(err.response?.data?.message || 'Erro ao carregar cliente')
@@ -140,6 +153,29 @@ export default function ClientDetailPage() {
       await agentsApi.provision()
       await loadData()
     } catch {}
+  }
+
+  const createInstallationToken = async () => {
+    try {
+      await agentsApi.criarInstallationToken({
+        descricao: newTokenDescription || undefined,
+        expiresAt: newTokenExpiresAt || undefined,
+      })
+      setNewTokenDescription('')
+      setNewTokenExpiresAt('')
+      await loadData()
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Erro ao criar token')
+    }
+  }
+
+  const revokeInstallationToken = async (tokenId: string) => {
+    try {
+      await agentsApi.revogarInstallationToken(tokenId)
+      await loadData()
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Erro ao revogar token')
+    }
   }
 
   if (loading) {
@@ -353,6 +389,33 @@ export default function ClientDetailPage() {
             </div>
           </div>
 
+          <div className="card">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <Shield className="w-5 h-5 text-brand-400" /> Tokens de Instalação
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+              <input className="input" placeholder="Descrição opcional" value={newTokenDescription} onChange={(e) => setNewTokenDescription(e.target.value)} />
+              <input className="input" type="datetime-local" value={newTokenExpiresAt} onChange={(e) => setNewTokenExpiresAt(e.target.value)} />
+            </div>
+            <button onClick={createInstallationToken} className="btn-primary mb-4">Gerar token</button>
+            <div className="space-y-2">
+              {installationTokens.length === 0 ? (
+                <p className="text-sm text-dark-500">Nenhum token criado.</p>
+              ) : installationTokens.map((token) => (
+                <div key={token.id} className="border border-dark-700 rounded-lg p-3 bg-dark-900/50">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm text-white font-medium">{token.descricao || 'Sem descrição'}</p>
+                      <p className="text-xs text-dark-500">Preview: {token.tokenPreview} · {token.status}</p>
+                      <p className="text-xs text-dark-500">Expira: {token.expiresAt ? new Date(token.expiresAt).toLocaleString('pt-BR') : 'Sem expiração'}</p>
+                    </div>
+                    <button onClick={() => revokeInstallationToken(token.id)} className="text-xs text-red-400 hover:text-red-300">Revogar</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Organizações */}
           <div className="card">
             <div className="flex items-center justify-between mb-4">
@@ -461,6 +524,38 @@ export default function ClientDetailPage() {
               </div>
             ) : (
               <p className="text-dark-500 text-sm text-center py-4">Nenhum dispositivo registrado</p>
+            )}
+          </div>
+
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Shield className="w-5 h-5 text-brand-400" /> Agentes
+              </h3>
+              <span className="text-dark-400 text-sm">{agents.length}</span>
+            </div>
+            {agents.length > 0 ? (
+              <div className="space-y-2">
+                {agents.map((agent) => (
+                  <div key={agent.id} className="p-3 bg-dark-800/50 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-white font-medium">{agent.device?.hostname || agent.deviceId}</p>
+                        <p className="text-xs text-dark-500">Agent ID: {agent.id}</p>
+                      </div>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-dark-700 text-dark-300 capitalize">{agent.status}</span>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-dark-400">
+                      <span>Versão: {agent.agentVersion || '-'}</span>
+                      <span>Último check-in: {agent.lastSeen ? new Date(agent.lastSeen).toLocaleString('pt-BR') : '-'}</span>
+                      <span>Remote: {agent.remoteStatus || '-'}</span>
+                      <span>RustDesk: {agent.device?.rustdeskId || '-'}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-dark-500 text-sm text-center py-4">Nenhum agente registrado</p>
             )}
           </div>
         </div>

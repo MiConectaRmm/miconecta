@@ -61,6 +61,11 @@ export class TicketFilterDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsString()
+  categoriaId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsUUID()
   atribuidoA?: string;
 

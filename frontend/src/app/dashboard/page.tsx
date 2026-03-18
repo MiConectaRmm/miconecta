@@ -9,6 +9,7 @@ import {
 import { devicesApi, alertsApi, ticketsApi, tenantsApi } from '@/lib/api'
 import StatCard from '@/components/ui/StatCard'
 import StatusBadge from '@/components/ui/StatusBadge'
+import { useSocket } from '@/hooks/useSocket'
 
 export default function DashboardPage() {
   const [resumo, setResumo] = useState({ total: 0, online: 0, offline: 0, alerta: 0 })
@@ -16,12 +17,24 @@ export default function DashboardPage() {
   const [tickets, setTickets] = useState({ abertos: 0, emAtendimento: 0, total: 0 })
   const [devices, setDevices] = useState<any[]>([])
   const [carregando, setCarregando] = useState(true)
+  const { on } = useSocket('/chat')
 
   useEffect(() => {
     carregarDados()
     const interval = setInterval(carregarDados, 30000)
     return () => clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    const unsubNotification = on('notification:new', () => carregarDados())
+    const unsubTicketUpdated = on('ticket:updated', () => carregarDados())
+    const unsubMessage = on('message:new', () => carregarDados())
+    return () => {
+      unsubNotification()
+      unsubTicketUpdated()
+      unsubMessage()
+    }
+  }, [on])
 
   const carregarDados = async () => {
     try {

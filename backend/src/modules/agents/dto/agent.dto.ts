@@ -1,13 +1,23 @@
-import { IsNotEmpty, IsString, IsOptional, IsNumber, IsArray, ValidateNested, MaxLength, Min } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsNumber, IsArray, ValidateNested, MaxLength, Min, IsUUID, IsDateString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
 export class AgentRegisterDto {
+  @ApiProperty({ example: 'abc123installationtoken' })
+  @IsNotEmpty()
+  @IsString()
+  installationToken: string;
+
   @ApiProperty({ example: 'PC-FINANCEIRO' })
   @IsNotEmpty()
   @IsString()
   @MaxLength(255)
   hostname: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  username?: string;
 
   @ApiPropertyOptional({ example: 'Windows 11 Pro' })
   @IsOptional()
@@ -59,6 +69,11 @@ export class AgentRegisterDto {
   @IsString()
   numeroSerie?: string;
 
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  macAddress?: string;
+
   @ApiPropertyOptional({ example: '2.1.0' })
   @IsOptional()
   @IsString()
@@ -81,10 +96,30 @@ export class AgentRegisterDto {
 }
 
 export class AgentHeartbeatDto {
+  @ApiProperty({ example: 'agent-token' })
+  @IsNotEmpty()
+  @IsString()
+  agentToken: string;
+
   @ApiProperty({ description: 'ID do dispositivo' })
   @IsNotEmpty()
   @IsString()
   deviceId: string;
+
+  @ApiPropertyOptional({ example: 'online', enum: ['online', 'offline', 'manutencao'] })
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @ApiPropertyOptional({ example: '2.1.0' })
+  @IsOptional()
+  @IsString()
+  agentVersion?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  remoteStatus?: string;
 
   @ApiPropertyOptional({ example: 45.2 })
   @IsOptional()
@@ -145,6 +180,18 @@ export class AgentHeartbeatDto {
   @IsOptional()
   @IsNumber()
   discoDisponivelMb?: number;
+}
+
+export class InstallationTokenCreateDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  descricao?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  expiresAt?: string;
 }
 
 export class InventoryItemDto {

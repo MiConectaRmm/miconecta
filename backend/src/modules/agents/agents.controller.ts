@@ -1,5 +1,5 @@
 import {
-  Controller, Post, Get, Body, Req, Param,
+  Controller, Post, Get, Body, Req, Param, Delete,
   UseGuards, Headers,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -10,8 +10,9 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
+import { AgentAuthGuard } from '../auth/guards/agent-auth.guard';
 import { AgentsService } from './agents.service';
-import { AgentRegisterDto, AgentHeartbeatDto, AgentInventoryDto } from './dto/agent.dto';
+import { AgentRegisterDto, AgentHeartbeatDto, AgentInventoryDto, InstallationTokenCreateDto } from './dto/agent.dto';
 
 @ApiTags('Agents')
 @Controller('agents')
@@ -43,6 +44,50 @@ export class AgentsController {
     return this.agentsService.gerarProvisionToken(tenantId);
   }
 
+  @Get('installation-tokens')
+  @UseGuards(JwtAuthGuard, TenantAccessGuard, RolesGuard, PermissionsGuard)
+  @Roles('super_admin', 'admin_maginf', 'admin')
+  @RequirePermissions('devices:read')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Listar tokens de instalação do tenant' })
+  async listInstallationTokens(@Req() req: any) {
+    const tenantId = req.tenantId || req.user.tenantId;
+    return this.agentsService.listarInstallationTokens(tenantId);
+  }
+
+  @Post('installation-tokens')
+  @UseGuards(JwtAuthGuard, TenantAccessGuard, RolesGuard, PermissionsGuard)
+  @Roles('super_admin', 'admin_maginf', 'admin')
+  @RequirePermissions('devices:write')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Criar token de instalação' })
+  async createInstallationToken(@Req() req: any, @Body() dto: InstallationTokenCreateDto) {
+    const tenantId = req.tenantId || req.user.tenantId;
+    return this.agentsService.criarInstallationToken(tenantId, dto);
+  }
+
+  @Delete('installation-tokens/:id')
+  @UseGuards(JwtAuthGuard, TenantAccessGuard, RolesGuard, PermissionsGuard)
+  @Roles('super_admin', 'admin_maginf', 'admin')
+  @RequirePermissions('devices:write')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Revogar token de instalação' })
+  async revokeInstallationToken(@Req() req: any, @Param('id') id: string) {
+    const tenantId = req.tenantId || req.user.tenantId;
+    return this.agentsService.revogarInstallationToken(tenantId, id);
+  }
+
+  @Get('agents')
+  @UseGuards(JwtAuthGuard, TenantAccessGuard, RolesGuard, PermissionsGuard)
+  @Roles('super_admin', 'admin_maginf', 'admin')
+  @RequirePermissions('devices:read')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Listar agentes do tenant' })
+  async listAgents(@Req() req: any) {
+    const tenantId = req.tenantId || req.user.tenantId;
+    return this.agentsService.listarAgentes(tenantId);
+  }
+
   @Get('install-script/:tenantId')
   @UseGuards(JwtAuthGuard, TenantAccessGuard, RolesGuard, PermissionsGuard)
   @Roles('super_admin', 'admin_maginf', 'admin')
@@ -67,17 +112,15 @@ export class AgentsController {
   }
 
   @Post('heartbeat')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @UseGuards(AgentAuthGuard)
   @ApiOperation({ summary: 'Heartbeat do agente com métricas' })
   async heartbeat(@Req() req: any, @Body() dto: AgentHeartbeatDto) {
-    const tenantId = req.user.tenantId;
-    return this.agentsService.heartbeat(dto.deviceId, tenantId, dto);
+    const agentToken = req.headers['x-agent-token'] || req.body.agentToken;
+    return this.agentsService.heartbeat(agentToken, dto);
   }
 
   @Post('inventory')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @UseGuards(AgentAuthGuard)
   @ApiOperation({ summary: 'Agente envia inventário (software + hardware)' })
   async inventory(
     @Req() req: any,

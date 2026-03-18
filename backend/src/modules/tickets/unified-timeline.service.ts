@@ -166,7 +166,7 @@ export class UnifiedTimelineService {
       autorNome: c.autorNome,
       conteudo: c.conteudo,
       visivelCliente: c.visivelCliente,
-      metadata: c.metadata,
+      metadata: this.normalizeMetadata(c.tipo, c.metadata),
     }));
   }
 
@@ -311,6 +311,35 @@ export class UnifiedTimelineService {
       [ChatMessageTipo.SISTEMA]: TimelineEventType.CHAT_SISTEMA,
     };
     return map[tipo] || TimelineEventType.CHAT_MENSAGEM;
+  }
+
+  private normalizeMetadata(tipo: TicketCommentTipo, metadata?: Record<string, any>) {
+    if (!metadata) return metadata;
+
+    if (tipo === TicketCommentTipo.MUDANCA_STATUS) {
+      return {
+        ...metadata,
+        antes: metadata.statusAnterior || metadata.anterior,
+        depois: metadata.statusNovo || metadata.novo,
+        tipoEvento: 'status',
+      };
+    }
+
+    if (tipo === TicketCommentTipo.NOTA_INTERNA) {
+      return {
+        ...metadata,
+        tipoEvento: 'nota_interna',
+      };
+    }
+
+    if (tipo === TicketCommentTipo.SISTEMA) {
+      return {
+        ...metadata,
+        tipoEvento: 'sistema',
+      };
+    }
+
+    return metadata;
   }
 
   private calcularTempoResposta(

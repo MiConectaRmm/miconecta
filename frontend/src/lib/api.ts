@@ -126,14 +126,21 @@ export const ticketsApi = {
   timeline: (id: string, limit?: number, offset?: number) =>
     api.get(`/tickets/${id}/timeline`, { params: { limit, offset } }),
   resumo: (id: string) => api.get(`/tickets/${id}/resumo`),
+  sugestaoIA: (id: string) => api.get(`/tickets/${id}/ia`),
   atribuir: (id: string, technicianId: string, technicianNome: string) =>
     api.put(`/tickets/${id}/atribuir`, { technicianId, technicianNome }),
+  removerAtribuicao: (id: string) => api.put(`/tickets/${id}/remover-atribuicao`, {}),
+  atualizarPrioridade: (id: string, prioridade: string) =>
+    api.put(`/tickets/${id}/prioridade/${prioridade}`, {}),
+  atualizarCategoria: (id: string, categoriaId?: string) =>
+    api.put(`/tickets/${id}/categoria`, { categoriaId }),
   resolver: (id: string) => api.put(`/tickets/${id}/resolver`),
   fechar: (id: string) => api.put(`/tickets/${id}/fechar`),
   reabrir: (id: string) => api.put(`/tickets/${id}/reabrir`),
   cancelar: (id: string) => api.put(`/tickets/${id}/cancelar`),
   aguardarCliente: (id: string) => api.put(`/tickets/${id}/aguardar-cliente`),
   aguardarTecnico: (id: string) => api.put(`/tickets/${id}/aguardar-tecnico`),
+  aguardarTerceiro: (id: string) => api.put(`/tickets/${id}/aguardar-terceiro`),
   comentar: (id: string, conteudo: string, visivelCliente?: boolean) =>
     api.post(`/tickets/${id}/comentario`, { conteudo, visivelCliente }),
   notaInterna: (id: string, conteudo: string) =>
@@ -247,6 +254,10 @@ export const rolesApi = {
 export const agentsApi = {
   provision: () => api.post('/agents/provision'),
   downloadInfo: () => api.get('/agents/download-info'),
+  listarInstallationTokens: () => api.get('/agents/installation-tokens'),
+  criarInstallationToken: (dados: { descricao?: string; expiresAt?: string }) => api.post('/agents/installation-tokens', dados),
+  revogarInstallationToken: (id: string) => api.delete(`/agents/installation-tokens/${id}`),
+  listarAgentes: () => api.get('/agents/agents'),
   installScript: (tenantId: string, format: 'bat' | 'ps1' = 'bat') =>
     api.get(`/agents/install-script/${tenantId}`, { params: { format } }),
 };
