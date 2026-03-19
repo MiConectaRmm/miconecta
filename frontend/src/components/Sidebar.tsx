@@ -32,7 +32,7 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'Principal' },
-  { href: '/dashboard/clients', label: 'Clientes', icon: Building2, section: 'Principal' },
+  { href: '/dashboard/clientes', label: 'Clientes', icon: Building2, section: 'Principal' },
   { href: '/dashboard/devices', label: 'Dispositivos', icon: Monitor, section: 'RMM' },
   { href: '/dashboard/alerts', label: 'Alertas', icon: Bell, section: 'RMM' },
   { href: '/dashboard/scripts', label: 'Scripts', icon: Terminal, section: 'RMM' },
