@@ -133,7 +133,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const normalized = this.normalizeMessage(message);
     this.server.to(`ticket:${ticket.id}`).emit('message:new', normalized);
-    this.server.to(`ticket:${ticket.id}`).emit('chat:new_message', normalized);
     this.server.to(`tenant:${ticket.tenantId}`).emit('notification:new', {
       type: 'ticket_message',
       ticketId: ticket.id,
@@ -160,7 +159,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
     const normalized = this.normalizeMessage(message);
     this.server.to(`ticket:${ticket.id}`).emit('message:new', normalized);
-    this.server.to(`ticket:${ticket.id}`).emit('chat:new_message', normalized);
     return normalized;
   }
 
@@ -191,7 +189,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
     const normalized = this.normalizeMessage(message);
     this.server.to(`ticket:${ticket.id}`).emit('message:new', normalized);
-    this.server.to(`ticket:${ticket.id}`).emit('chat:new_message', normalized);
     this.server.to(`tenant:${ticket.tenantId}`).emit('notification:new', {
       type: 'ticket_message',
       ticketId: ticket.id,
@@ -229,7 +226,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   emitMessage(ticketId: string, payload: unknown) {
     this.server.to(`ticket:${ticketId}`).emit('message:new', payload);
-    this.server.to(`ticket:${ticketId}`).emit('chat:new_message', payload);
   }
 
   private extractToken(client: Socket): string | null {
