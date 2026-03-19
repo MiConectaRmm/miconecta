@@ -23,7 +23,7 @@ export class Agent {
   @Column({ name: 'device_id' })
   deviceId: string;
 
-  @Column({ name: 'installation_token_id', nullable: true })
+  @Column({ name: 'installation_token_id', type: 'uuid', nullable: true })
   installationTokenId: string | null;
 
   @Column({ name: 'agent_token_hash', type: 'text' })
@@ -35,13 +35,13 @@ export class Agent {
   @Column({ type: 'enum', enum: AgentStatus, default: AgentStatus.ATIVO })
   status: AgentStatus;
 
-  @Column({ name: 'agent_version', length: 50, nullable: true })
+  @Column({ name: 'agent_version', type: 'varchar', length: 50, nullable: true })
   agentVersion: string | null;
 
   @Column({ name: 'last_seen', type: 'timestamp', nullable: true })
   lastSeen: Date | null;
 
-  @Column({ name: 'remote_status', length: 50, nullable: true })
+  @Column({ name: 'remote_status', type: 'varchar', length: 50, nullable: true })
   remoteStatus: string | null;
 
   @CreateDateColumn({ name: 'criado_em' })
