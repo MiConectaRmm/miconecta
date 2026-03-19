@@ -29,6 +29,11 @@ import { Agent } from '../../database/entities/agent.entity';
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, AgentAuthGuard],
-  exports: [AuthService, JwtModule, AgentAuthGuard],
+  exports: [
+    AuthService,
+    JwtModule,
+    AgentAuthGuard,
+    TypeOrmModule, // Export repositories for AgentAuthGuard usage in other modules
+  ],
 })
 export class AuthModule {}
