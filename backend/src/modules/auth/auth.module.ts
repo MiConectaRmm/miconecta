@@ -12,10 +12,11 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { AgentAuthGuard } from './guards/agent-auth.guard';
+import { Agent } from '../../database/entities/agent.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Technician, ClientUser, AuditLog, Device, Tenant]),
+    TypeOrmModule.forFeature([Technician, ClientUser, AuditLog, Device, Tenant, Agent]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
