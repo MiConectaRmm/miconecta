@@ -338,22 +338,26 @@ export class TicketsService {
       },
     });
 
-    const unread = await this.chatRepo
-      .createQueryBuilder('msg')
-      .select('COUNT(DISTINCT msg.ticketId)', 'count')
-      .where('msg.lido = false')
-      .andWhere('msg.remetenteTipo = :tipo', { tipo: ChatRemetenteTipo.CLIENT_USER })
-      .andWhere('msg.ticketId IN ' +
-        this.ticketRepo
-          .createQueryBuilder('t')
-          .select('t.id')
-          .where('t.tenantId = :tenantId', { tenantId })
-          .getQuery(),
-      )
-      .setParameter('tenantId', tenantId)
-      .getRawOne<{ count: string }>();
+    const ticketIds = await this.ticketRepo
+      .createQueryBuilder('t')
+      .select('t.id')
+      .where('t.tenantId = :tenantId', { tenantId })
+      .getMany();
 
-    const comNovaMensagem = unread?.count ? Number(unread.count) : 0;
+    const ids = ticketIds.map((t) => t.id);
+
+    let comNovaMensagem = 0;
+    if (ids.length > 0) {
+      const unread = await this.chatRepo
+        .createQueryBuilder('msg')
+        .select('COUNT(DISTINCT msg.ticketId)', 'count')
+        .where('msg.lido = false')
+        .andWhere('msg.remetenteTipo = :tipo', { tipo: ChatRemetenteTipo.CLIENT_USER })
+        .andWhere('msg.ticketId IN (:...ids)', { ids })
+        .getRawOne<{ count: string }>();
+
+      comNovaMensagem = unread?.count ? Number(unread.count) : 0;
+    }
 
     return { abertos, emAtendimento, aguardando, resolvidos, total, urgentes, comNovaMensagem, fechadosHoje };
   }
