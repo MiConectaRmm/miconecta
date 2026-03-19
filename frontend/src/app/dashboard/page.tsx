@@ -142,7 +142,7 @@ export default function DashboardPage() {
                 <p className="text-xs text-dark-500">Gerenciar parque</p>
               </div>
             </Link>
-            <Link href="/dashboard/clients" className="flex items-center gap-3 p-3 rounded-lg bg-dark-900 hover:bg-dark-700 transition-colors group">
+            <Link href="/dashboard/clientes" className="flex items-center gap-3 p-3 rounded-lg bg-dark-900 hover:bg-dark-700 transition-colors group">
               <div className="w-9 h-9 rounded-lg bg-emerald-500/20 flex items-center justify-center">
                 <Building2 className="w-4 h-4 text-emerald-400" />
               </div>
