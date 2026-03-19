@@ -7,6 +7,7 @@ import { ArrowLeft, Send, Clock, MessageSquare, FileText, Paperclip } from 'luci
 import { ticketsApi, chatApi } from '@/lib/api'
 import StatusBadge from '@/components/ui/StatusBadge'
 import { useAuthStore } from '@/stores/auth.store'
+import { useChatSocket } from '@/hooks/useSocket'
 
 export default function PortalTicketDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -19,6 +20,16 @@ export default function PortalTicketDetailPage() {
   const [carregando, setCarregando] = useState(true)
   const [enviando, setEnviando] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const { socket, on, sendMessage } = useChatSocket(id)
+
+  const normalizeIncomingMessage = (msg: any) => ({
+    ...msg,
+    remetenteId: msg.remetenteId ?? msg.senderId,
+    remetenteNome: msg.remetenteNome ?? msg.senderName,
+    remetenteTipo: msg.remetenteTipo ?? msg.senderType,
+    conteudo: msg.conteudo ?? msg.content,
+    criadoEm: msg.criadoEm ?? msg.createdAt,
+  })
 
   useEffect(() => {
     if (!id) return
@@ -28,6 +39,21 @@ export default function PortalTicketDetailPage() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [mensagens])
+
+  useEffect(() => {
+    const unsub = on('message:new', (msg: any) => {
+      const normalized = normalizeIncomingMessage(msg)
+      setMensagens((prev) => {
+        if (normalized?.id && prev.some((item: any) => item.id === normalized.id)) {
+          return prev
+        }
+        return [...prev, normalized]
+      })
+    })
+    return () => {
+      unsub()
+    }
+  }, [on])
 
   const carregar = async () => {
     try {
@@ -47,10 +73,16 @@ export default function PortalTicketDetailPage() {
     if (!novaMsg.trim() || enviando) return
     setEnviando(true)
     try {
-      await chatApi.enviar(id, novaMsg.trim())
+      if (socket?.connected) {
+        sendMessage(novaMsg.trim())
+      } else {
+        await chatApi.enviar(id, novaMsg.trim())
+      }
       setNovaMsg('')
-      const { data } = await chatApi.mensagens(id, 200)
-      setMensagens(data || [])
+      if (!socket?.connected) {
+        const { data } = await chatApi.mensagens(id, 200)
+        setMensagens(data || [])
+      }
     } catch {}
     setEnviando(false)
   }

@@ -26,7 +26,8 @@ export class ChatController {
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
   ) {
-    return this.chatService.listarMensagens(ticketId, limit || 100, offset || 0);
+    const messages = await this.chatService.listarMensagens(ticketId, limit || 100, offset || 0);
+    return messages.map((message) => this.normalizeMessage(message));
   }
 
   @Post('tickets/:ticketId/messages')
@@ -41,7 +42,7 @@ export class ChatController {
       ? ChatRemetenteTipo.CLIENT_USER
       : ChatRemetenteTipo.TECHNICIAN;
 
-    return this.chatService.enviarMensagem({
+    const message = await this.chatService.enviarMensagem({
       ticketId,
       remetenteTipo,
       remetenteId: req.user.sub,
@@ -52,13 +53,16 @@ export class ChatController {
       arquivoNome: dto.arquivoNome,
       arquivoTamanho: dto.arquivoTamanho,
     });
+    return this.normalizeMessage(message);
   }
 
   @Put('messages/:id/read')
   @RequirePermissions('tickets:read')
   @ApiOperation({ summary: 'Marcar mensagem como lida' })
   async marcarComoLida(@Param('id') id: string) {
-    return this.chatService.marcarComoLida(id);
+    const message = await this.chatService.marcarComoLida(id);
+    if (!message) return null;
+    return this.normalizeMessage(message);
   }
 
   @Put('tickets/:ticketId/read-all')
@@ -75,5 +79,34 @@ export class ChatController {
   async contarNaoLidas(@Req() req: any, @Param('ticketId') ticketId: string) {
     const count = await this.chatService.contarNaoLidas(ticketId, req.user.sub);
     return { ticketId, unread: count };
+  }
+
+  private normalizeMessage(message: any) {
+    return {
+      id: message.id,
+      ticketId: message.ticketId,
+      deviceId: message.deviceId,
+      // Campos canônicos (EN)
+      senderType: message.remetenteTipo,
+      senderId: message.remetenteId,
+      senderName: message.remetenteNome,
+      type: message.tipo,
+      content: message.conteudo,
+      read: message.lido,
+      readAt: message.lidoEm,
+      createdAt: message.criadoEm,
+      // Campos legados (PT) para compatibilidade gradual.
+      remetenteTipo: message.remetenteTipo,
+      remetenteId: message.remetenteId,
+      remetenteNome: message.remetenteNome,
+      tipo: message.tipo,
+      conteudo: message.conteudo,
+      lido: message.lido,
+      lidoEm: message.lidoEm,
+      criadoEm: message.criadoEm,
+      arquivoUrl: message.arquivoUrl,
+      arquivoNome: message.arquivoNome,
+      arquivoTamanho: message.arquivoTamanho,
+    };
   }
 }

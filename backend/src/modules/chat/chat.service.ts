@@ -77,11 +77,14 @@ export class ChatService {
   }
 
   async contarNaoLidas(ticketId: string, userId: string) {
-    return this.messageRepo.count({
-      where: {
-        ticketId,
-        lido: false,
-      },
-    });
+    const result = await this.messageRepo
+      .createQueryBuilder('msg')
+      .select('COUNT(*)', 'count')
+      .where('msg.ticketId = :ticketId', { ticketId })
+      .andWhere('msg.lido = false')
+      .andWhere('(msg.remetenteId IS NULL OR msg.remetenteId != :userId)', { userId })
+      .getRawOne<{ count: string }>();
+
+    return Number(result?.count || 0);
   }
 }

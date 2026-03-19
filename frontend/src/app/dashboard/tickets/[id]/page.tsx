@@ -54,18 +54,29 @@ export default function TicketDetailPage() {
 
   const { socket, on, sendMessage, sendFile } = useChatSocket(id)
 
+  const normalizeIncomingMessage = (msg: any) => ({
+    ...msg,
+    remetenteId: msg.remetenteId ?? msg.senderId,
+    remetenteNome: msg.remetenteNome ?? msg.senderName,
+    remetenteTipo: msg.remetenteTipo ?? msg.senderType,
+    conteudo: msg.conteudo ?? msg.content,
+    criadoEm: msg.criadoEm ?? msg.createdAt,
+  })
+
   useEffect(() => { carregar() }, [id])
 
   useEffect(() => {
     const unsub = on('message:new', (msg: any) => {
-      setMessages((prev) => [...prev, msg])
-    })
-    const unsubCompat = on('chat:new_message', (msg: any) => {
-      setMessages((prev) => [...prev, msg])
+      const normalized = normalizeIncomingMessage(msg)
+      setMessages((prev) => {
+        if (normalized?.id && prev.some((item: any) => item.id === normalized.id)) {
+          return prev
+        }
+        return [...prev, normalized]
+      })
     })
     return () => {
       unsub()
-      unsubCompat()
     }
   }, [on])
 

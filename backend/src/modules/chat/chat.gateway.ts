@@ -258,11 +258,17 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       throw new Error('Ticket not found');
     }
 
-    if (ticket.tenantId !== user.tenantId && user.userType !== 'technician') {
+    if (ticket.tenantId !== user.tenantId && !this.canAccessCrossTenant(user)) {
       throw new Error('Forbidden');
     }
 
     return ticket;
+  }
+
+  private canAccessCrossTenant(user: JwtSocketUser): boolean {
+    // Cross-tenant apenas para perfis globais de administração.
+    const globalRoles = new Set(['super_admin', 'admin_maginf']);
+    return Boolean(user.role && globalRoles.has(user.role));
   }
 
   private normalizeMessage(message: {
@@ -285,17 +291,27 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       id: message.id,
       ticketId: message.ticketId,
       deviceId: message.deviceId,
+      // Campos canônicos (EN)
       senderType: message.remetenteTipo,
       senderId: message.remetenteId,
       senderName: message.remetenteNome,
       type: message.tipo,
       content: message.conteudo,
-      arquivoUrl: message.arquivoUrl,
-      arquivoNome: message.arquivoNome,
-      arquivoTamanho: message.arquivoTamanho,
       read: message.lido,
       readAt: message.lidoEm,
       createdAt: message.criadoEm,
+      // Campos legados (PT) para compatibilidade gradual no frontend.
+      remetenteTipo: message.remetenteTipo,
+      remetenteId: message.remetenteId,
+      remetenteNome: message.remetenteNome,
+      tipo: message.tipo,
+      conteudo: message.conteudo,
+      arquivoUrl: message.arquivoUrl,
+      arquivoNome: message.arquivoNome,
+      arquivoTamanho: message.arquivoTamanho,
+      lido: message.lido,
+      lidoEm: message.lidoEm,
+      criadoEm: message.criadoEm,
     };
   }
 }
