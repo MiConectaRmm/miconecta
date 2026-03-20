@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Plus, User, Search, Mail, Phone, Building } from 'lucide-react'
 import { usersApi } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth.store'
 import Modal from '@/components/ui/Modal'
 
 export default function ClientesPage() {
@@ -18,6 +19,9 @@ export default function ClientesPage() {
     telefone: '',
     cargo: '',
   })
+
+  const user = useAuthStore((s) => s.user)
+  const isReadOnly = user?.userType === 'technician'
 
   useEffect(() => { carregar() }, [])
 
@@ -105,11 +109,13 @@ export default function ClientesPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white">Clientes</h1>
-          <p className="text-dark-400 text-sm mt-1">Gerenciar usuários dos clientes</p>
+          <p className="text-dark-400 text-sm mt-1">{isReadOnly ? 'Visualizar usuários dos clientes' : 'Gerenciar usuários dos clientes'}</p>
         </div>
-        <button onClick={() => abrirModal()} className="btn-primary flex items-center gap-2">
-          <Plus className="w-4 h-4" /> Novo Cliente
-        </button>
+        {!isReadOnly && (
+          <button onClick={() => abrirModal()} className="btn-primary flex items-center gap-2">
+            <Plus className="w-4 h-4" /> Novo Cliente
+          </button>
+        )}
       </div>
 
       <div className="card mb-6">
@@ -199,6 +205,7 @@ export default function ClientesPage() {
                     Enviar convite
                   </button>
                 </div>
+                )}
               </div>
             ))}
           </div>
