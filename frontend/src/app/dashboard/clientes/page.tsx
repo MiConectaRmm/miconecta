@@ -176,35 +176,36 @@ export default function ClientesPage() {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => abrirModal(cliente)}
-                    className="btn-secondary text-xs py-1.5 px-3"
-                  >
-                    Editar
-                  </button>
-                  {cliente.ativo ? (
+                {!isReadOnly && (
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => desativar(cliente.id)}
-                      className="text-xs py-1.5 px-3 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                      onClick={() => abrirModal(cliente)}
+                      className="btn-secondary text-xs py-1.5 px-3"
                     >
-                      Desativar
+                      Editar
                     </button>
-                  ) : (
+                    {cliente.ativo ? (
+                      <button
+                        onClick={() => desativar(cliente.id)}
+                        className="text-xs py-1.5 px-3 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                      >
+                        Desativar
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => reativar(cliente.id)}
+                        className="text-xs py-1.5 px-3 text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
+                      >
+                        Reativar
+                      </button>
+                    )}
                     <button
-                      onClick={() => reativar(cliente.id)}
-                      className="text-xs py-1.5 px-3 text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
+                      onClick={() => enviarConvite(cliente.id)}
+                      className="btn-secondary text-xs py-1.5 px-3"
                     >
-                      Reativar
+                      Enviar convite
                     </button>
-                  )}
-                  <button
-                    onClick={() => enviarConvite(cliente.id)}
-                    className="btn-secondary text-xs py-1.5 px-3"
-                  >
-                    Enviar convite
-                  </button>
-                </div>
+                  </div>
                 )}
               </div>
             ))}
