@@ -37,10 +37,11 @@ export class ClientUsersService {
     return this.sanitize(salvo);
   }
 
-  async listar(tenantId: string) {
+  async listar(tenantId?: string | null) {
+    const where = tenantId ? { tenantId } : {};
     const users = await this.clientUserRepo.find({
-      where: { tenantId },
-      relations: ['organization'],
+      where,
+      relations: ['organization', 'tenant'],
       order: { nome: 'ASC' },
     });
     return users.map((u) => this.sanitize(u));

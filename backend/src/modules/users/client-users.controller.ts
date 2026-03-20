@@ -31,7 +31,8 @@ export class ClientUsersController {
   @RequirePermissions('users:read')
   @ApiOperation({ summary: 'Listar usuários do cliente' })
   async listar(@Req() req: any) {
-    const tenantId = req.tenantId || req.user.tenantId;
+    const isTechnician = req.user.userType === 'technician';
+    const tenantId = isTechnician ? null : (req.tenantId || req.user.tenantId);
     return this.clientUsersService.listar(tenantId);
   }
 
