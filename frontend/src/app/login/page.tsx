@@ -33,7 +33,16 @@ export default function LoginPage() {
       })
 
       const userType = data.user?.userType || 'technician'
-      router.push(userType === 'client_user' ? '/portal' : '/dashboard')
+      const role = data.user?.role || data.tecnico?.funcao
+      
+      // Técnico comum vai direto para tickets
+      if (userType === 'technician' && role === 'tecnico') {
+        router.push('/dashboard/tickets')
+      } else if (userType === 'client_user') {
+        router.push('/portal')
+      } else {
+        router.push('/dashboard')
+      }
     } catch (err: any) {
       setErro(err.response?.data?.message || 'Credenciais inválidas')
     } finally {

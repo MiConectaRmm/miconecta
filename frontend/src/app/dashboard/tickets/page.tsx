@@ -33,6 +33,8 @@ export default function TicketsPage() {
   const [carregando, setCarregando] = useState(true)
   const { on } = useSocket('/chat')
 
+  const isTechnician = user?.userType === 'technician' && user?.role === 'tecnico'
+
   useEffect(() => { carregar() }, [filtroStatus, filtroPrioridade, filtroCategoria, apenasMeus, semResponsavel])
 
   useEffect(() => {
@@ -190,18 +192,24 @@ export default function TicketsPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {filtrados.map((ticket: any) => (
-              <Link
-                key={ticket.id}
-                href={`/dashboard/tickets/${ticket.id}`}
-                className={`flex items-center justify-between p-4 rounded-lg bg-dark-900 hover:bg-dark-700 transition-colors group border ${
-                  ticket.prioridade === 'urgente'
-                    ? 'border-red-500/70'
-                    : ticket.prioridade === 'alta'
-                      ? 'border-amber-500/40'
-                      : 'border-transparent'
-                }`}
-              >
+            {filtrados.map((ticket: any) => {
+              // Para técnico: link vai para página do cliente com ticket específico
+              const href = isTechnician 
+                ? `/dashboard/clientes/${ticket.tenantId}?ticket=${ticket.id}`
+                : `/dashboard/tickets/${ticket.id}`
+              
+              return (
+                <Link
+                  key={ticket.id}
+                  href={href}
+                  className={`flex items-center justify-between p-4 rounded-lg bg-dark-900 hover:bg-dark-700 transition-colors group border ${
+                    ticket.prioridade === 'urgente'
+                      ? 'border-red-500/70'
+                      : ticket.prioridade === 'alta'
+                        ? 'border-amber-500/40'
+                        : 'border-transparent'
+                  }`}
+                >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3">
                     <p className="text-white font-medium group-hover:text-brand-400 truncate">{ticket.titulo}</p>
@@ -226,7 +234,7 @@ export default function TicketsPage() {
                 </div>
                 <StatusBadge status={ticket.status} />
               </Link>
-            ))}
+            )})}
           </div>
         )}
       </div>

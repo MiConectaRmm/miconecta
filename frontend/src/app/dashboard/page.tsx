@@ -10,8 +10,135 @@ import { devicesApi, alertsApi, ticketsApi, tenantsApi } from '@/lib/api'
 import StatCard from '@/components/ui/StatCard'
 import StatusBadge from '@/components/ui/StatusBadge'
 import { useSocket } from '@/hooks/useSocket'
+import { useAuthStore } from '@/stores/auth.store'
 
 export default function DashboardPage() {
+  const user = useAuthStore((s) => s.user)
+  const isTechnician = user?.userType === 'technician' && user?.role === 'tecnico'
+
+  if (isTechnician) {
+    return <DashboardTechnician />
+  }
+
+  return <DashboardAdmin />
+}
+
+function DashboardTechnician() {
+  const [clientes, setClientes] = useState<any[]>([])
+  const [carregando, setCarregando] = useState(true)
+
+  useEffect(() => {
+    carregar()
+  }, [])
+
+  const carregar = async () => {
+    try {
+      const { data } = await tenantsApi.listar()
+      
+      const clientesComStats = await Promise.all(
+        data.map(async (cliente: any) => {
+          try {
+            const [ticketsRes, devicesRes, alertasRes] = await Promise.allSettled([
+              ticketsApi.listar({ tenantId: cliente.id, limit: 100 }),
+              devicesApi.listar({ tenantId: cliente.id }),
+              alertsApi.listar({ tenantId: cliente.id, status: 'ativo' }),
+            ])
+
+            const tickets = ticketsRes.status === 'fulfilled' ? ticketsRes.value.data : []
+            const devices = devicesRes.status === 'fulfilled' ? devicesRes.value.data : []
+            const alertas = alertasRes.status === 'fulfilled' ? alertasRes.value.data : []
+
+            return {
+              ...cliente,
+              ticketsAtivos: tickets.filter((t: any) => ['aberto', 'em_andamento'].includes(t.status)).length,
+              totalDispositivos: devices.length,
+              dispositivosOnline: devices.filter((d: any) => d.online).length,
+              alertasAtivos: alertas.length,
+            }
+          } catch {
+            return { ...cliente, ticketsAtivos: 0, totalDispositivos: 0, dispositivosOnline: 0, alertasAtivos: 0 }
+          }
+        })
+      )
+
+      setClientes(clientesComStats)
+    } catch (err) {
+      console.error('Erro ao carregar:', err)
+    } finally {
+      setCarregando(false)
+    }
+  }
+
+  return (
+    <div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+        <p className="text-dark-400 text-sm mt-1">Panorama geral dos clientes</p>
+      </div>
+
+      {carregando ? (
+        <div className="text-center py-12 text-dark-400">Carregando...</div>
+      ) : clientes.length === 0 ? (
+        <div className="text-center py-12">
+          <Building2 className="w-12 h-12 text-dark-600 mx-auto mb-3" />
+          <p className="text-dark-400">Nenhum cliente encontrado</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {clientes.map((cliente: any) => (
+            <Link
+              key={cliente.id}
+              href={`/dashboard/clientes/${cliente.id}`}
+              className="card hover:border-brand-600 transition-all group cursor-pointer"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-white group-hover:text-brand-400 transition-colors">
+                    {cliente.nome}
+                  </h3>
+                  <p className="text-xs text-dark-400 mt-1">{cliente.cnpj}</p>
+                </div>
+                <div className="w-10 h-10 rounded-lg bg-brand-500/20 flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-brand-400" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg bg-dark-900">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Ticket className="w-4 h-4 text-blue-400" />
+                    <span className="text-xs text-dark-400">Tickets</span>
+                  </div>
+                  <p className="text-xl font-bold text-white">{cliente.ticketsAtivos}</p>
+                </div>
+
+                <div className="p-3 rounded-lg bg-dark-900">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Monitor className="w-4 h-4 text-emerald-400" />
+                    <span className="text-xs text-dark-400">Dispositivos</span>
+                  </div>
+                  <p className="text-xl font-bold text-white">
+                    {cliente.dispositivosOnline}/{cliente.totalDispositivos}
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-lg bg-dark-900 col-span-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <AlertTriangle className="w-4 h-4 text-red-400" />
+                    <span className="text-xs text-dark-400">Alertas Ativos</span>
+                  </div>
+                  <p className="text-xl font-bold text-white">{cliente.alertasAtivos}</p>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DashboardAdmin() {
   const [resumo, setResumo] = useState({ total: 0, online: 0, offline: 0, alerta: 0 })
   const [alertas, setAlertas] = useState({ ativos: 0, total: 0 })
   const [tickets, setTickets] = useState({ abertos: 0, emAtendimento: 0, total: 0 })

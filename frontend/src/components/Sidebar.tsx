@@ -49,14 +49,24 @@ export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const logout = useAuthStore((s) => s.logout)
+  const user = useAuthStore((s) => s.user)
 
   const handleLogout = () => {
     logout()
     router.push('/login')
   }
 
-  const sections = menuItems.reduce((acc, item) => {
-    const section = item.section || 'Outros'
+  // Menu simplificado para técnicos
+  const isTechnician = user?.userType === 'technician' && user?.role === 'tecnico'
+  const technicianMenu: MenuItem[] = [
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/dashboard/tickets', label: 'Tickets', icon: Ticket },
+  ]
+
+  const displayItems = isTechnician ? technicianMenu : menuItems
+
+  const sections = displayItems.reduce((acc, item) => {
+    const section = item.section || 'Principal'
     if (!acc[section]) acc[section] = []
     acc[section].push(item)
     return acc
