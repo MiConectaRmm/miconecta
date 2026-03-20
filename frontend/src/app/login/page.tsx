@@ -29,6 +29,8 @@ export default function LoginPage() {
         userType: data.user?.userType || 'technician',
         role: data.user?.role || data.tecnico?.funcao || 'admin',
         tenantId: data.user?.tenantId || data.tecnico?.tenantId,
+        tenant: data.user?.tenant,
+        tenantsAtribuidos: data.user?.tenantsAtribuidos,
         permissions: data.user?.permissions || [],
       })
 

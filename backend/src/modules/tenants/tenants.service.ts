@@ -1,11 +1,13 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { HttpService } from '@nestjs/axios';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { firstValueFrom } from 'rxjs';
 import { Tenant, TenantPlano, TenantStatus } from '../../database/entities/tenant.entity';
 import { Organization } from '../../database/entities/organization.entity';
+import { Technician } from '../../database/entities/technician.entity';
 import { CreateTenantDto, UpdateTenantDto } from './dto/create-tenant.dto';
+import { JwtPayload } from '../../common/interfaces';
 
 @Injectable()
 export class TenantsService {
@@ -16,6 +18,8 @@ export class TenantsService {
     private readonly tenantRepo: Repository<Tenant>,
     @InjectRepository(Organization)
     private readonly orgRepo: Repository<Organization>,
+    @InjectRepository(Technician)
+    private readonly technicianRepo: Repository<Technician>,
     private readonly httpService: HttpService,
   ) {}
 
@@ -29,19 +33,64 @@ export class TenantsService {
     return this.tenantRepo.save(tenant);
   }
 
-  async listarTenants() {
+  private readonly rolesListaTenantsGlobal = ['super_admin', 'admin_maginf', 'admin'];
+
+  private isTecnicoCampo(user: JwtPayload): boolean {
+    return (
+      user.userType === 'technician' &&
+      ['tecnico', 'tecnico_senior', 'visualizador'].includes(user.role)
+    );
+  }
+
+  async listarTenants(user: JwtPayload) {
+    if (this.rolesListaTenantsGlobal.includes(user.role)) {
+      return this.tenantRepo.find({
+        relations: ['organizacoes'],
+        order: { nome: 'ASC' },
+      });
+    }
+
+    if (!this.isTecnicoCampo(user)) {
+      throw new ForbiddenException('Sem permissão para listar tenants');
+    }
+
+    const tecnico = await this.technicianRepo.findOne({ where: { id: user.sub } });
+    const ids = (tecnico?.tenantsAtribuidos ?? []).filter(Boolean);
+    if (ids.length === 0) {
+      return [];
+    }
+
     return this.tenantRepo.find({
+      where: { id: In(ids) },
       relations: ['organizacoes'],
       order: { nome: 'ASC' },
     });
   }
 
-  async buscarTenant(id: string) {
+  async podeLerTenant(id: string, user: JwtPayload): Promise<boolean> {
+    if (this.rolesListaTenantsGlobal.includes(user.role)) {
+      return true;
+    }
+    if (user.userType !== 'technician') {
+      return false;
+    }
+    if (this.isTecnicoCampo(user)) {
+      const tecnico = await this.technicianRepo.findOne({ where: { id: user.sub } });
+      const ids = tecnico?.tenantsAtribuidos ?? [];
+      return ids.includes(id);
+    }
+    return false;
+  }
+
+  async buscarTenant(id: string, user?: JwtPayload) {
     const tenant = await this.tenantRepo.findOne({
       where: { id },
       relations: ['organizacoes', 'organizacoes.dispositivos'],
     });
     if (!tenant) throw new NotFoundException('Tenant não encontrado');
+    if (user && !(await this.podeLerTenant(id, user))) {
+      throw new ForbiddenException('Sem permissão para acessar este tenant');
+    }
     return tenant;
   }
 
@@ -70,7 +119,10 @@ export class TenantsService {
     return this.orgRepo.save(org);
   }
 
-  async listarOrganizacoes(tenantId: string) {
+  async listarOrganizacoes(tenantId: string, user?: JwtPayload) {
+    if (user && !(await this.podeLerTenant(tenantId, user))) {
+      throw new ForbiddenException('Sem permissão para acessar este tenant');
+    }
     return this.orgRepo.find({
       where: { tenantId },
       relations: ['dispositivos'],

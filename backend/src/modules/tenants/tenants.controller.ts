@@ -2,6 +2,7 @@ import {
   Controller, Get, Post, Put, Delete,
   Body, Param, UseGuards, Req,
 } from '@nestjs/common';
+import { AuthenticatedRequest } from '../../common/interfaces/authenticated-request.interface';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantAccessGuard } from '../../common/guards/tenant-access.guard';
@@ -28,11 +29,11 @@ export class TenantsController {
   }
 
   @Get()
-  @Roles('super_admin', 'admin_maginf', 'admin')
+  @Roles('super_admin', 'admin_maginf', 'admin', 'tecnico', 'tecnico_senior', 'visualizador')
   @RequirePermissions('tenants:read')
-  @ApiOperation({ summary: 'Listar todos os tenants' })
-  listar() {
-    return this.service.listarTenants();
+  @ApiOperation({ summary: 'Listar tenants (admins: todos; técnicos: apenas tenants atribuídos)' })
+  listar(@Req() req: AuthenticatedRequest) {
+    return this.service.listarTenants(req.user);
   }
 
   @Get('cnpj/:cnpj')
@@ -46,8 +47,8 @@ export class TenantsController {
   @Get(':id')
   @RequirePermissions('tenants:read')
   @ApiOperation({ summary: 'Buscar tenant por ID' })
-  buscar(@Param('id') id: string) {
-    return this.service.buscarTenant(id);
+  buscar(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    return this.service.buscarTenant(id, req.user);
   }
 
   @Put(':id')
@@ -78,8 +79,8 @@ export class TenantsController {
   @Get(':tenantId/organizacoes')
   @RequirePermissions('tenants:read')
   @ApiOperation({ summary: 'Listar organizações do tenant' })
-  listarOrgs(@Param('tenantId') tenantId: string) {
-    return this.service.listarOrganizacoes(tenantId);
+  listarOrgs(@Param('tenantId') tenantId: string, @Req() req: AuthenticatedRequest) {
+    return this.service.listarOrganizacoes(tenantId, req.user);
   }
 
   @Put('organizacoes/:id')

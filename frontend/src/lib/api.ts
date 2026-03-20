@@ -74,7 +74,11 @@ export const tenantsApi = {
 export const usersApi = {
   listarClientes: () => api.get('/users/clients'),
   buscarCliente: (id: string) => api.get(`/users/clients/${id}`),
-  criarCliente: (dados: any) => api.post('/users/clients', dados),
+  /** Para super admin criar usuário em um tenant específico, passe tenantId (header X-Tenant-Id). */
+  criarCliente: (dados: any, tenantId?: string) =>
+    api.post('/users/clients', dados, {
+      headers: tenantId ? { 'X-Tenant-Id': tenantId } : undefined,
+    }),
   atualizarCliente: (id: string, dados: any) => api.put(`/users/clients/${id}`, dados),
   desativarCliente: (id: string) => api.delete(`/users/clients/${id}`),
   reativarCliente: (id: string) => api.put(`/users/clients/${id}/reativar`),

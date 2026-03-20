@@ -19,6 +19,7 @@ import {
   BarChart3,
   Eye,
   Download,
+  UserCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth.store'
@@ -32,7 +33,8 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'Principal' },
-  { href: '/dashboard/clientes', label: 'Clientes', icon: Building2, section: 'Principal' },
+  { href: '/dashboard/clients', label: 'Empresas', icon: Building2, section: 'Principal' },
+  { href: '/dashboard/clientes', label: 'Usuários do portal', icon: UserCircle, section: 'Principal' },
   { href: '/dashboard/devices', label: 'Dispositivos', icon: Monitor, section: 'RMM' },
   { href: '/dashboard/alerts', label: 'Alertas', icon: Bell, section: 'RMM' },
   { href: '/dashboard/scripts', label: 'Scripts', icon: Terminal, section: 'RMM' },
@@ -56,14 +58,16 @@ export default function Sidebar() {
     router.push('/login')
   }
 
-  // Menu simplificado para técnicos
-  const isTechnician = user?.userType === 'technician' && user?.role === 'tecnico'
+  // Técnicos de campo (não admin Maginf): só dashboard + tickets
+  const isFieldTechnician =
+    user?.userType === 'technician' &&
+    ['tecnico', 'tecnico_senior', 'visualizador'].includes(user?.role || '')
   const technicianMenu: MenuItem[] = [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/dashboard/tickets', label: 'Tickets', icon: Ticket },
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'Principal' },
+    { href: '/dashboard/tickets', label: 'Tickets', icon: Ticket, section: 'Principal' },
   ]
 
-  const displayItems = isTechnician ? technicianMenu : menuItems
+  const displayItems = isFieldTechnician ? technicianMenu : menuItems
 
   const sections = displayItems.reduce((acc, item) => {
     const section = item.section || 'Principal'

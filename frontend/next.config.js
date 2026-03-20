@@ -1,8 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  output: 'standalone',
   images: {
     domains: [],
+  },
+  async redirects() {
+    return [{ source: '/favicon.ico', destination: '/icon.svg', permanent: false }]
   },
   async rewrites() {
     // Proxy API em desenvolvimento local

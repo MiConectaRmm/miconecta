@@ -16,9 +16,9 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   super_admin: ['*'],
   admin_maginf: ['tenants:*', 'devices:*', 'tickets:*', 'chat:*', 'scripts:*', 'reports:*', 'audit:*', 'users:*', 'sessions:*', 'alerts:*'],
   admin: ['tenants:*', 'devices:*', 'tickets:*', 'chat:*', 'scripts:*', 'reports:*', 'audit:*', 'users:*', 'sessions:*', 'alerts:*'],
-  tecnico_senior: ['devices:read', 'devices:write', 'devices:remote_access', 'tickets:*', 'chat:*', 'scripts:*', 'reports:read', 'audit:read', 'users:read', 'sessions:*', 'alerts:*'],
-  tecnico: ['devices:read', 'devices:remote_access', 'tickets:read', 'tickets:write', 'chat:*', 'scripts:execute', 'users:read', 'alerts:read', 'alerts:acknowledge', 'sessions:initiate'],
-  visualizador: ['devices:read', 'tickets:read', 'alerts:read', 'reports:read'],
+  tecnico_senior: ['tenants:read', 'devices:read', 'devices:write', 'devices:remote_access', 'tickets:*', 'chat:*', 'scripts:*', 'reports:read', 'audit:read', 'users:read', 'sessions:*', 'alerts:*'],
+  tecnico: ['tenants:read', 'devices:read', 'devices:remote_access', 'tickets:read', 'tickets:write', 'chat:*', 'scripts:execute', 'users:read', 'alerts:read', 'alerts:acknowledge', 'sessions:initiate'],
+  visualizador: ['tenants:read', 'devices:read', 'tickets:read', 'alerts:read', 'reports:read'],
   admin_cliente: ['devices:read', 'tickets:*', 'chat:*', 'reports:read', 'users:read', 'users:write', 'users:invite', 'sessions:read', 'alerts:read'],
   gestor: ['devices:read', 'tickets:read', 'tickets:write', 'chat:*', 'reports:read', 'sessions:read', 'alerts:read'],
   usuario: ['tickets:read', 'tickets:write', 'chat:read', 'chat:write'],
@@ -78,7 +78,7 @@ export class AuthService {
       }
     }
 
-    throw new UnauthorizedException('Credenciais inválidas');
+    throw new UnauthorizedException('Credenciais inv?lidas');
   }
 
   private async loginAsTechnician(tecnico: Technician, ip?: string) {
@@ -113,6 +113,7 @@ export class AuthService {
         role: tecnico.funcao,
         tenantId: tecnico.tenantId,
         tenant: tecnico.tenant ? { id: tecnico.tenant.id, nome: tecnico.tenant.nome, slug: tecnico.tenant.slug } : null,
+        tenantsAtribuidos: tecnico.tenantsAtribuidos ?? [],
         permissions: payload.permissions,
       },
     };
@@ -159,11 +160,11 @@ export class AuthService {
       if (decoded.userType === 'technician') {
         const tecnico = await this.technicianRepo.findOne({ where: { id: decoded.sub }, relations: ['tenant'] });
         if (!tecnico || !tecnico.ativo || !tecnico.refreshToken) {
-          throw new UnauthorizedException('Refresh token inválido');
+          throw new UnauthorizedException('Refresh token inv?lido');
         }
 
         const isValid = await bcrypt.compare(refreshToken, tecnico.refreshToken);
-        if (!isValid) throw new UnauthorizedException('Refresh token inválido');
+        if (!isValid) throw new UnauthorizedException('Refresh token inv?lido');
 
         // Rotation: gerar novos tokens e invalidar o anterior
         return this.loginAsTechnician(tecnico);
@@ -172,14 +173,14 @@ export class AuthService {
       if (decoded.userType === 'client_user') {
         const clientUser = await this.clientUserRepo.findOne({ where: { id: decoded.sub }, relations: ['tenant'] });
         if (!clientUser || !clientUser.ativo) {
-          throw new UnauthorizedException('Refresh token inválido');
+          throw new UnauthorizedException('Refresh token inv?lido');
         }
         return this.loginAsClientUser(clientUser);
       }
 
-      throw new UnauthorizedException('Tipo de usuário desconhecido');
+      throw new UnauthorizedException('Tipo de usu?rio desconhecido');
     } catch {
-      throw new UnauthorizedException('Refresh token inválido ou expirado');
+      throw new UnauthorizedException('Refresh token inv?lido ou expirado');
     }
   }
 
@@ -196,7 +197,7 @@ export class AuthService {
     });
 
     if (existente) {
-      throw new ConflictException('E-mail já cadastrado');
+      throw new ConflictException('E-mail j? cadastrado');
     }
 
     const senhaHash = await bcrypt.hash(dto.senha, 12);
@@ -209,19 +210,30 @@ export class AuthService {
   async validarToken(payload: any) {
     if (payload.userType === 'client_user') {
       const user = await this.clientUserRepo.findOne({ where: { id: payload.sub } });
-      if (!user || !user.ativo) throw new UnauthorizedException('Token inválido');
-      return { ...payload, tenantId: user.tenantId };
+      if (!user || !user.ativo) throw new UnauthorizedException('Token inv?lido');
+      return {
+        ...payload,
+        tenantId: user.tenantId,
+        role: user.funcao,
+        permissions: this.getPermissions(user.funcao),
+      };
     }
 
     const tecnico = await this.technicianRepo.findOne({ where: { id: payload.sub } });
-    if (!tecnico || !tecnico.ativo) throw new UnauthorizedException('Token inválido');
-    return payload;
+    if (!tecnico || !tecnico.ativo) throw new UnauthorizedException('Token inv?lido');
+    // Permiss?es e fun??o sempre do banco ? evita JWT antigo sem novas permiss?es ap?s deploy
+    return {
+      ...payload,
+      tenantId: tecnico.tenantId,
+      role: tecnico.funcao,
+      permissions: this.getPermissions(tecnico.funcao),
+    };
   }
 
   async me(userId: string, userType: string) {
     if (userType === 'client_user') {
       const user = await this.clientUserRepo.findOne({ where: { id: userId }, relations: ['tenant', 'organization'] });
-      if (!user) throw new UnauthorizedException('Usuário não encontrado');
+      if (!user) throw new UnauthorizedException('Usu?rio n?o encontrado');
       return {
         id: user.id, nome: user.nome, email: user.email,
         userType: 'client_user', role: user.funcao,
@@ -232,7 +244,7 @@ export class AuthService {
     }
 
     const tecnico = await this.technicianRepo.findOne({ where: { id: userId }, relations: ['tenant'] });
-    if (!tecnico) throw new UnauthorizedException('Usuário não encontrado');
+    if (!tecnico) throw new UnauthorizedException('Usu?rio n?o encontrado');
     return {
       id: tecnico.id, nome: tecnico.nome, email: tecnico.email,
       userType: 'technician', role: tecnico.funcao,

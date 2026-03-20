@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Building2, Plus, Search, Monitor, Mail, Loader2 } from 'lucide-react'
-import { tenantsApi } from '@/lib/api'
+import { tenantsApi, usersApi } from '@/lib/api'
 import StatusBadge from '@/components/ui/StatusBadge'
 import Modal from '@/components/ui/Modal'
 
@@ -14,8 +14,17 @@ export default function ClientsPage() {
   const [novoCliente, setNovoCliente] = useState({
     nome: '', razaoSocial: '', slug: '', email: '', cnpj: '', telefone: '',
     contatoPrincipal: '', cep: '', logradouro: '', numero: '', complemento: '',
-    bairro: '', cidade: '', uf: '', atividadePrincipal: '', naturezaJuridica: '',
-    porte: '', situacaoCadastral: '', plano: 'basic',
+    bairro: '', cidade: '', uf: '', enderecoLivre: '',
+    inscricaoEstadual: '', atividadePrincipal: '', naturezaJuridica: '',
+    porte: '', situacaoCadastral: '', dataAbertura: '', plano: 'basic',
+    maxDispositivos: '50', maxUsuarios: '10',
+  })
+  const [portal, setPortal] = useState({
+    criar: true,
+    nome: '',
+    email: '',
+    senha: '',
+    funcao: 'admin_cliente' as 'admin_cliente' | 'gestor' | 'usuario',
   })
   const [carregando, setCarregando] = useState(true)
   const [cnpjLoading, setCnpjLoading] = useState(false)
@@ -36,11 +45,60 @@ export default function ClientsPage() {
     }
   }
 
+  const montarEndereco = () => {
+    if (novoCliente.enderecoLivre?.trim()) return novoCliente.enderecoLivre.trim()
+    const p = [novoCliente.logradouro, novoCliente.numero, novoCliente.complemento, novoCliente.bairro, novoCliente.cidade, novoCliente.uf, novoCliente.cep].filter(Boolean)
+    return p.length ? p.join(', ') : undefined
+  }
+
   const criarCliente = async () => {
     try {
       setSubmitLoading(true)
       setSubmitError('')
-      await tenantsApi.criar({ ...novoCliente, ativo: true })
+      const payload: Record<string, unknown> = {
+        nome: novoCliente.nome,
+        razaoSocial: novoCliente.razaoSocial || undefined,
+        slug: novoCliente.slug,
+        email: novoCliente.email || undefined,
+        cnpj: novoCliente.cnpj?.replace(/[^\d]/g, '') || undefined,
+        telefone: novoCliente.telefone || undefined,
+        contatoPrincipal: novoCliente.contatoPrincipal || undefined,
+        cep: novoCliente.cep || undefined,
+        logradouro: novoCliente.logradouro || undefined,
+        numero: novoCliente.numero || undefined,
+        complemento: novoCliente.complemento || undefined,
+        bairro: novoCliente.bairro || undefined,
+        cidade: novoCliente.cidade || undefined,
+        uf: novoCliente.uf || undefined,
+        endereco: montarEndereco(),
+        inscricaoEstadual: novoCliente.inscricaoEstadual || undefined,
+        atividadePrincipal: novoCliente.atividadePrincipal || undefined,
+        naturezaJuridica: novoCliente.naturezaJuridica || undefined,
+        porte: novoCliente.porte || undefined,
+        situacaoCadastral: novoCliente.situacaoCadastral || undefined,
+        dataAbertura: novoCliente.dataAbertura || undefined,
+        plano: novoCliente.plano,
+        ativo: true,
+      }
+      const md = parseInt(novoCliente.maxDispositivos, 10)
+      const mu = parseInt(novoCliente.maxUsuarios, 10)
+      if (!Number.isNaN(md) && md > 0) payload.maxDispositivos = md
+      if (!Number.isNaN(mu) && mu > 0) payload.maxUsuarios = mu
+
+      const { data: tenant } = await tenantsApi.criar(payload)
+
+      if (portal.criar && tenant?.id && portal.nome?.trim() && portal.email?.trim() && portal.senha?.length >= 6) {
+        await usersApi.criarCliente(
+          {
+            nome: portal.nome.trim(),
+            email: portal.email.trim().toLowerCase(),
+            senha: portal.senha,
+            funcao: portal.funcao,
+          },
+          tenant.id,
+        )
+      }
+
       setShowModal(false)
       resetForm()
       carregar()
@@ -59,9 +117,12 @@ export default function ClientsPage() {
     setNovoCliente({
       nome: '', razaoSocial: '', slug: '', email: '', cnpj: '', telefone: '',
       contatoPrincipal: '', cep: '', logradouro: '', numero: '', complemento: '',
-      bairro: '', cidade: '', uf: '', atividadePrincipal: '', naturezaJuridica: '',
-      porte: '', situacaoCadastral: '', plano: 'basic',
+      bairro: '', cidade: '', uf: '', enderecoLivre: '',
+      inscricaoEstadual: '', atividadePrincipal: '', naturezaJuridica: '',
+      porte: '', situacaoCadastral: '', dataAbertura: '', plano: 'basic',
+      maxDispositivos: '50', maxUsuarios: '10',
     })
+    setPortal({ criar: true, nome: '', email: '', senha: '', funcao: 'admin_cliente' })
     setCnpjError('')
     setSubmitError('')
   }
@@ -122,8 +183,11 @@ export default function ClientsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">Clientes</h1>
-          <p className="text-dark-400 text-sm mt-1">Gerencie tenants e organizações</p>
+          <h1 className="text-2xl font-bold text-white">Cadastro de clientes (empresa)</h1>
+          <p className="text-dark-400 text-sm mt-1">
+            Cadastro empresarial completo (CNPJ, endereço, contrato). Opcionalmente crie o primeiro usuário do{' '}
+            <strong className="text-dark-200">portal do cliente</strong> — ele verá apenas o parque tecnológico, tickets e chat da própria empresa.
+          </p>
         </div>
         <button onClick={() => { resetForm(); setShowModal(true) }} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" /> Novo Cliente
@@ -188,8 +252,8 @@ export default function ClientsPage() {
         )}
       </div>
 
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Novo Cliente" size="lg">
-        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Novo cliente — cadastro empresarial" size="lg">
+        <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
           {/* CNPJ - primeiro campo */}
           <div>
             <label className="block text-sm font-medium text-dark-300 mb-1.5">CNPJ</label>
@@ -321,16 +385,181 @@ export default function ClientsPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-dark-300 mb-1.5">Plano</label>
-            <select
-              value={novoCliente.plano}
-              onChange={(e) => setNovoCliente({ ...novoCliente, plano: e.target.value })}
-              className="input w-full"
-            >
-              <option value="basic">Básico</option>
-              <option value="professional">Profissional</option>
-              <option value="enterprise">Enterprise</option>
-            </select>
+            <label className="block text-sm font-medium text-dark-300 mb-1.5">Endereço (texto completo, opcional)</label>
+            <textarea
+              value={novoCliente.enderecoLivre}
+              onChange={(e) => setNovoCliente({ ...novoCliente, enderecoLivre: e.target.value })}
+              className="input w-full min-h-[72px]"
+              placeholder="Se preencher, substitui a montagem automática a partir dos campos acima."
+            />
+          </div>
+
+          <div className="border-t border-dark-700 pt-4 mt-4">
+            <p className="text-xs uppercase tracking-wider text-dark-500 font-semibold mb-3">Dados fiscais e jurídicos</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-1.5">Inscrição estadual</label>
+                <input
+                  type="text"
+                  value={novoCliente.inscricaoEstadual}
+                  onChange={(e) => setNovoCliente({ ...novoCliente, inscricaoEstadual: e.target.value })}
+                  className="input w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-1.5">Data de abertura</label>
+                <input
+                  type="date"
+                  value={novoCliente.dataAbertura}
+                  onChange={(e) => setNovoCliente({ ...novoCliente, dataAbertura: e.target.value })}
+                  className="input w-full"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 mt-3">
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-1.5">Atividade principal</label>
+                <input
+                  type="text"
+                  value={novoCliente.atividadePrincipal}
+                  onChange={(e) => setNovoCliente({ ...novoCliente, atividadePrincipal: e.target.value })}
+                  className="input w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-1.5">Natureza jurídica</label>
+                <input
+                  type="text"
+                  value={novoCliente.naturezaJuridica}
+                  onChange={(e) => setNovoCliente({ ...novoCliente, naturezaJuridica: e.target.value })}
+                  className="input w-full"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 mt-3">
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-1.5">Porte</label>
+                <input
+                  type="text"
+                  value={novoCliente.porte}
+                  onChange={(e) => setNovoCliente({ ...novoCliente, porte: e.target.value })}
+                  className="input w-full"
+                  placeholder="ME, EPP, etc."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-1.5">Situação cadastral</label>
+                <input
+                  type="text"
+                  value={novoCliente.situacaoCadastral}
+                  onChange={(e) => setNovoCliente({ ...novoCliente, situacaoCadastral: e.target.value })}
+                  className="input w-full"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-dark-700 pt-4 mt-4">
+            <p className="text-xs uppercase tracking-wider text-dark-500 font-semibold mb-3">Plano e limites</p>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="col-span-3 sm:col-span-1">
+                <label className="block text-sm font-medium text-dark-300 mb-1.5">Plano</label>
+                <select
+                  value={novoCliente.plano}
+                  onChange={(e) => setNovoCliente({ ...novoCliente, plano: e.target.value })}
+                  className="input w-full"
+                >
+                  <option value="basic">Básico</option>
+                  <option value="professional">Profissional</option>
+                  <option value="enterprise">Enterprise</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-1.5">Máx. dispositivos</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={novoCliente.maxDispositivos}
+                  onChange={(e) => setNovoCliente({ ...novoCliente, maxDispositivos: e.target.value })}
+                  className="input w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-1.5">Máx. usuários portal</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={novoCliente.maxUsuarios}
+                  onChange={(e) => setNovoCliente({ ...novoCliente, maxUsuarios: e.target.value })}
+                  className="input w-full"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-dark-700 pt-4 mt-4">
+            <p className="text-xs uppercase tracking-wider text-dark-500 font-semibold mb-2">Portal do cliente</p>
+            <p className="text-dark-500 text-xs mb-3">
+              Usuários do portal acessam apenas dados da própria empresa: dispositivos, tickets e chat. Não administram a plataforma Maginf.
+            </p>
+            <label className="flex items-center gap-2 text-sm text-dark-300 mb-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={portal.criar}
+                onChange={(e) => setPortal({ ...portal, criar: e.target.checked })}
+                className="rounded border-dark-600"
+              />
+              Criar primeiro usuário do portal neste cadastro
+            </label>
+            {portal.criar && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-dark-300 mb-1.5">Nome completo</label>
+                  <input
+                    type="text"
+                    value={portal.nome}
+                    onChange={(e) => setPortal({ ...portal, nome: e.target.value })}
+                    className="input w-full"
+                    placeholder="Responsável pelo portal"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-dark-300 mb-1.5">E-mail (login)</label>
+                  <input
+                    type="email"
+                    value={portal.email}
+                    onChange={(e) => setPortal({ ...portal, email: e.target.value })}
+                    className="input w-full"
+                    placeholder="usuario@empresa.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-dark-300 mb-1.5">Senha</label>
+                  <input
+                    type="password"
+                    value={portal.senha}
+                    onChange={(e) => setPortal({ ...portal, senha: e.target.value })}
+                    className="input w-full"
+                    placeholder="Mínimo 6 caracteres"
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-dark-300 mb-1.5">Perfil no portal</label>
+                  <select
+                    value={portal.funcao}
+                    onChange={(e) =>
+                      setPortal({ ...portal, funcao: e.target.value as typeof portal.funcao })
+                    }
+                    className="input w-full"
+                  >
+                    <option value="admin_cliente">Administrador do cliente (gerencia usuários do portal)</option>
+                    <option value="gestor">Gestor</option>
+                    <option value="usuario">Usuário</option>
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
 
           {submitError && (
@@ -342,7 +571,14 @@ export default function ClientsPage() {
             <button
               onClick={criarCliente}
               className="btn-primary flex items-center gap-2"
-              disabled={submitLoading || !novoCliente.nome || !novoCliente.slug || !novoCliente.email}
+              disabled={
+                submitLoading ||
+                !novoCliente.nome ||
+                !novoCliente.slug ||
+                !novoCliente.email ||
+                (portal.criar &&
+                  (!portal.nome?.trim() || !portal.email?.trim() || (portal.senha?.length || 0) < 6))
+              }
             >
               {submitLoading && <Loader2 className="w-4 h-4 animate-spin" />}
               Criar Cliente

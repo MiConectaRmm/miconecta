@@ -1,5 +1,12 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
+
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_WS_URL
+
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
+
 COPY package*.json ./
 RUN npm ci
 COPY . /app
@@ -11,5 +18,7 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 EXPOSE 3000
-ENV PORT 3000
+ENV PORT=3000
+# Fly.io / Docker: escutar em todas as interfaces (evita proxy sem rota)
+ENV HOSTNAME=0.0.0.0
 CMD ["node", "server.js"]

@@ -39,8 +39,9 @@ export default function ClienteDetailPage() {
   
   const [activeTab, setActiveTab] = useState('tickets')
   const [carregando, setCarregando] = useState(true)
-
-  const { sendMessage, connected } = useChatSocket()
+  
+  const token = useAuthStore((s) => s.token)
+  const { sendMessage, connected } = useChatSocket(ticketSelecionado?.id || null, token)
 
   useEffect(() => {
     carregar()
@@ -105,7 +106,7 @@ export default function ClienteDetailPage() {
     
     try {
       if (connected) {
-        sendMessage(ticketSelecionado.id, novaMensagem)
+        sendMessage(novaMensagem)
       } else {
         await chatApi.enviar(ticketSelecionado.id, novaMensagem)
         carregarMensagens(ticketSelecionado.id)

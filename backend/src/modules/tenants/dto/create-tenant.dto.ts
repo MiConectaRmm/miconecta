@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsOptional, IsEmail, IsBoolean, MaxLength, Matches, IsDateString } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsEmail, IsBoolean, MaxLength, Matches, IsDateString, IsInt, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateTenantDto {
@@ -136,6 +136,18 @@ export class CreateTenantDto {
   @IsOptional()
   @IsString()
   plano?: string;
+
+  @ApiPropertyOptional({ description: 'Limite de dispositivos no parque tecnológico' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  maxDispositivos?: number;
+
+  @ApiPropertyOptional({ description: 'Limite de usuários do portal do cliente' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  maxUsuarios?: number;
 }
 
 export class UpdateTenantDto {
