@@ -39,6 +39,7 @@ try
     builder.Services.AddSingleton<AgentConfig>();
     builder.Services.AddSingleton<ApiClient>();
     builder.Services.AddSingleton<LocalQueue>();
+    builder.Services.AddSingleton<LocalStateStore>();
 
     // ── Collectors ──
     builder.Services.AddSingleton<SystemInfoCollector>();
@@ -53,6 +54,7 @@ try
     builder.Services.AddSingleton<ConsentManager>();
     builder.Services.AddSingleton<ChatService>();
     builder.Services.AddSingleton<AutoUpdater>();
+    builder.Services.AddSingleton<AgentIdentityService>();
 
     // ── Background Services ──
     builder.Services.AddHostedService<HeartbeatService>();

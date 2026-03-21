@@ -16,8 +16,8 @@ public class HeartbeatService : BackgroundService
     private readonly ConsentManager _consentManager;
     private readonly ChatService _chatService;
     private readonly AutoUpdater _autoUpdater;
+    private readonly AgentIdentityService _identity;
 
-    private bool _registrado = false;
     private bool _online = false;
     private DateTime _ultimoInventario = DateTime.MinValue;
     private DateTime _ultimoPatches = DateTime.MinValue;
@@ -36,7 +36,8 @@ public class HeartbeatService : BackgroundService
         LocalQueue queue,
         ConsentManager consentManager,
         ChatService chatService,
-        AutoUpdater autoUpdater)
+        AutoUpdater autoUpdater,
+        AgentIdentityService identity)
     {
         _logger = logger;
         _config = config;
@@ -49,14 +50,15 @@ public class HeartbeatService : BackgroundService
         _consentManager = consentManager;
         _chatService = chatService;
         _autoUpdater = autoUpdater;
+        _identity = identity;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("MIConectaRMM Agent v{Version} iniciado", _config.AgentVersion);
 
-        // Registrar dispositivo (com retry infinito)
-        await RegistrarDispositivo(stoppingToken);
+        // Registro via AgentIdentityService (retry infinito com backoff)
+        await _identity.RegistrarAsync(stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -64,6 +66,10 @@ public class HeartbeatService : BackgroundService
             {
                 // ── Heartbeat + Métricas ──
                 var metricas = _metricsCollector.Coletar();
+
+                // Adiciona usuário logado ao payload do heartbeat
+                metricas["loggedUser"] = Environment.UserName;
+
                 var heartbeatOk = await _apiClient.EnviarHeartbeat(metricas);
 
                 if (heartbeatOk)
@@ -141,49 +147,6 @@ public class HeartbeatService : BackgroundService
             }
 
             await Task.Delay(TimeSpan.FromSeconds(_config.HeartbeatIntervalSeconds), stoppingToken);
-        }
-    }
-
-    private async Task RegistrarDispositivo(CancellationToken stoppingToken)
-    {
-        // Se já registrado, pular
-        if (_config.IsRegistered)
-        {
-            _registrado = true;
-            _logger.LogInformation("Dispositivo já registrado: {DeviceId}", _config.DeviceId);
-            return;
-        }
-
-        while (!_registrado && !stoppingToken.IsCancellationRequested)
-        {
-            try
-            {
-                _logger.LogInformation("Registrando dispositivo no servidor...");
-                var info = _systemInfo.ColetarInformacoes();
-                info["agentVersion"] = _config.AgentVersion;
-                var resultado = await _apiClient.RegistrarDispositivo(info);
-
-                if (resultado.HasValue)
-                {
-                    var json = resultado.Value;
-                    _config.DeviceId = json.GetProperty("id").GetString() ?? "";
-                    if (json.TryGetProperty("deviceToken", out var token))
-                        _config.DeviceToken = token.GetString() ?? "";
-                    _config.Salvar();
-                    _registrado = true;
-                    _logger.LogInformation("Dispositivo registrado com ID: {DeviceId}", _config.DeviceId);
-                }
-                else
-                {
-                    _logger.LogWarning("Falha ao registrar, tentando novamente em 30s...");
-                    await Task.Delay(30000, stoppingToken);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Erro ao registrar dispositivo, tentando novamente em 30s...");
-                await Task.Delay(30000, stoppingToken);
-            }
         }
     }
 }

@@ -371,6 +371,16 @@ export class AgentsService {
     if (dto.discoDisponivelMb) updateData.discoDisponivelMb = dto.discoDisponivelMb;
     if (dto.remoteStatus) updateData.rustdeskId = dto.remoteStatus;
 
+    // Preservar usuário logado nas notas do device
+    if ((dto as any).loggedUser) {
+      try {
+        const notas = JSON.parse(device.notas || '{}');
+        notas.loggedUser = (dto as any).loggedUser;
+        notas.loggedUserAt = new Date().toISOString();
+        (updateData as any).notas = JSON.stringify(notas);
+      } catch { /* ignora */ }
+    }
+
     await this.deviceRepo.update(device.id, {
       ...updateData,
       lastCheckin: new Date(),
@@ -406,6 +416,22 @@ export class AgentsService {
 
     // Retornar comandos pendentes (placeholder para futuro)
     return { status: 'ok', agentId: agent.id, deviceId: device.id, tenantId: payload.tenantId, commands: [], timestamp: new Date().toISOString() };
+  }
+
+  async verificarAtualizacao() {
+    // Retorna informações da versão mais recente do agente disponível
+    // Configurável via env AGENT_VERSION e AGENT_DOWNLOAD_URL
+    const versaoDisponivel = process.env.AGENT_VERSION || '2.0.0';
+    const downloadUrl = process.env.AGENT_DOWNLOAD_URL || null;
+    const checksum = process.env.AGENT_CHECKSUM || null;
+
+    return {
+      versaoDisponivel,
+      downloadUrl,
+      checksum,
+      obrigatoria: false,
+      notas: `Agente MIConectaRMM v${versaoDisponivel}`,
+    };
   }
 
   async atualizarInventario(deviceId: string, tenantId: string, dto: AgentInventoryDto) {

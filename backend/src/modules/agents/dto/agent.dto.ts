@@ -180,6 +180,11 @@ export class AgentHeartbeatDto {
   @IsOptional()
   @IsNumber()
   discoDisponivelMb?: number;
+
+  @ApiPropertyOptional({ example: 'DESKTOP\\joao.silva', description: 'Usuário Windows atualmente logado' })
+  @IsOptional()
+  @IsString()
+  loggedUser?: string;
 }
 
 export class InstallationTokenCreateDto {

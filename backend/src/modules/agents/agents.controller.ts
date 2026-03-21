@@ -119,6 +119,13 @@ export class AgentsController {
     return this.agentsService.heartbeat(agentToken, dto);
   }
 
+  @Get('check-update')
+  @UseGuards(AgentAuthGuard)
+  @ApiOperation({ summary: 'Verifica se há atualização disponível para o agente' })
+  async checkUpdate(@Req() req: any) {
+    return this.agentsService.verificarAtualizacao();
+  }
+
   @Post('inventory')
   @UseGuards(AgentAuthGuard)
   @ApiOperation({ summary: 'Agente envia inventário (software + hardware)' })

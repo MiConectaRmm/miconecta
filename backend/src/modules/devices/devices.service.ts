@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan } from 'typeorm';
 import { Device, DeviceStatus } from '../../database/entities/device.entity';
 import { DeviceInventory } from '../../database/entities/device-inventory.entity';
+import { DeviceMetric } from '../../database/entities/device-metric.entity';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -13,6 +14,8 @@ export class DevicesService {
     private readonly deviceRepo: Repository<Device>,
     @InjectRepository(DeviceInventory)
     private readonly inventoryRepo: Repository<DeviceInventory>,
+    @InjectRepository(DeviceMetric)
+    private readonly metricRepo: Repository<DeviceMetric>,
   ) {}
 
   async registrarDispositivo(dados: Partial<Device>) {
@@ -74,7 +77,32 @@ export class DevicesService {
       });
     }
 
-    return query.orderBy('device.hostname', 'ASC').getMany();
+    const devices = await query.orderBy('device.hostname', 'ASC').getMany();
+
+    // Adicionar última métrica a cada device (cpuPercent, ramPercent)
+    const deviceIds = devices.map(d => d.id);
+    if (deviceIds.length > 0) {
+      const metricas = await Promise.all(
+        deviceIds.map(id =>
+          this.metricRepo.findOne({
+            where: { deviceId: id },
+            order: { criadoEm: 'DESC' } as any,
+          })
+        )
+      );
+      return devices.map((device, i) => ({
+        ...device,
+        ultimaMetrica: metricas[i]
+          ? {
+              cpuPercent: metricas[i]!.cpuPercent,
+              ramPercent: metricas[i]!.ramPercent,
+              discoPercent: metricas[i]!.discoPercent,
+            }
+          : null,
+      }));
+    }
+
+    return devices;
   }
 
   async buscarDispositivo(id: string) {
