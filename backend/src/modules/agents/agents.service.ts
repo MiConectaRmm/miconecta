@@ -128,7 +128,7 @@ export class AgentsService {
     const serverUrl = configService.get('API_URL')
       || (configService.get('RAILWAY_PUBLIC_DOMAIN')
         ? `https://${configService.get('RAILWAY_PUBLIC_DOMAIN')}/api/v1`
-        : 'https://miconecta-backend.fly.dev/api/v1');
+  : 'https://api.maginf.com.br/api/v1');
 
     const clientName = tenant.nome.replace(/[^a-zA-Z0-9 ]/g, '').trim();
 

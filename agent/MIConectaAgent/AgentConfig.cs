@@ -3,7 +3,7 @@ namespace MIConectaAgent;
 public class AgentConfig
 {
     // ── Conexão ──
-    public string ServerUrl { get; set; } = "https://miconecta-backend.fly.dev/api/v1";
+    public string ServerUrl { get; set; } = "https://api.maginf.com.br/api/v1";
     public string TenantId { get; set; } = "";
     public string OrganizationId { get; set; } = "";
     public string DeviceId { get; set; } = "";

@@ -1,4 +1,4 @@
-ServerUrl=https://miconecta-backend.fly.dev/api/v1
+ServerUrl=https://api.maginf.com.br/api/v1
 TenantId=
 ProvisionToken=
 RustDeskServer=136.248.114.218
