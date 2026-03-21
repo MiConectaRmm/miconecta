@@ -107,12 +107,13 @@
 ## 🔄 Última Sessão de Desenvolvimento (21/03/2026)
 
 ### O que foi feito
-**Reestruturação completa da navegação + Hub do Cliente com Abas + WebSocket Real-Time (Etapas 1, 2, 3, 4)**
+**Reestruturação completa da navegação + Hub do Cliente com Abas + WebSocket Real-Time + Configurações Reorganizadas (Etapas 1, 2, 3, 4, 5)**
 
 O sidebar foi reduzido de ~13 itens para 5. Dashboard é painel executivo unificado.
 Central de Atendimento criada como inbox **com WebSocket em tempo real**. A página de detalhe do cliente agora é um
 **hub central com 9 abas**: Cadastro, Usuários Portal, Dispositivos, Alertas, Tickets,
 Scripts, Software, Patches, Sessões. Cada aba é um componente separado em `tabs/`.
+Página de Configurações reorganizada em **5 abas**: Geral, Biblioteca de Scripts, Políticas de Patch, LGPD, Integrações.
 
 **Etapa 3 — WebSocket Real-Time na Central de Atendimento:**
 - Backend: `ChatGateway` agora emite eventos para sala `atendimento` (broadcast para técnicos)
@@ -262,6 +263,29 @@ Scripts, Software, Patches, Sessões. Cada aba é um componente separado em `tab
 17. **`frontend/tailwind.config.ts`** — ATUALIZADO (Etapa 3)
     - Keyframes: `slide-in-right`, `fade-out`
     - Animations: `animate-slide-in-right`, `animate-fade-out`
+
+18. **`frontend/src/app/dashboard/settings/page.tsx`** — REESCRITO (Etapa 5)
+    - De página estática com 4 cards para interface com **5 abas**
+    - **Aba Geral**: API Backend, Segurança, Notificações, Branding (info estática)
+    - **Aba Biblioteca de Scripts**: CRUD completo de scripts globais
+      - Lista com badge linguagem (PowerShell/Bat/Bash/Python), badge GLOBAL
+      - Modal criar/editar com campos: nome, descrição, linguagem, código, checkbox global
+      - Modal preview do código (fundo terminal)
+      - Ações: ver código, editar, remover
+    - **Aba Políticas de Patch**: Resumo global de patches cross-tenant
+      - Contadores por status (pendente, instalando, instalado, falha, agendado)
+      - Distribuição por severidade com barras de progresso
+      - Info de janelas de manutenção
+    - **Aba LGPD**: Proteção de dados
+      - Tabela de políticas de retenção (5 entidades com prazos)
+      - Tabela de solicitações DSAR com status (pendente, em andamento, concluída, negada)
+      - Tabela de registros de consentimento (concedido/recusado)
+    - **Aba Integrações**: Serviços externos
+      - RustDesk (servidor, domínio, portas, status)
+      - SMTP (pendente, instruções .env)
+      - Agente Windows (runtime, protocolo, heartbeat, auto-update)
+      - Storage S3/R2 (provider, upload, limites)
+    - Componentes compartilhados: `InfoRow`, `Modal`, `ScriptFormModal`
 
 #### Páginas que continuam existindo (sem link no sidebar):
 - `/dashboard/devices` — Dispositivos (global)
