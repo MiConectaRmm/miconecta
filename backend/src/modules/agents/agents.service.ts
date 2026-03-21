@@ -460,10 +460,27 @@ export class AgentsService {
   }
 
   private async getDefaultOrganizationId(tenantId: string): Promise<string> {
-    const org = await this.deviceRepo.manager
-      .getRepository('Organization')
-      .findOne({ where: { tenantId }, order: { criadoEm: 'ASC' } });
-    return org?.id || tenantId;
+    const tenantRepo = this.deviceRepo.manager.getRepository('Tenant');
+    const orgRepo = this.deviceRepo.manager.getRepository('Organization');
+
+    const existente = await orgRepo.findOne({
+      where: { tenantId },
+      order: { criadoEm: 'ASC' },
+    });
+
+    if (existente?.id) return existente.id;
+
+    const tenant = await tenantRepo.findOne({ where: { id: tenantId } });
+    if (!tenant) throw new NotFoundException('Tenant não encontrado');
+
+    const organizacao = await orgRepo.save({
+      tenantId,
+      nome: tenant.nome || 'Organização Principal',
+      ativo: true,
+    });
+
+    this.logger.log(`Organização padrão criada automaticamente para tenant ${tenantId}: ${organizacao.id}`);
+    return organizacao.id;
   }
 
   private gerarTokenSeguro(bytes: number): string {

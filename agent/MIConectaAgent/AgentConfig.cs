@@ -8,6 +8,7 @@ public class AgentConfig
     public string OrganizationId { get; set; } = "";
     public string DeviceId { get; set; } = "";
     public string DeviceToken { get; set; } = "";
+    public string ProvisionToken { get; set; } = "";
 
     // ── RustDesk ──
     public string RustDeskServer { get; set; } = "136.248.114.218";
@@ -67,6 +68,7 @@ public class AgentConfig
                 case "OrganizationId": OrganizationId = valor; break;
                 case "DeviceId": DeviceId = valor; break;
                 case "DeviceToken": DeviceToken = valor; break;
+                case "ProvisionToken": ProvisionToken = valor; break;
                 case "RustDeskServer": RustDeskServer = valor; break;
                 case "RustDeskKey": RustDeskKey = valor; break;
                 case "HeartbeatIntervalSeconds":
@@ -98,6 +100,7 @@ public class AgentConfig
             $"OrganizationId={OrganizationId}",
             $"DeviceId={DeviceId}",
             $"DeviceToken={DeviceToken}",
+            $"ProvisionToken={ProvisionToken}",
             $"RustDeskServer={RustDeskServer}",
             $"RustDeskKey={RustDeskKey}",
             $"HeartbeatIntervalSeconds={HeartbeatIntervalSeconds}",

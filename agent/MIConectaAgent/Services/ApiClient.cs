@@ -38,10 +38,19 @@ public class ApiClient
     {
         try
         {
-            info["tenantId"] = _config.TenantId;
-            info["organizationId"] = _config.OrganizationId;
+            // Garantir installationToken no body (obrigatório pelo DTO)
+            info["installationToken"] = _config.ProvisionToken;
 
-            var response = await _http.PostAsJsonAsync("agent/register", info);
+            // Remover campos que não existem no AgentRegisterDto (forbidNonWhitelisted)
+            info.Remove("tenantId");
+            info.Remove("organizationId");
+            info.Remove("fingerprint");
+
+            using var request = new HttpRequestMessage(HttpMethod.Post, "agents/register");
+            request.Headers.Add("x-agent-provision-token", _config.ProvisionToken);
+            request.Content = JsonContent.Create(info);
+
+            var response = await _http.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -59,7 +68,7 @@ public class ApiClient
         try
         {
             AdicionarHeaders();
-            var response = await _http.PostAsJsonAsync("agent/heartbeat", metricas ?? new Dictionary<string, object>());
+            var response = await _http.PostAsJsonAsync("agents/heartbeat", metricas ?? new Dictionary<string, object>());
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
@@ -90,7 +99,7 @@ public class ApiClient
         {
             AdicionarHeaders();
             var payload = new { softwares };
-            var response = await _http.PostAsJsonAsync("agent/inventory", payload);
+            var response = await _http.PostAsJsonAsync("agents/inventory", payload);
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)

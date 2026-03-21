@@ -60,12 +60,18 @@ try
     builder.Services.AddSingleton<TelemetryService>();
 
     // ── Background Services ──
+    builder.Services.AddSingleton<RealtimeClient>();
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<RealtimeClient>());
+
+    builder.Services.AddSingleton<ChatNotificationService>();
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<ChatNotificationService>());
+
+    builder.Services.AddSingleton<RemoteSessionHandler>();
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<RemoteSessionHandler>());
+
     builder.Services.AddHostedService<HeartbeatService>();
     builder.Services.AddHostedService<CommandPollingService>();
     builder.Services.AddHostedService<QueueProcessor>();
-    builder.Services.AddHostedService<RealtimeClient>();
-    builder.Services.AddHostedService<ChatNotificationService>();
-    builder.Services.AddHostedService<RemoteSessionHandler>();
 
     var host = builder.Build();
     host.Run();
