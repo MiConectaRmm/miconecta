@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
 import { Device, DeviceStatus } from '../../database/entities/device.entity';
+import { Organization } from '../../database/entities/organization.entity';
 import { Tenant } from '../../database/entities/tenant.entity';
 import { DeviceMetric } from '../../database/entities/device-metric.entity';
 import { DeviceInventory } from '../../database/entities/device-inventory.entity';
@@ -21,6 +22,8 @@ export class AgentsService {
   constructor(
     @InjectRepository(Device)
     private readonly deviceRepo: Repository<Device>,
+    @InjectRepository(Organization)
+    private readonly organizationRepo: Repository<Organization>,
     @InjectRepository(Tenant)
     private readonly tenantRepo: Repository<Tenant>,
     @InjectRepository(DeviceMetric)
@@ -460,24 +463,26 @@ export class AgentsService {
   }
 
   private async getDefaultOrganizationId(tenantId: string): Promise<string> {
-    const tenantRepo = this.deviceRepo.manager.getRepository('Tenant');
-    const orgRepo = this.deviceRepo.manager.getRepository('Organization');
-
-    const existente = await orgRepo.findOne({
-      where: { tenantId },
+    const existente = await this.organizationRepo.findOne({
+      where: { tenantId, ativo: true },
       order: { criadoEm: 'ASC' },
     });
 
     if (existente?.id) return existente.id;
 
-    const tenant = await tenantRepo.findOne({ where: { id: tenantId } });
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
     if (!tenant) throw new NotFoundException('Tenant não encontrado');
 
-    const organizacao = await orgRepo.save({
-      tenantId,
-      nome: tenant.nome || 'Organização Principal',
-      ativo: true,
-    });
+    this.logger.warn(`Nenhuma organização ativa encontrada para tenant ${tenantId}. Criando organização padrão.`);
+
+    const organizacao = await this.organizationRepo.save(
+      this.organizationRepo.create({
+        tenantId,
+        nome: tenant.nome || 'Organização Principal',
+        ativo: true,
+        configuracoes: { criadaAutomaticamente: true, origem: 'agent-register' },
+      }),
+    );
 
     this.logger.log(`Organização padrão criada automaticamente para tenant ${tenantId}: ${organizacao.id}`);
     return organizacao.id;
