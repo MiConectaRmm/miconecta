@@ -20,7 +20,7 @@ export class AlertsController {
   @RequirePermissions('alerts:read')
   @ApiOperation({ summary: 'Listar alertas do tenant' })
   listar(@Req() req: any, @Query() filtros: any) {
-    const tenantId = req.tenantId || req.user.tenantId;
+    const tenantId = filtros.tenantId || req.tenantId || req.user.tenantId;
     return this.service.listarAlertas(tenantId, filtros);
   }
 

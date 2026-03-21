@@ -157,6 +157,11 @@ export class RegistrarEvidenciaDto {
 // ── Filtro de listagem ──
 
 export class SessionFilterDto {
+  @ApiPropertyOptional({ description: 'Filtrar por tenant do dispositivo' })
+  @IsOptional()
+  @IsUUID()
+  deviceTenantId?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

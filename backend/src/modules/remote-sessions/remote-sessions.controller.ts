@@ -57,7 +57,7 @@ export class RemoteSessionsController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Listar sessões remotas' })
   async listar(@Req() req: any, @Query() filtros: SessionFilterDto) {
-    const tenantId = req.tenantId || req.user.tenantId;
+    const tenantId = filtros.deviceTenantId || req.tenantId || req.user.tenantId;
     return this.sessionsService.listar(tenantId, filtros);
   }
 

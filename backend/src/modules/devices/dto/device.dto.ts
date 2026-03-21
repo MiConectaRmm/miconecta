@@ -55,6 +55,11 @@ export class UpdateDeviceDto {
 }
 
 export class DeviceFilterDto {
+  @ApiPropertyOptional({ description: 'Filtrar por tenant (super_admin)' })
+  @IsOptional()
+  @IsUUID()
+  tenantId?: string;
+
   @ApiPropertyOptional({ enum: DeviceStatus })
   @IsOptional()
   @IsEnum(DeviceStatus)

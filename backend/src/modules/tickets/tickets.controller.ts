@@ -41,7 +41,7 @@ export class TicketsController {
   @RequirePermissions('tickets:read')
   @ApiOperation({ summary: 'Listar tickets do tenant' })
   async listar(@Req() req: any, @Query() filtros: TicketFilterDto) {
-    const tenantId = req.tenantId || req.user.tenantId;
+    const tenantId = filtros.tenantId || req.tenantId || req.user.tenantId;
     return this.ticketsService.listar(tenantId, filtros);
   }
 

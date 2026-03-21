@@ -1,4 +1,5 @@
 import { IsNotEmpty, IsString, IsOptional, IsBoolean, IsInt, Min, Max, MaxLength, IsUUID } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class AtribuirTicketDto {
@@ -49,6 +50,11 @@ export class AvaliarTicketDto {
 }
 
 export class TicketFilterDto {
+  @ApiPropertyOptional({ description: 'Filtrar por tenant (super_admin)' })
+  @IsOptional()
+  @IsUUID()
+  tenantId?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -78,4 +84,11 @@ export class TicketFilterDto {
   @IsOptional()
   @IsString()
   busca?: string;
+
+  @ApiPropertyOptional({ description: 'Limitar quantidade de resultados' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  limit?: number;
 }

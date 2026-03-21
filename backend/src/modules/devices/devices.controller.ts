@@ -23,7 +23,7 @@ export class DevicesController {
   @RequirePermissions('devices:read')
   @ApiOperation({ summary: 'Listar dispositivos do tenant' })
   listar(@Req() req: any, @Query() filtros: DeviceFilterDto) {
-    const tenantId = req.tenantId || req.user.tenantId;
+    const tenantId = filtros.tenantId || req.tenantId || req.user.tenantId;
     return this.service.listarDispositivos(tenantId, filtros);
   }
 
