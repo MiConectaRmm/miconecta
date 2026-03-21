@@ -10,8 +10,9 @@ Plataforma completa de Remote Monitoring and Management (RMM) + Help Desk para M
 
 | Componente | Tecnologia | Hospedagem |
 |---|---|---|
-| **Backend API** | NestJS 10 + TypeORM + PostgreSQL | Render.com |
-| **Frontend** | Next.js 14 + Tailwind + Zustand | Vercel |
+| **Backend API** | NestJS 10 + TypeORM + PostgreSQL | Fly.io (gru) |
+| **Frontend** | Next.js 14 + Tailwind + Zustand | Fly.io (gru) |
+| **Database** | PostgreSQL 15 | Fly.io (gru) |
 | **Agente Windows** | C# .NET 8 Windows Service | Instalado nos PCs |
 | **Acesso Remoto** | RustDesk (self-hosted) | 136.248.114.218 |
 | **Storage** | Cloudflare R2 (S3-compatible) | Cloudflare |
@@ -20,9 +21,9 @@ Plataforma completa de Remote Monitoring and Management (RMM) + Help Desk para M
 
 | Componente | URL |
 |---|---|
-| **Frontend** | https://miconecta.vercel.app |
-| **Backend API** | https://miconecta.onrender.com/api/v1 |
-| **Health Check** | https://miconecta.onrender.com/health |
+| **Frontend** | https://miconecta-frontend.fly.dev |
+| **Backend API** | https://miconecta-backend.fly.dev/api/v1 |
+| **Health Check** | https://miconecta-backend.fly.dev/health |
 | **Swagger** | http://localhost:3000/api/docs (dev only) |
 | **GitHub** | https://github.com/MiConectaRmm/miconecta |
 
@@ -32,7 +33,7 @@ Plataforma completa de Remote Monitoring and Management (RMM) + Help Desk para M
 
 ```
 miconecta/
-├── backend/                    NestJS API (20 modules, 25 entities)
+├── backend/                    NestJS API (20 modules, 27 entities)
 │   ├── src/
 │   │   ├── common/             Guards, interceptors, decorators, middlewares, filters
 │   │   │   ├── guards/         RolesGuard, PermissionsGuard, TenantAccessGuard
@@ -42,7 +43,7 @@ miconecta/
 │   │   │   ├── decorators/    @Roles, @RequirePermissions, @CurrentUser, @CurrentTenant
 │   │   │   └── interfaces/    JwtPayload, etc
 │   │   ├── database/
-│   │   │   ├── entities/       25 TypeORM entities
+│   │   │   ├── entities/       27 TypeORM entities
 │   │   │   └── subscribers/    TenantValidationSubscriber
 │   │   ├── modules/
 │   │   │   ├── auth/           Login, refresh, logout, JWT, AgentAuth
@@ -69,14 +70,14 @@ miconecta/
 │   │   └── main.ts             Bootstrap (Helmet, ValidationPipe, CORS, health)
 │   └── package.json
 │
-├── frontend/                   Next.js 14 (22 pages)
+├── frontend/                   Next.js 14 (30 pages)
 │   ├── src/
 │   │   ├── app/
 │   │   │   ├── login/          Dual-user login
-│   │   │   ├── dashboard/      Painel Maginf (12 pages)
-│   │   │   └── portal/         Portal Cliente (6 pages)
+│   │   │   ├── dashboard/      Painel Maginf (18 pages)
+│   │   │   └── portal/         Portal Cliente (11 pages)
 │   │   ├── components/         Sidebar, StatusBadge, StatCard, Modal, EmptyState
-│   │   ├── hooks/              usePermissions, useSocket
+│   │   ├── hooks/              usePermissions, useSocket, useChatSocket
 │   │   ├── stores/             Zustand auth store
 │   │   └── lib/                Axios API client (16 modules), utils
 │   └── package.json
@@ -121,36 +122,42 @@ miconecta/
 
 ---
 
-## Deploy em Producao
+## Deploy em Producao (Fly.io)
 
-### Backend (Render.com)
+Toda a stack roda no Fly.io, regiao `gru` (Sao Paulo). Veja `FLY_MIGRATION.md` para setup completo.
 
-- **Root Directory:** `backend`
-- **Build Command:** `npm install --include=dev && npm run build`
-- **Start Command:** `node dist/main.js`
+### Backend
+
+```bash
+cd backend
+fly deploy
+```
 
 | Variavel | Valor |
 |---|---|
+| `DATABASE_URL` | (via `fly postgres attach`) |
 | `NODE_ENV` | `production` |
-| `DATABASE_URL` | (Render PostgreSQL internal URL) |
-| `JWT_SECRET` | (64 chars) |
-| `JWT_EXPIRATION` | `24h` |
+| `JWT_SECRET` | (64 chars, via `fly secrets set`) |
+| `JWT_EXPIRATION` | `15m` |
 | `AGENT_AUTH_SECRET` | (32 chars) |
-| `CORS_ORIGIN` | `https://miconecta.vercel.app` |
+| `CORS_ORIGIN` | `https://miconecta-frontend.fly.dev` |
+| `PORT` | `3000` |
 
-### Frontend (Vercel)
+### Frontend
 
-- **Root Directory:** `frontend`
-- **Framework:** Next.js
+```bash
+cd frontend
+fly deploy
+```
 
 | Variavel | Valor |
 |---|---|
-| `NEXT_PUBLIC_API_URL` | `https://miconecta.onrender.com/api/v1` |
-| `NEXT_PUBLIC_WS_URL` | `wss://miconecta.onrender.com` |
+| `NEXT_PUBLIC_API_URL` | `https://miconecta-backend.fly.dev/api/v1` |
+| `NEXT_PUBLIC_WS_URL` | `wss://miconecta-backend.fly.dev` |
 
-### Auto-deploy
+### Database
 
-Todo `git push main` dispara build automatico no Render e Vercel.
+PostgreSQL gerenciado pelo Fly.io, conectado via `fly postgres attach`.
 
 ---
 
