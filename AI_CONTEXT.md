@@ -107,57 +107,72 @@
 ## 🔄 Última Sessão de Desenvolvimento (21/03/2026)
 
 ### O que foi feito
-**Feature: Usuários do Portal por Cliente (limite de até 5)**
+**Reestruturação completa da navegação do Dashboard (Etapa 1 + Etapa 4)**
 
-Implementação completa do gerenciamento de usuários do portal dentro da página de detalhe de cada empresa.
+O sidebar foi reduzido de ~13 itens para 5 itens. O Dashboard agora é um painel executivo unificado.
+Uma nova página "Central de Atendimento" foi criada como inbox unificado de tickets e alertas.
 
-**IMPORTANTE — Reestruturação de navegação (sessão 2):**
-- Usuários do portal **NÃO têm página/rota própria**. Ficam DENTRO de `/dashboard/clients/[id]` (detalhe da empresa).
-- Removido item "Usuários do portal" do Sidebar
-- Removidos links para `/dashboard/clientes` do Dashboard
-- A rota `/dashboard/clientes` e `/dashboard/clientes/[id]` ainda existem nos arquivos mas estão **órfãs** (sem links para elas). Podem ser removidas futuramente.
+#### Decisões de design (aprovadas pelo Maicon):
+- **Maicon** = Super Admin / Dono da Maginf
+- **Gabriel** = Técnico (atende todos os 20 clientes)
+- Mesmo painel `/dashboard/` para ambos, com itens escondidos por role
+- Técnicos e Configurações visíveis só para Super Admin / Admin
+- Cliente é o **hub central** — tudo fica dentro do perfil da empresa
+- Sidebar com **5 itens**: Dashboard, Central de Atendimento, Clientes, Técnicos*, Config*
+
+#### Novo Sidebar:
+```
+📊 Dashboard              → /dashboard           (Painel executivo com saúde por cliente)
+📥 Central de Atendimento → /dashboard/atendimento (Inbox de tickets + alertas, auto-refresh 30s)
+👥 Clientes               → /dashboard/clients    (Lista de empresas → detalhe com tudo)
+👨‍💻 Técnicos              → /dashboard/technicians (🔒 Só Super Admin / Admin)
+⚙️ Configurações          → /dashboard/settings   (🔒 Só Super Admin / Admin)
+```
 
 #### Arquivos modificados:
 
-1. **`backend/src/modules/users/users.module.ts`**
-   - Adicionou `Tenant` ao `TypeOrmModule.forFeature()` 
+1. **`frontend/src/components/Sidebar.tsx`** — REESCRITO
+   - De ~13 itens em 4 seções para 5 itens com RBAC
+   - Filtro por role (super_admin, admin, admin_maginf veem Técnicos + Config)
+   - Técnicos de campo (tecnico, tecnico_senior, visualizador) veem só Dashboard + Central + Clientes
+   - Mostra nome e role do usuário no footer
 
-2. **`backend/src/modules/users/client-users.service.ts`**
-   - Injetou `Tenant` repository
-   - Limite agora é dinâmico via `tenant.maxUsuarios` (default 5 se null)
-   - Novo método `contagem(tenantId)` → retorna `{ total, ativos, inativos, limite, disponivel, atingiuLimite }`
-   - Novo método `listarPorTenant(tenantId)` → ordenado por ativos primeiro
+2. **`frontend/src/app/dashboard/page.tsx`** — REESCRITO
+   - Dashboard unificado (não mais 3 componentes separados)
+   - Cards: Clientes, Técnicos*, Dispositivos, Offline, Alertas, Tickets
+   - Seção "Saúde por Cliente" com status (OK/Atenção/Crítico) e indicadores
+   - Seção "Atividade Recente" com tickets mais recentes
+   - Ações rápidas contextualizadas por role
+   - Auto-refresh 30s + WebSocket
+   - *Técnicos card só visível para Super Admin/Admin
 
-3. **`backend/src/modules/users/client-users.controller.ts`**
-   - Novo endpoint: `GET /api/v1/users/clients/tenant/:tenantId` (listar por tenant)
-   - Novo endpoint: `GET /api/v1/users/clients/tenant/:tenantId/contagem` (contagem + limite)
+3. **`frontend/src/app/dashboard/atendimento/page.tsx`** — NOVO
+   - Central de Atendimento / Inbox unificado
+   - Carrega tickets abertos + em andamento + alertas ativos
+   - Contadores: Total, Tickets, Alertas
+   - Filtros: tipo (todos/tickets/alertas), prioridade (critica/alta/media/baixa), busca textual
+   - Ordenação: crítica primeiro, depois por tempo
+   - Clique em ticket → abre detalhe do ticket
+   - Clique em alerta → abre perfil do cliente
+   - Auto-refresh a cada 30s
 
-4. **`frontend/src/lib/api.ts`**
-   - Novos métodos: `usersApi.listarPorTenant(tenantId)` e `usersApi.contagemPorTenant(tenantId)`
+#### Páginas que continuam existindo (sem link no sidebar):
+- `/dashboard/devices` — Dispositivos (global)
+- `/dashboard/alerts` — Alertas (global)
+- `/dashboard/scripts` — Scripts (global)
+- `/dashboard/software` — Software (global)
+- `/dashboard/patches` — Patches (global)
+- `/dashboard/tickets` — Tickets (global) — acessível via Central de Atendimento
+- `/dashboard/audit` — Auditoria (global)
+- `/dashboard/reports` — Relatórios (global)
+- `/dashboard/agent-download` — Download do agente
+- `/dashboard/clientes` e `/dashboard/clientes/[id]` — Rotas antigas órfãs
 
-5. **`frontend/src/app/dashboard/clients/[id]/page.tsx`** ← PRINCIPAL
-   - Seção "Usuários do Portal" adicionada na coluna esquerda (após Organizações)
-   - CRUD completo: listar, criar, editar, desativar/reativar, enviar convite
-   - Barra de progresso visual X/limite (verde/amarelo/vermelho)
-   - Aviso quando limite atingido
-   - Botão "Novo" bloqueado quando limite atingido
-   - Modal de criar/editar (nome, email, senha, perfil, telefone, cargo)
-   - Contagem de usuários no Resumo lateral (sidebar direita)
-   - Dados carregados junto com o resto na função `loadData()`
-
-6. **`frontend/src/components/Sidebar.tsx`**
-   - Removido item "Usuários do portal" apontando para `/dashboard/clientes`
-
-7. **`frontend/src/app/dashboard/page.tsx`**
-   - Removidos 2 links "Usuários do portal" (seção Administração e Ações Rápidas)
-   - Link "Empresas" atualizado com descrição "CNPJ, contrato, usuários do portal"
-
-#### Detalhes técnicos:
-- O limite de usuários vem de `tenant.maxUsuarios` (coluna `max_usuarios`, default entity = 10, default service = 5)
-- Client users têm 3 perfis: `admin_cliente`, `gestor`, `usuario`
-- Senha com bcrypt 12 rounds
-- Token de convite: UUID v4, validade 24h
-- Registro detalhado em `docs/SESSAO-2026-03-21-USUARIOS-PORTAL.md`
+### Sessão anterior (mesmo dia):
+**Feature: Usuários do Portal por Cliente**
+- Implementação completa do gerenciamento de usuários do portal dentro da página `/dashboard/clients/[id]`
+- CRUD completo com limite dinâmico por tenant
+- Removido do sidebar e dashboard links separados
 
 ---
 
