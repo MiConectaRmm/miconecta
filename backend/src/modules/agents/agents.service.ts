@@ -372,7 +372,7 @@ export class AgentsService {
     if (dto.antivirusStatus) updateData.antivirusStatus = dto.antivirusStatus;
     if (dto.uptimeSegundos) updateData.uptime_segundos = dto.uptimeSegundos;
     if (dto.discoDisponivelMb) updateData.discoDisponivelMb = dto.discoDisponivelMb;
-    if (dto.remoteStatus) updateData.rustdeskId = dto.remoteStatus;
+  if (dto.rustdeskId) updateData.rustdeskId = dto.rustdeskId;
 
     // Preservar usuário logado nas notas do device
     if ((dto as any).loggedUser) {

@@ -90,6 +90,7 @@ public class ApiClient
                 ["status"] = "online",
                 ["agentVersion"] = data.TryGetValue("agentVersion", out var agentVersion) ? agentVersion : _config.AgentVersion,
                 ["remoteStatus"] = data.TryGetValue("rustdeskId", out var rustdeskId) && rustdeskId is not null && !string.IsNullOrWhiteSpace(rustdeskId.ToString()) ? "ready" : null,
+                ["rustdeskId"] = data.TryGetValue("rustdeskId", out var rustdeskIdValue) ? rustdeskIdValue : null,
                 ["cpuPercent"] = data.TryGetValue("cpuPercent", out var cpuPercent) ? cpuPercent : null,
                 ["ramPercent"] = data.TryGetValue("ramPercent", out var ramPercent) ? ramPercent : null,
                 ["ramUsadaMb"] = data.TryGetValue("ramUsadaMb", out var ramUsadaMb) ? ramUsadaMb : null,

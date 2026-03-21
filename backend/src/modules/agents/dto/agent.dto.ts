@@ -121,6 +121,11 @@ export class AgentHeartbeatDto {
   @IsString()
   remoteStatus?: string;
 
+  @ApiPropertyOptional({ example: '1041447531' })
+  @IsOptional()
+  @IsString()
+  rustdeskId?: string;
+
   @ApiPropertyOptional({ example: 45.2 })
   @IsOptional()
   @IsNumber()
