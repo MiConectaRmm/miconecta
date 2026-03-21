@@ -137,7 +137,7 @@ export default function CentralAtendimentoPage() {
 
       const [abertosRes, andamentoRes] = await Promise.allSettled([
         ticketsApi.listar({ status: 'aberto', limit: 200 }),
-        ticketsApi.listar({ status: 'em_andamento', limit: 200 }),
+        ticketsApi.listar({ status: 'em_atendimento', limit: 200 }),
       ])
 
       const ticketsAbertos = abertosRes.status === 'fulfilled'
@@ -154,7 +154,7 @@ export default function CentralAtendimentoPage() {
           titulo: t.titulo || t.assunto || t.title || 'Sem título',
           cliente: t.tenant?.nomeFantasia || t.tenant?.razaoSocial || t.tenant?.nome || 'N/A',
           clienteId: t.tenantId,
-          prioridade: (t.prioridade || 'media') as AtendimentoItem['prioridade'],
+          prioridade: (t.prioridade === 'urgente' ? 'critica' : t.prioridade || 'media') as AtendimentoItem['prioridade'],
           status: t.status,
           criadoEm: t.criadoEm || t.createdAt,
           hasUnreadFromClient: t.hasUnreadFromClient,

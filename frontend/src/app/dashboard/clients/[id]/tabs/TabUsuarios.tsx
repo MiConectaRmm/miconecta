@@ -30,7 +30,10 @@ export default function TabUsuarios({ tenantId, tenantNome, maxUsuarios }: Props
         usersApi.listarPorTenant(tenantId),
         usersApi.contagemPorTenant(tenantId),
       ])
-      if (usersRes.status === 'fulfilled') setPortalUsers(usersRes.value.data)
+      if (usersRes.status === 'fulfilled') {
+        const d = usersRes.value.data
+        setPortalUsers(Array.isArray(d) ? d : d?.items || [])
+      }
       if (contagemRes.status === 'fulfilled') setContagem(contagemRes.value.data)
     } catch {} finally { setCarregando(false) }
   }

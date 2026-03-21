@@ -32,7 +32,10 @@ export default function TabTickets({ tenantId }: Props) {
         ticketsApi.listar(filtros),
         ticketsApi.contagem(),
       ])
-      if (ticketsRes.status === 'fulfilled') setTickets(ticketsRes.value.data)
+      if (ticketsRes.status === 'fulfilled') {
+        const d = ticketsRes.value.data
+        setTickets(Array.isArray(d) ? d : d?.items || [])
+      }
       if (contagemRes.status === 'fulfilled') setContagem(contagemRes.value.data)
     } catch {} finally { setCarregando(false) }
   }

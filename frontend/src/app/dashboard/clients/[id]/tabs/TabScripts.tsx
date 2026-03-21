@@ -26,7 +26,10 @@ export default function TabScripts({ tenantId }: Props) {
         scriptsApi.listar(),
         devicesApi.listar({ tenantId }),
       ])
-      if (scriptsRes.status === 'fulfilled') setScripts(scriptsRes.value.data)
+      if (scriptsRes.status === 'fulfilled') {
+        const d = scriptsRes.value.data
+        setScripts(Array.isArray(d) ? d : d?.items || [])
+      }
       if (devRes.status === 'fulfilled') {
         const d = devRes.value.data
         setDevices(Array.isArray(d) ? d : d?.items || [])
