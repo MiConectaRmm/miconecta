@@ -16,7 +16,7 @@ public class LocalStateStore
     public LocalStateStore(AgentConfig config, ILogger<LocalStateStore> logger)
     {
         _logger = logger;
-        _dbPath = Path.Combine(AgentConfig.AppDir, "agent_state.db");
+        _dbPath = Path.Combine(config.AppDir, "agent_state.db");
         InicializarBanco();
     }
 
