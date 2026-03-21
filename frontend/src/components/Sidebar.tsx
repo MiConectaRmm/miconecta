@@ -45,6 +45,7 @@ const menuItems: MenuItem[] = [
   { href: '/dashboard/audit', label: 'Auditoria', icon: Eye, section: 'Administração' },
   { href: '/dashboard/reports', label: 'Relatórios', icon: BarChart3, section: 'Administração' },
   { href: '/dashboard/agent-download', label: 'Download Agente', icon: Download, section: 'Administração' },
+  { href: '/dashboard/settings', label: 'Configurações', icon: Settings, section: 'Administração' },
 ]
 
 export default function Sidebar() {

@@ -78,7 +78,7 @@ export class AuthService {
       }
     }
 
-    throw new UnauthorizedException('Credenciais inv?lidas');
+    throw new UnauthorizedException('Credenciais inválidas');
   }
 
   private async loginAsTechnician(tecnico: Technician, ip?: string) {
@@ -160,11 +160,11 @@ export class AuthService {
       if (decoded.userType === 'technician') {
         const tecnico = await this.technicianRepo.findOne({ where: { id: decoded.sub }, relations: ['tenant'] });
         if (!tecnico || !tecnico.ativo || !tecnico.refreshToken) {
-          throw new UnauthorizedException('Refresh token inv?lido');
+          throw new UnauthorizedException('Refresh token inválido');
         }
 
         const isValid = await bcrypt.compare(refreshToken, tecnico.refreshToken);
-        if (!isValid) throw new UnauthorizedException('Refresh token inv?lido');
+        if (!isValid) throw new UnauthorizedException('Refresh token inválido');
 
         // Rotation: gerar novos tokens e invalidar o anterior
         return this.loginAsTechnician(tecnico);
@@ -173,14 +173,14 @@ export class AuthService {
       if (decoded.userType === 'client_user') {
         const clientUser = await this.clientUserRepo.findOne({ where: { id: decoded.sub }, relations: ['tenant'] });
         if (!clientUser || !clientUser.ativo) {
-          throw new UnauthorizedException('Refresh token inv?lido');
+          throw new UnauthorizedException('Refresh token inválido');
         }
         return this.loginAsClientUser(clientUser);
       }
 
-      throw new UnauthorizedException('Tipo de usu?rio desconhecido');
+      throw new UnauthorizedException('Tipo de usuário desconhecido');
     } catch {
-      throw new UnauthorizedException('Refresh token inv?lido ou expirado');
+      throw new UnauthorizedException('Refresh token inválido ou expirado');
     }
   }
 
@@ -197,7 +197,7 @@ export class AuthService {
     });
 
     if (existente) {
-      throw new ConflictException('E-mail j? cadastrado');
+      throw new ConflictException('E-mail já cadastrado');
     }
 
     const senhaHash = await bcrypt.hash(dto.senha, 12);
@@ -210,7 +210,7 @@ export class AuthService {
   async validarToken(payload: any) {
     if (payload.userType === 'client_user') {
       const user = await this.clientUserRepo.findOne({ where: { id: payload.sub } });
-      if (!user || !user.ativo) throw new UnauthorizedException('Token inv?lido');
+      if (!user || !user.ativo) throw new UnauthorizedException('Token inválido');
       return {
         ...payload,
         tenantId: user.tenantId,
@@ -220,8 +220,8 @@ export class AuthService {
     }
 
     const tecnico = await this.technicianRepo.findOne({ where: { id: payload.sub } });
-    if (!tecnico || !tecnico.ativo) throw new UnauthorizedException('Token inv?lido');
-    // Permiss?es e fun??o sempre do banco ? evita JWT antigo sem novas permiss?es ap?s deploy
+    if (!tecnico || !tecnico.ativo) throw new UnauthorizedException('Token inválido');
+    // Permissões e função sempre do banco — evita JWT antigo sem novas permissões após deploy
     return {
       ...payload,
       tenantId: tecnico.tenantId,
@@ -233,7 +233,7 @@ export class AuthService {
   async me(userId: string, userType: string) {
     if (userType === 'client_user') {
       const user = await this.clientUserRepo.findOne({ where: { id: userId }, relations: ['tenant', 'organization'] });
-      if (!user) throw new UnauthorizedException('Usu?rio n?o encontrado');
+      if (!user) throw new UnauthorizedException('Usuário não encontrado');
       return {
         id: user.id, nome: user.nome, email: user.email,
         userType: 'client_user', role: user.funcao,
@@ -244,7 +244,7 @@ export class AuthService {
     }
 
     const tecnico = await this.technicianRepo.findOne({ where: { id: userId }, relations: ['tenant'] });
-    if (!tecnico) throw new UnauthorizedException('Usu?rio n?o encontrado');
+    if (!tecnico) throw new UnauthorizedException('Usuário não encontrado');
     return {
       id: tecnico.id, nome: tecnico.nome, email: tecnico.email,
       userType: 'technician', role: tecnico.funcao,

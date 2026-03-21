@@ -58,7 +58,7 @@ export default function SettingsPage() {
             </div>
             <div className="flex items-center justify-between py-2">
               <span className="text-dark-400">Versão</span>
-              <span className="text-white">v1.0.0</span>
+              <span className="text-white">v2.0.0</span>
             </div>
           </div>
         </div>
