@@ -14,8 +14,8 @@ interface Technician {
   funcao: string
   ativo: boolean
   tenantId?: string
-  tenantNome?: string
-  ultimoAcessoEm?: string
+  tenant?: { id: string; nome: string; slug?: string }
+  ultimoLogin?: string
 }
 
 export default function TechniciansPage() {
@@ -199,9 +199,9 @@ export default function TechniciansPage() {
                         <Shield className="w-4 h-4 text-brand-400" />
                         <div>
                           <div className="text-dark-100 font-medium">{t.nome}</div>
-                          {t.ultimoAcessoEm && (
+                          {t.ultimoLogin && (
                             <div className="text-xs text-dark-500">
-                              Último acesso: {new Date(t.ultimoAcessoEm).toLocaleString('pt-BR')}
+                              Último acesso: {new Date(t.ultimoLogin).toLocaleString('pt-BR')}
                             </div>
                           )}
                         </div>
@@ -219,7 +219,7 @@ export default function TechniciansPage() {
                       </span>
                     </td>
                     <td className="py-2.5 px-3 text-xs text-dark-400">
-                      {t.tenantNome || 'Maginf / Global'}
+                      {t.tenant?.nome || 'Maginf / Global'}
                     </td>
                     <td className="py-2.5 px-3">
                       <StatusBadge status={t.ativo ? 'ativo' : 'suspenso'} />

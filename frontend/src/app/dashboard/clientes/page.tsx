@@ -1,14 +1,25 @@
-'use client'
+'use client''use client'
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
+
+
+import { useEffect } from 'react'import { useEffect, useState } from 'react'
+
+import { useRouter } from 'next/navigation'import Link from 'next/link'
+
 import { Plus, User, Search, Mail, Phone, Building, Shield } from 'lucide-react'
-import { usersApi, tenantsApi } from '@/lib/api'
-import { useAuthStore } from '@/stores/auth.store'
-import Modal from '@/components/ui/Modal'
 
-export default function ClientesPage() {
-  const [clientes, setClientes] = useState<any[]>([])
+/** Redirect legado: /dashboard/clientes → /dashboard/clients */import { usersApi, tenantsApi } from '@/lib/api'
+
+export default function ClientesRedirect() {import { useAuthStore } from '@/stores/auth.store'
+
+  const router = useRouter()import Modal from '@/components/ui/Modal'
+
+  useEffect(() => { router.replace('/dashboard/clients') }, [router])
+
+  return nullexport default function ClientesPage() {
+
+}  const [clientes, setClientes] = useState<any[]>([])
+
   const [busca, setBusca] = useState('')
   const [carregando, setCarregando] = useState(true)
   const [showModal, setShowModal] = useState(false)

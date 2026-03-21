@@ -106,16 +106,41 @@
 
 ## 🔄 Última Sessão de Desenvolvimento (21/03/2026)
 
-### O que foi feito
-**Reestruturação completa da navegação + Hub do Cliente com Abas + WebSocket Real-Time + Configurações Reorganizadas (Etapas 1, 2, 3, 4, 5)**
+### O que foi feito — Auditoria e Correção Geral ("corrija tudo")
 
-O sidebar foi reduzido de ~13 itens para 5. Dashboard é painel executivo unificado.
-Central de Atendimento criada como inbox **com WebSocket em tempo real**. A página de detalhe do cliente agora é um
-**hub central com 9 abas**: Cadastro, Usuários Portal, Dispositivos, Alertas, Tickets,
-Scripts, Software, Patches, Sessões. Cada aba é um componente separado em `tabs/`.
-Página de Configurações reorganizada em **5 abas**: Geral, Biblioteca de Scripts, Políticas de Patch, LGPD, Integrações.
+Após completar Etapas 1-5 da reestruturação de navegação, realizamos uma **auditoria completa
+de todo o código** (backend + frontend, ~50 arquivos lidos) e corrigimos todos os problemas encontrados.
 
-**Etapa 3 — WebSocket Real-Time na Central de Atendimento:**
+#### Correções aplicadas:
+
+1. **Login redirect corrigido** (`login/page.tsx`)
+   - `tecnico` role agora redireciona para `/dashboard/atendimento` (Central de Atendimento) em vez de `/dashboard/tickets`
+
+2. **Technicians page — mapeamento de dados corrigido** (`technicians/page.tsx`)
+   - Interface `Technician` agora tem `tenant?: { id, nome, slug }` em vez de `tenantNome` (compatível com resposta da API)
+   - Campo `ultimoAcessoEm` corrigido para `ultimoLogin` (nome real na entity)
+   - Coluna Tenant agora exibe `t.tenant?.nome` em vez de `t.tenantNome`
+
+3. **Dashboard search bar corrigido** (`dashboard/layout.tsx`)
+   - Removido `onFocus → redirect /dashboard/tickets` e `readOnly` — barra de busca agora é funcional (sem redirect)
+
+4. **Rotas /clientes duplicadas resolvidas** (`clientes/page.tsx`, `clientes/[id]/page.tsx`)
+   - Rota antiga `/dashboard/clientes` agora redireciona para `/dashboard/clients` (canônico)
+   - Rota antiga `/dashboard/clientes/:id` (monolito de 1037 linhas) substituída por redirect para `/dashboard/clients/:id` (hub com abas)
+
+5. **Hook duplicado removido** (`hooks/useChatSocket.ts`)
+   - Arquivo standalone removido — a versão usada está em `useSocket.ts` (exporta `useChatSocket`)
+
+6. **CORS seguro em produção** (`backend/main.ts`)
+   - Fallback agora é `https://miconecta-frontend.fly.dev` em produção (antes era `*`)
+   - Adicionado `CORS_ORIGIN` e `DB_SSL=true` no `backend/fly.toml`
+
+7. **TypeORM synchronize warning** (`backend/app.module.ts`)
+   - Adicionado warning log em produção sobre `synchronize: true`
+   - TODO marcado para migrar para migrations antes de dados reais
+
+#### Sessão anterior (mesmo dia):
+**Etapas 1-5: Reestruturação completa da navegação**
 - Backend: `ChatGateway` agora emite eventos para sala `atendimento` (broadcast para técnicos)
 - Backend: `AlertsService` agora emite `notification:new` via WebSocket ao criar/reconhecer/resolver alertas
 - Frontend: Central usa `useSocket('/chat')` e entra na sala `atendimento:join`
@@ -293,11 +318,12 @@ Página de Configurações reorganizada em **5 abas**: Geral, Biblioteca de Scri
 - `/dashboard/scripts` — Scripts (global)
 - `/dashboard/software` — Software (global)
 - `/dashboard/patches` — Patches (global)
-- `/dashboard/tickets` — Tickets (global) — acessível via Central de Atendimento
+- `/dashboard/tickets` — Tickets (global) — acessível via Central de Atendimento e links internos
 - `/dashboard/audit` — Auditoria (global)
 - `/dashboard/reports` — Relatórios (global)
 - `/dashboard/agent-download` — Download do agente
-- `/dashboard/clientes` e `/dashboard/clientes/[id]` — Rotas antigas órfãs
+- `/dashboard/clientes` → **REDIRECT** para `/dashboard/clients`
+- `/dashboard/clientes/[id]` → **REDIRECT** para `/dashboard/clients/[id]`
 
 ### Sessão anterior (mesmo dia):
 **Feature: Usuários do Portal por Cliente**
@@ -313,11 +339,10 @@ Página de Configurações reorganizada em **5 abas**: Geral, Biblioteca de Scri
 |---|---|---|
 | `synchronize: true` | TypeORM em produção com synchronize — deveria usar migrations | 🔴 Alta |
 | Secrets hardcoded | docker-compose com senhas default | 🔴 Alta |
-| CORS `origin: '*'` | Fallback perigoso em produção | 🟡 Média |
+| ~~CORS `origin: '*'`~~ | ✅ **CORRIGIDO** — Fallback agora é `https://miconecta-frontend.fly.dev` | ~~🟡~~ ✅ |
 | localStorage tokens | Vulnerável a XSS — considerar httpOnly cookies | 🟡 Média |
 | Sem testes | Jest configurado mas sem `*.spec.ts` | 🟡 Média |
 | Sem error boundaries | Frontend sem tratamento global de erro | 🟢 Baixa |
-| maxUsuarios inconsistente | Entity default=10, Service default=5 — decidir qual é correto | 🟢 Baixa |
 | Convite não envia email | `/invite` gera token mas não envia email (nodemailer não integrado) | 🟢 Baixa |
 | organizationId no modal | Modal de client user não tem dropdown de organização | 🟢 Baixa |
 

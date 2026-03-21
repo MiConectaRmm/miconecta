@@ -37,9 +37,9 @@ export default function LoginPage() {
       const userType = data.user?.userType || 'technician'
       const role = data.user?.role || data.tecnico?.funcao
       
-      // Técnico comum vai direto para tickets
+      // Técnico comum vai direto para Central de Atendimento
       if (userType === 'technician' && role === 'tecnico') {
-        router.push('/dashboard/tickets')
+        router.push('/dashboard/atendimento')
       } else if (userType === 'client_user') {
         router.push('/portal')
       } else {

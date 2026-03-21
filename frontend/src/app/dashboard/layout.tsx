@@ -98,8 +98,6 @@ export default function DashboardLayout({
                 type="text"
                 placeholder="Buscar dispositivos, tickets..."
                 className="bg-dark-800 border border-dark-700 rounded-lg pl-9 pr-4 py-1.5 text-sm text-dark-200 placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-brand-500 w-72"
-                onFocus={() => router.push('/dashboard/tickets')}
-                readOnly
               />
             </div>
           </div>

@@ -44,9 +44,9 @@ async function bootstrap() {
     app.useGlobalInterceptors(new AuditInterceptor());
 
     // CORS
-    const corsOrigin = process.env.CORS_ORIGIN || '*';
+    const corsOrigin = process.env.CORS_ORIGIN || (isProd ? 'https://miconecta-frontend.fly.dev' : '*');
     app.enableCors({
-      origin: corsOrigin === '*' ? '*' : corsOrigin.split(',').map(o => o.trim()),
+      origin: corsOrigin === '*' ? true : corsOrigin.split(',').map(o => o.trim()),
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
       credentials: true,
     });

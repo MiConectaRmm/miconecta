@@ -61,14 +61,19 @@ const entities = [
       useFactory: (config: ConfigService) => {
         const databaseUrl = config.get<string>('DATABASE_URL');
         const useSsl = config.get<string>('DB_SSL', 'false') === 'true';
-        console.log(`TypeORM: DATABASE_URL=${databaseUrl ? 'set' : 'unset'}, SSL=${useSsl}`);
+        const isProd = config.get<string>('NODE_ENV') === 'production';
+        console.log(`TypeORM: DATABASE_URL=${databaseUrl ? 'set' : 'unset'}, SSL=${useSsl}, ENV=${config.get<string>('NODE_ENV')}`);
+
+        if (isProd) {
+          console.warn('⚠️  synchronize=true em produção — mude para migrations quando estável');
+        }
 
         return {
           type: 'postgres' as const,
           url: databaseUrl,
           entities,
           subscribers: [TenantValidationSubscriber],
-          synchronize: true,
+          synchronize: true, // TODO: migrar para migrations antes de dados reais em produção
           logging: false,
           ssl: useSsl ? { rejectUnauthorized: false } : false,
           retryAttempts: 5,

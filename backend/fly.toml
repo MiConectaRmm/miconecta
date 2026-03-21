@@ -6,6 +6,8 @@ primary_region = "gru"
 [env]
   PORT = "3000"
   NODE_ENV = "production"
+  CORS_ORIGIN = "https://miconecta-frontend.fly.dev"
+  DB_SSL = "true"
 
 [http_service]
   internal_port = 3000
