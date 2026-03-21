@@ -38,17 +38,31 @@ public class ApiClient
     {
         try
         {
-            // Garantir installationToken no body (obrigatório pelo DTO)
-            info["installationToken"] = _config.ProvisionToken;
-
-            // Remover campos que não existem no AgentRegisterDto (forbidNonWhitelisted)
-            info.Remove("tenantId");
-            info.Remove("organizationId");
-            info.Remove("fingerprint");
+            var payload = new Dictionary<string, object?>
+            {
+                ["installationToken"] = _config.ProvisionToken,
+                ["hostname"] = info.TryGetValue("hostname", out var hostname) ? hostname : Environment.MachineName,
+                ["username"] = info.TryGetValue("username", out var username) ? username : Environment.UserName,
+                ["sistemaOperacional"] = info.TryGetValue("sistemaOperacional", out var sistemaOperacional) ? sistemaOperacional : null,
+                ["versaoWindows"] = info.TryGetValue("versaoWindows", out var versaoWindows) ? versaoWindows : null,
+                ["cpu"] = info.TryGetValue("cpu", out var cpu) ? cpu : null,
+                ["ramTotalMb"] = info.TryGetValue("ramTotalMb", out var ramTotalMb) ? ramTotalMb : null,
+                ["discoTotalMb"] = info.TryGetValue("discoTotalMb", out var discoTotalMb) ? discoTotalMb : null,
+                ["discoDisponivelMb"] = info.TryGetValue("discoDisponivelMb", out var discoDisponivelMb) ? discoDisponivelMb : null,
+                ["ipLocal"] = info.TryGetValue("ipLocal", out var ipLocal) ? ipLocal : null,
+                ["ipExterno"] = info.TryGetValue("ipExterno", out var ipExterno) ? ipExterno : null,
+                ["modeloMaquina"] = info.TryGetValue("modeloMaquina", out var modeloMaquina) ? modeloMaquina : null,
+                ["numeroSerie"] = info.TryGetValue("numeroSerie", out var numeroSerie) ? numeroSerie : null,
+                ["macAddress"] = info.TryGetValue("macAddress", out var macAddress) ? macAddress : null,
+                ["agentVersion"] = info.TryGetValue("agentVersion", out var agentVersion) ? agentVersion : _config.AgentVersion,
+                ["rustdeskId"] = info.TryGetValue("rustdeskId", out var rustdeskId) ? rustdeskId : null,
+                ["antivirusNome"] = info.TryGetValue("antivirusNome", out var antivirusNome) ? antivirusNome : null,
+                ["antivirusStatus"] = info.TryGetValue("antivirusStatus", out var antivirusStatus) ? antivirusStatus : null,
+            };
 
             using var request = new HttpRequestMessage(HttpMethod.Post, "agents/register");
             request.Headers.Add("x-agent-provision-token", _config.ProvisionToken);
-            request.Content = JsonContent.Create(info);
+            request.Content = JsonContent.Create(payload);
 
             var response = await _http.SendAsync(request);
             response.EnsureSuccessStatusCode();
@@ -68,7 +82,26 @@ public class ApiClient
         try
         {
             AdicionarHeaders();
-            var response = await _http.PostAsJsonAsync("agents/heartbeat", metricas ?? new Dictionary<string, object>());
+            var data = metricas ?? new Dictionary<string, object>();
+            var payload = new Dictionary<string, object?>
+            {
+                ["agentToken"] = _config.DeviceToken,
+                ["deviceId"] = _config.DeviceId,
+                ["status"] = "online",
+                ["agentVersion"] = data.TryGetValue("agentVersion", out var agentVersion) ? agentVersion : _config.AgentVersion,
+                ["remoteStatus"] = data.TryGetValue("rustdeskId", out var rustdeskId) && rustdeskId is not null && !string.IsNullOrWhiteSpace(rustdeskId.ToString()) ? "ready" : null,
+                ["cpuPercent"] = data.TryGetValue("cpuPercent", out var cpuPercent) ? cpuPercent : null,
+                ["ramPercent"] = data.TryGetValue("ramPercent", out var ramPercent) ? ramPercent : null,
+                ["ramUsadaMb"] = data.TryGetValue("ramUsadaMb", out var ramUsadaMb) ? ramUsadaMb : null,
+                ["discoPercent"] = data.TryGetValue("discoPercent", out var discoPercent) ? discoPercent : null,
+                ["discoUsadoMb"] = data.TryGetValue("discoUsadoMb", out var discoUsadoMb) ? discoUsadoMb : null,
+                ["uptimeSegundos"] = data.TryGetValue("uptimeSegundos", out var uptimeSegundos) ? uptimeSegundos : null,
+                ["loggedUser"] = data.TryGetValue("loggedUser", out var loggedUser) ? loggedUser : null,
+                ["antivirusNome"] = data.TryGetValue("antivirusNome", out var antivirusNome) ? antivirusNome : null,
+                ["antivirusStatus"] = data.TryGetValue("antivirusStatus", out var antivirusStatus) ? antivirusStatus : null,
+            };
+
+            var response = await _http.PostAsJsonAsync("agents/heartbeat", payload);
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)

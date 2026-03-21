@@ -1,15 +1,14 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Device } from '../../../database/entities/device.entity';
 import { Agent } from '../../../database/entities/agent.entity';
-import * as crypto from 'crypto';
 
 @Injectable()
 export class AgentAuthGuard implements CanActivate {
   constructor(
-    private readonly configService: ConfigService,
+    private readonly jwtService: JwtService,
     @InjectRepository(Device)
     private readonly deviceRepo: Repository<Device>,
     @InjectRepository(Agent)
@@ -25,20 +24,28 @@ export class AgentAuthGuard implements CanActivate {
       throw new UnauthorizedException('Token ou ID do dispositivo ausente');
     }
 
-    const agent = await this.agentRepo.findOne({ where: { deviceId } });
-    const device = await this.deviceRepo.findOne({ where: { id: deviceId } });
+    try {
+      const payload = this.jwtService.verify<{ sub: string; tenantId: string; deviceId: string; type: string }>(String(token));
 
-    if (!device || !agent) {
-      throw new UnauthorizedException('Dispositivo não autorizado');
-    }
+      if (payload.type !== 'agent' || payload.deviceId !== deviceId) {
+        throw new UnauthorizedException('Token inválido para este dispositivo');
+      }
 
-    const tokenHash = crypto.createHash('sha256').update(String(token)).digest('hex');
-    if (agent.agentTokenHash !== tokenHash) {
+      const agent = await this.agentRepo.findOne({ where: { id: payload.sub, tenantId: payload.tenantId, deviceId } });
+      const device = await this.deviceRepo.findOne({ where: { id: deviceId, tenantId: payload.tenantId } });
+
+      if (!device || !agent) {
+        throw new UnauthorizedException('Dispositivo não autorizado');
+      }
+
+      request.device = device;
+      request.agent = agent;
+      request.tenantId = payload.tenantId;
+      request.agentPayload = payload;
+
+      return true;
+    } catch {
       throw new UnauthorizedException('Agente não autorizado');
     }
-
-    request.device = device;
-    request.agent = agent;
-    return true;
   }
 }
