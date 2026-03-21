@@ -107,10 +107,12 @@
 ## 🔄 Última Sessão de Desenvolvimento (21/03/2026)
 
 ### O que foi feito
-**Reestruturação completa da navegação do Dashboard (Etapa 1 + Etapa 4)**
+**Reestruturação completa da navegação + Hub do Cliente com Abas (Etapas 1, 2, 4)**
 
-O sidebar foi reduzido de ~13 itens para 5 itens. O Dashboard agora é um painel executivo unificado.
-Uma nova página "Central de Atendimento" foi criada como inbox unificado de tickets e alertas.
+O sidebar foi reduzido de ~13 itens para 5. Dashboard é painel executivo unificado.
+Central de Atendimento criada como inbox. A página de detalhe do cliente agora é um
+**hub central com 9 abas**: Cadastro, Usuários Portal, Dispositivos, Alertas, Tickets,
+Scripts, Software, Patches, Sessões. Cada aba é um componente separado em `tabs/`.
 
 #### Decisões de design (aprovadas pelo Maicon):
 - **Maicon** = Super Admin / Dono da Maginf
@@ -152,9 +154,71 @@ Uma nova página "Central de Atendimento" foi criada como inbox unificado de tic
    - Contadores: Total, Tickets, Alertas
    - Filtros: tipo (todos/tickets/alertas), prioridade (critica/alta/media/baixa), busca textual
    - Ordenação: crítica primeiro, depois por tempo
-   - Clique em ticket → abre detalhe do ticket
-   - Clique em alerta → abre perfil do cliente
    - Auto-refresh a cada 30s
+
+4. **`frontend/src/app/dashboard/clients/[id]/page.tsx`** — REESCRITO (Hub com Abas)
+   - Layout: sidebar resumo (1 col) + conteúdo aba (3 col)
+   - Header com dados do tenant (nome, slug, status, plano)
+   - Sidebar: card Resumo (dispositivos, storage, online, usuários, retenção, desde) + navegação vertical 9 abas
+   - Abas: Cadastro, Usuários Portal, Dispositivos, Alertas, Tickets, Scripts, Software, Patches, Sessões
+   - Lazy loading: cada aba carrega dados sob demanda (só quando selecionada)
+
+5. **`frontend/src/app/dashboard/clients/[id]/tabs/TabCadastro.tsx`** — NOVO
+   - Dados da empresa (CRUD inline), endereço, organizações
+   - Configuração do agente (Tenant ID, Server URL, Provision Token)
+   - Instalação do agente (download MSI, scripts .bat/.ps1, comando manual)
+   - Tokens de instalação (CRUD, revogar)
+
+6. **`frontend/src/app/dashboard/clients/[id]/tabs/TabUsuarios.tsx`** — NOVO
+   - CRUD completo de usuários do portal com limite dinâmico
+   - Contagem visual (barra de progresso total/limite)
+   - Modal criar/editar com perfis (Admin, Gestor, Usuário)
+   - Ações: editar, desativar/reativar, enviar convite
+
+7. **`frontend/src/app/dashboard/clients/[id]/tabs/TabDispositivos.tsx`** — NOVO
+   - Stats rápidos (total, online, offline, alerta)
+   - Filtros: busca hostname/IP, status
+   - Tabela com hostname, IP, SO, CPU, RAM, status, último contato
+   - Botão CONECTAR via RustDesk para dispositivos com rustdeskId
+   - Auto-refresh 15s
+
+8. **`frontend/src/app/dashboard/clients/[id]/tabs/TabAlertas.tsx`** — NOVO
+   - Stats: ativos, reconhecidos, total
+   - Filtros por status (ativo, reconhecido, resolvido, todos)
+   - Cards com ícone por severidade, hostname, timeago
+   - Ações: reconhecer, resolver
+   - Auto-refresh 15s
+
+9. **`frontend/src/app/dashboard/clients/[id]/tabs/TabTickets.tsx`** — NOVO
+   - Stats: abertos, atendimento, aguardando, urgentes, total
+   - Filtros: busca, status, prioridade
+   - Lista com StatusBadge, indicador nova mensagem, técnico atribuído
+   - Modal para criar ticket direto no contexto do cliente
+   - Link para detalhe do ticket
+
+10. **`frontend/src/app/dashboard/clients/[id]/tabs/TabScripts.tsx`** — NOVO
+    - Grid de scripts com preview do código
+    - Modal criar script (PowerShell/CMD/Batch)
+    - Modal executar: selecionar dispositivos online do cliente
+    - Ação remover script
+
+11. **`frontend/src/app/dashboard/clients/[id]/tabs/TabSoftware.tsx`** — NOVO
+    - Sub-tabs: Pacotes e Deploys
+    - Grid de pacotes com botão Deploy
+    - Lista de deploys com status
+    - Modal deploy: selecionar dispositivos online
+
+12. **`frontend/src/app/dashboard/clients/[id]/tabs/TabPatches.tsx`** — NOVO
+    - Seletor de dispositivo (dropdown)
+    - Stats: pendentes, instalados, total
+    - Lista de patches com severidade e status
+    - Botão instalar para patches pendentes
+
+13. **`frontend/src/app/dashboard/clients/[id]/tabs/TabSessoes.tsx`** — NOVO
+    - Stats: ativas, aguardando, total
+    - Lista de sessões com status, técnico, motivo, duração
+    - Botão Conectar para sessões ativas via RustDesk
+    - Modal nova sessão: selecionar dispositivo online + motivo
 
 #### Páginas que continuam existindo (sem link no sidebar):
 - `/dashboard/devices` — Dispositivos (global)
