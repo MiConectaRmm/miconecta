@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -13,7 +13,16 @@ export class ClientUsersService {
     private readonly clientUserRepo: Repository<ClientUser>,
   ) {}
 
+  private static readonly MAX_USERS_PER_TENANT = 5;
+
   async criar(tenantId: string, dto: CreateClientUserDto) {
+    const totalUsuarios = await this.clientUserRepo.count({ where: { tenantId } });
+    if (totalUsuarios >= ClientUsersService.MAX_USERS_PER_TENANT) {
+      throw new BadRequestException(
+        `Limite de ${ClientUsersService.MAX_USERS_PER_TENANT} usuários por cliente atingido`,
+      );
+    }
+
     const existente = await this.clientUserRepo.findOne({
       where: { tenantId, email: dto.email },
     });

@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Plus, User, Search, Mail, Phone, Building } from 'lucide-react'
-import { usersApi } from '@/lib/api'
+import { Plus, User, Search, Mail, Phone, Building, Shield } from 'lucide-react'
+import { usersApi, tenantsApi } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth.store'
 import Modal from '@/components/ui/Modal'
 
@@ -13,17 +13,24 @@ export default function ClientesPage() {
   const [carregando, setCarregando] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editando, setEditando] = useState<any>(null)
+  const [tenants, setTenants] = useState<any[]>([])
   const [form, setForm] = useState({
     nome: '',
     email: '',
+    senha: '',
     telefone: '',
     cargo: '',
+    funcao: 'usuario' as string,
+    tenantId: '',
   })
 
   const user = useAuthStore((s) => s.user)
   const isReadOnly = user?.userType === 'technician'
 
-  useEffect(() => { carregar() }, [])
+  useEffect(() => {
+    carregar()
+    tenantsApi.listar().then(({ data }) => setTenants(data)).catch(() => {})
+  }, [])
 
   const carregar = async () => {
     try {
@@ -42,12 +49,15 @@ export default function ClientesPage() {
       setForm({
         nome: cliente.nome || '',
         email: cliente.email || '',
+        senha: '',
         telefone: cliente.telefone || '',
         cargo: cliente.cargo || '',
+        funcao: cliente.funcao || 'usuario',
+        tenantId: cliente.tenantId || '',
       })
     } else {
       setEditando(null)
-      setForm({ nome: '', email: '', telefone: '', cargo: '' })
+      setForm({ nome: '', email: '', senha: '', telefone: '', cargo: '', funcao: 'usuario', tenantId: '' })
     }
     setShowModal(true)
   }
@@ -55,14 +65,18 @@ export default function ClientesPage() {
   const salvar = async () => {
     try {
       if (editando) {
-        await usersApi.atualizarCliente(editando.id, form)
+        const payload: any = { nome: form.nome, email: form.email, telefone: form.telefone, cargo: form.cargo, funcao: form.funcao }
+        if (form.senha) payload.senha = form.senha
+        await usersApi.atualizarCliente(editando.id, payload)
       } else {
-        await usersApi.criarCliente(form)
+        const payload = { nome: form.nome, email: form.email, senha: form.senha, telefone: form.telefone, cargo: form.cargo, funcao: form.funcao }
+        await usersApi.criarCliente(payload, form.tenantId || undefined)
       }
       setShowModal(false)
       carregar()
-    } catch (err) {
-      console.error('Erro ao salvar:', err)
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Erro ao salvar'
+      alert(typeof msg === 'string' ? msg : JSON.stringify(msg))
     }
   }
 
@@ -173,6 +187,14 @@ export default function ClientesPage() {
                           <Building className="w-3 h-3" /> {cliente.cargo}
                         </span>
                       )}
+                      {cliente.funcao && (
+                        <span className="flex items-center gap-1">
+                          <Shield className="w-3 h-3" /> {cliente.funcao === 'admin_cliente' ? 'Admin' : cliente.funcao === 'gestor' ? 'Gestor' : 'Usuário'}
+                        </span>
+                      )}
+                      {cliente.tenant?.nome && (
+                        <span className="text-dark-500">{cliente.tenant.nome}</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -213,54 +235,100 @@ export default function ClientesPage() {
         )}
       </div>
 
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editando ? 'Editar Cliente' : 'Novo Cliente'} size="lg">
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editando ? 'Editar Usuário do Portal' : 'Novo Usuário do Portal'} size="lg">
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-dark-300 mb-1.5">Nome completo</label>
-            <input
-              type="text"
-              value={form.nome}
-              onChange={(e) => setForm({ ...form, nome: e.target.value })}
-              className="input w-full"
-              placeholder="João da Silva"
-            />
+          {!editando && (
+            <div>
+              <label className="block text-sm font-medium text-dark-300 mb-1.5">Empresa (cliente)</label>
+              <select
+                value={form.tenantId}
+                onChange={(e) => setForm({ ...form, tenantId: e.target.value })}
+                className="input w-full"
+              >
+                <option value="">— Selecione a empresa —</option>
+                {tenants.filter((t: any) => t.ativo).map((t: any) => (
+                  <option key={t.id} value={t.id}>{t.nome}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-dark-300 mb-1.5">Nome completo</label>
+              <input
+                type="text"
+                value={form.nome}
+                onChange={(e) => setForm({ ...form, nome: e.target.value })}
+                className="input w-full"
+                placeholder="João da Silva"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-dark-300 mb-1.5">Email (login)</label>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                className="input w-full"
+                placeholder="joao@empresa.com"
+              />
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-dark-300 mb-1.5">Email</label>
-            <input
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="input w-full"
-              placeholder="joao@empresa.com"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-dark-300 mb-1.5">
+                Senha{editando ? ' (deixe vazio para manter)' : ''}
+              </label>
+              <input
+                type="password"
+                value={form.senha}
+                onChange={(e) => setForm({ ...form, senha: e.target.value })}
+                className="input w-full"
+                placeholder={editando ? '••••••' : 'Mínimo 6 caracteres'}
+                autoComplete="new-password"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-dark-300 mb-1.5">Perfil no portal</label>
+              <select
+                value={form.funcao}
+                onChange={(e) => setForm({ ...form, funcao: e.target.value })}
+                className="input w-full"
+              >
+                <option value="admin_cliente">Administrador do cliente</option>
+                <option value="gestor">Gestor</option>
+                <option value="usuario">Usuário</option>
+              </select>
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-dark-300 mb-1.5">Telefone</label>
-            <input
-              type="text"
-              value={form.telefone}
-              onChange={(e) => setForm({ ...form, telefone: e.target.value })}
-              className="input w-full"
-              placeholder="(11) 99999-9999"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-dark-300 mb-1.5">Cargo</label>
-            <input
-              type="text"
-              value={form.cargo}
-              onChange={(e) => setForm({ ...form, cargo: e.target.value })}
-              className="input w-full"
-              placeholder="Gerente de TI"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-dark-300 mb-1.5">Telefone</label>
+              <input
+                type="text"
+                value={form.telefone}
+                onChange={(e) => setForm({ ...form, telefone: e.target.value })}
+                className="input w-full"
+                placeholder="(11) 99999-9999"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-dark-300 mb-1.5">Cargo</label>
+              <input
+                type="text"
+                value={form.cargo}
+                onChange={(e) => setForm({ ...form, cargo: e.target.value })}
+                className="input w-full"
+                placeholder="Gerente de TI"
+              />
+            </div>
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button onClick={() => setShowModal(false)} className="btn-secondary">Cancelar</button>
             <button
               onClick={salvar}
               className="btn-primary"
-              disabled={!form.nome || !form.email}
+              disabled={!form.nome || !form.email || (!editando && (!form.senha || form.senha.length < 6)) || (!editando && !form.tenantId)}
             >
               {editando ? 'Salvar' : 'Criar'}
             </button>
