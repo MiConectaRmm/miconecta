@@ -39,5 +39,8 @@
     <!-- HTTP resilience -->
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="8.0.0" />
     <PackageReference Include="Polly" Version="8.2.0" />
+
+    <!-- Socket.IO Client (WebSocket para backend /rmm) -->
+    <PackageReference Include="SocketIOClient" Version="3.1.1" />
   </ItemGroup>
 </Project>

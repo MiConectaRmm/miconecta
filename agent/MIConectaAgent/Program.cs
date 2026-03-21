@@ -55,11 +55,17 @@ try
     builder.Services.AddSingleton<ChatService>();
     builder.Services.AddSingleton<AutoUpdater>();
     builder.Services.AddSingleton<AgentIdentityService>();
+    builder.Services.AddSingleton<ModuleSupervisor>();
+    builder.Services.AddSingleton<RustDeskIntegrationService>();
+    builder.Services.AddSingleton<TelemetryService>();
 
     // ── Background Services ──
     builder.Services.AddHostedService<HeartbeatService>();
     builder.Services.AddHostedService<CommandPollingService>();
     builder.Services.AddHostedService<QueueProcessor>();
+    builder.Services.AddHostedService<RealtimeClient>();
+    builder.Services.AddHostedService<ChatNotificationService>();
+    builder.Services.AddHostedService<RemoteSessionHandler>();
 
     var host = builder.Build();
     host.Run();

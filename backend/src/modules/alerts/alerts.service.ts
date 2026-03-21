@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Alert, AlertStatus } from '../../database/entities/alert.entity';
+import { Alert, AlertStatus, AlertType, AlertSeverity } from '../../database/entities/alert.entity';
+import { Device } from '../../database/entities/device.entity';
 import { ChatGateway } from '../chat/chat.gateway';
 
 @Injectable()
@@ -9,6 +10,8 @@ export class AlertsService {
   constructor(
     @InjectRepository(Alert)
     private readonly alertRepo: Repository<Alert>,
+    @InjectRepository(Device)
+    private readonly deviceRepo: Repository<Device>,
     private readonly chatGateway: ChatGateway,
   ) {}
 
@@ -104,5 +107,41 @@ export class AlertsService {
     }
 
     return updated;
+  }
+
+  // ── Fase 6: Alerta criado pelo agente ──
+
+  async criarAlertaDoAgente(
+    deviceId: string,
+    tipo: AlertType,
+    severidade: AlertSeverity,
+    mensagem: string,
+  ) {
+    const device = await this.deviceRepo.findOne({ where: { id: deviceId } });
+    if (!device) throw new NotFoundException('Dispositivo não encontrado');
+
+    const alerta = this.alertRepo.create({
+      tenantId: device.tenantId,
+      deviceId,
+      tipo,
+      severidade,
+      titulo: mensagem,
+      status: AlertStatus.ATIVO,
+    });
+
+    const saved = await this.alertRepo.save(alerta);
+
+    // Notificar dashboard via WebSocket
+    this.chatGateway.emitNotification(device.tenantId, {
+      type: 'alert_created',
+      alertId: saved.id,
+      tenantId: device.tenantId,
+      deviceId,
+      severidade,
+      titulo: mensagem,
+      timestamp: new Date(),
+    });
+
+    return saved;
   }
 }

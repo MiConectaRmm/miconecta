@@ -251,7 +251,7 @@ public class ApiClient
         try
         {
             AdicionarHeaders();
-            var response = await _http.GetAsync($"agents/update/check?versao={versaoAtual}");
+            var response = await _http.GetAsync($"agents/check-update?versao={versaoAtual}&deviceId={_config.DeviceId}");
             if (!response.IsSuccessStatusCode) return null;
 
             var json = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -311,5 +311,47 @@ public class ApiClient
             return response.IsSuccessStatusCode;
         }
         catch { return false; }
+    }
+
+    // ── Fase 6: Alertas ──
+
+    public async Task<bool> CriarAlerta(string tipo, string mensagem, string severidade = "media")
+    {
+        try
+        {
+            AdicionarHeaders();
+            var payload = new
+            {
+                deviceId = _config.DeviceId,
+                tipo,
+                mensagem,
+                severidade,
+                timestamp = DateTime.UtcNow.ToString("O"),
+            };
+            var response = await _http.PostAsJsonAsync("alerts/agent", payload);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Erro ao criar alerta {Tipo}", tipo);
+            return false;
+        }
+    }
+
+    // ── Fase 3: Telemetria ──
+
+    public async Task<bool> EnviarTelemetria(TelemetrySnapshot snap)
+    {
+        try
+        {
+            AdicionarHeaders();
+            var response = await _http.PostAsJsonAsync($"devices/{_config.DeviceId}/telemetry", snap);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Erro ao enviar telemetria");
+            return false;
+        }
     }
 }

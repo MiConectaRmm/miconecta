@@ -177,4 +177,29 @@ export class DevicesService {
       { status: DeviceStatus.OFFLINE },
     );
   }
+
+  // ── Fase 3: Telemetria ──
+
+  async salvarTelemetria(deviceId: string, snap: any) {
+    const device = await this.deviceRepo.findOne({ where: { id: deviceId } });
+    if (!device) throw new NotFoundException('Dispositivo não encontrado');
+
+    // Armazena telemetria em notas (JSONB) preservando outras notas
+    const notas = (device.notas as any) ?? {};
+    notas.telemetria = {
+      ...snap,
+      atualizadoEm: new Date().toISOString(),
+    };
+
+    await this.deviceRepo.update(deviceId, { notas });
+    return { status: 'ok' };
+  }
+
+  async obterTelemetria(deviceId: string) {
+    const device = await this.deviceRepo.findOne({ where: { id: deviceId } });
+    if (!device) throw new NotFoundException('Dispositivo não encontrado');
+
+    const notas = (device.notas as any) ?? {};
+    return notas.telemetria ?? null;
+  }
 }

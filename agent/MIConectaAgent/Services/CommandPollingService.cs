@@ -10,17 +10,23 @@ public class CommandPollingService : BackgroundService
     private readonly AgentConfig _config;
     private readonly ApiClient _apiClient;
     private readonly ScriptExecutor _scriptExecutor;
+    private readonly RealtimeClient _realtimeClient;
 
     public CommandPollingService(
         ILogger<CommandPollingService> logger,
         AgentConfig config,
         ApiClient apiClient,
-        ScriptExecutor scriptExecutor)
+        ScriptExecutor scriptExecutor,
+        RealtimeClient realtimeClient)
     {
         _logger = logger;
         _config = config;
         _apiClient = apiClient;
         _scriptExecutor = scriptExecutor;
+        _realtimeClient = realtimeClient;
+
+        // Wire WebSocket script dispatch → execução local
+        _realtimeClient.OnScriptDispatch += ExecutarViaWebSocket;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -28,27 +34,25 @@ public class CommandPollingService : BackgroundService
         // Aguardar registro inicial
         await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
 
-        _logger.LogInformation("Serviço de polling de comandos iniciado");
+        _logger.LogInformation("Serviço de polling de comandos iniciado (WebSocket + HTTP fallback)");
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                if (!string.IsNullOrEmpty(_config.DeviceId))
+                // Polling HTTP apenas quando WebSocket NÃO está conectado
+                // Quando WS conectado, comandos chegam via evento OnScriptDispatch
+                if (!string.IsNullOrEmpty(_config.DeviceId) && !_realtimeClient.Conectado)
                 {
-                    // Verificar comandos de script pendentes
+                    _logger.LogDebug("WS offline — usando HTTP polling de comandos");
+
                     var comandos = await _apiClient.ObterComandosPendentes();
                     foreach (var comando in comandos)
-                    {
-                        await ProcessarComando(comando);
-                    }
+                        await ProcessarComandoHttp(comando);
 
-                    // Verificar deploys pendentes
                     var deploys = await _apiClient.ObterDeploysPendentes();
                     foreach (var deploy in deploys)
-                    {
                         await ProcessarDeploy(deploy);
-                    }
                 }
             }
             catch (Exception ex)
@@ -60,7 +64,39 @@ public class CommandPollingService : BackgroundService
         }
     }
 
-    private async Task ProcessarComando(JsonElement comando)
+    // ── Handler WebSocket: script.dispatch ──
+    private async Task ExecutarViaWebSocket(ScriptDispatchPayload payload)
+    {
+        try
+        {
+            _logger.LogInformation("WS: executando script {ExecId} ({Lang})", payload.ExecutionId, payload.Linguagem);
+
+            var resultado = await _scriptExecutor.ExecutarAsync(
+                payload.Linguagem,
+                payload.Conteudo,
+                payload.TimeoutSegundos);
+
+            var sucesso = resultado.Status == "sucesso";
+            var saida = resultado.Saida + (string.IsNullOrEmpty(resultado.SaidaErro) ? "" : $"\n[STDERR]\n{resultado.SaidaErro}");
+
+            // Enviar resultado via WebSocket
+            await _realtimeClient.EnviarScriptResultado(payload.ExecutionId, saida, sucesso, resultado.CodigoSaida);
+
+            // Também registrar via HTTP para persistência no backend
+            await _apiClient.ReportarResultadoExecucao(payload.ExecutionId, resultado);
+
+            _logger.LogInformation("WS: script {ExecId} concluído — sucesso={Ok}", payload.ExecutionId, sucesso);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao executar script via WebSocket: {ExecId}", payload.ExecutionId);
+            try { await _realtimeClient.EnviarScriptResultado(payload.ExecutionId, ex.Message, false, -1); }
+            catch { /* silencioso */ }
+        }
+    }
+
+    // ── Handler HTTP polling (fallback) ──
+    private async Task ProcessarComandoHttp(JsonElement comando)
     {
         try
         {
@@ -72,16 +108,16 @@ public class CommandPollingService : BackgroundService
             if (script.TryGetProperty("timeoutSegundos", out var t))
                 timeout = t.GetInt32();
 
-            _logger.LogInformation("Executando script {ExecId} - Tipo: {Tipo}", execId, tipo);
+            _logger.LogInformation("HTTP: executando script {ExecId} - Tipo: {Tipo}", execId, tipo);
 
             var resultado = await _scriptExecutor.ExecutarAsync(tipo, conteudo, timeout);
             await _apiClient.ReportarResultadoExecucao(execId, resultado);
 
-            _logger.LogInformation("Script {ExecId} finalizado com status: {Status}", execId, resultado.Status);
+            _logger.LogInformation("HTTP: script {ExecId} finalizado — {Status}", execId, resultado.Status);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Erro ao processar comando");
+            _logger.LogError(ex, "Erro ao processar comando via HTTP");
         }
     }
 

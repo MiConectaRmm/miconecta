@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Put, Delete,
+  Controller, Get, Put, Post, Delete,
   Body, Param, Query, UseGuards, Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -62,5 +62,19 @@ export class DevicesController {
   @ApiOperation({ summary: 'Listar inventário do dispositivo' })
   inventario(@Param('id') id: string, @Query('tipo') tipo?: string) {
     return this.service.listarInventario(id, tipo);
+  }
+
+  @Post(':id/telemetry')
+  @RequirePermissions('devices:write')
+  @ApiOperation({ summary: 'Receber telemetria do agente (Fase 3)' })
+  telemetria(@Param('id') id: string, @Body() snap: any) {
+    return this.service.salvarTelemetria(id, snap);
+  }
+
+  @Get(':id/telemetry')
+  @RequirePermissions('devices:read')
+  @ApiOperation({ summary: 'Obter última telemetria do dispositivo (Fase 3)' })
+  obterTelemetria(@Param('id') id: string) {
+    return this.service.obterTelemetria(id);
   }
 }
