@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { ClientUser, ClientUserRole } from '../../database/entities/client-user.entity';
+import { Tenant } from '../../database/entities/tenant.entity';
 import { CreateClientUserDto } from './dto/create-client-user.dto';
 
 @Injectable()
@@ -11,15 +12,50 @@ export class ClientUsersService {
   constructor(
     @InjectRepository(ClientUser)
     private readonly clientUserRepo: Repository<ClientUser>,
+    @InjectRepository(Tenant)
+    private readonly tenantRepo: Repository<Tenant>,
   ) {}
 
-  private static readonly MAX_USERS_PER_TENANT = 5;
+  /** Limite padrão caso o tenant não tenha maxUsuarios definido */
+  private static readonly DEFAULT_MAX_USERS = 5;
+
+  /**
+   * Retorna o limite de usuários do portal para um tenant.
+   * Usa tenant.maxUsuarios se definido, senão DEFAULT_MAX_USERS.
+   */
+  private async getMaxUsuarios(tenantId: string): Promise<number> {
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    if (!tenant) throw new NotFoundException('Tenant não encontrado');
+    return tenant.maxUsuarios ?? ClientUsersService.DEFAULT_MAX_USERS;
+  }
+
+  /**
+   * Retorna a contagem atual e o limite de usuários do portal para um tenant.
+   */
+  async contagem(tenantId: string) {
+    const maxUsuarios = await this.getMaxUsuarios(tenantId);
+    const total = await this.clientUserRepo.count({ where: { tenantId } });
+    const ativos = await this.clientUserRepo.count({ where: { tenantId, ativo: true } });
+    const inativos = total - ativos;
+
+    return {
+      total,
+      ativos,
+      inativos,
+      limite: maxUsuarios,
+      disponivel: Math.max(0, maxUsuarios - total),
+      atingiuLimite: total >= maxUsuarios,
+    };
+  }
 
   async criar(tenantId: string, dto: CreateClientUserDto) {
+    const maxUsuarios = await this.getMaxUsuarios(tenantId);
     const totalUsuarios = await this.clientUserRepo.count({ where: { tenantId } });
-    if (totalUsuarios >= ClientUsersService.MAX_USERS_PER_TENANT) {
+
+    if (totalUsuarios >= maxUsuarios) {
       throw new BadRequestException(
-        `Limite de ${ClientUsersService.MAX_USERS_PER_TENANT} usuários por cliente atingido`,
+        `Limite de ${maxUsuarios} usuários do portal atingido para este cliente. ` +
+        `Atualmente existem ${totalUsuarios} usuários cadastrados.`,
       );
     }
 
@@ -52,6 +88,15 @@ export class ClientUsersService {
       where,
       relations: ['organization', 'tenant'],
       order: { nome: 'ASC' },
+    });
+    return users.map((u) => this.sanitize(u));
+  }
+
+  async listarPorTenant(tenantId: string) {
+    const users = await this.clientUserRepo.find({
+      where: { tenantId },
+      relations: ['organization', 'tenant'],
+      order: { ativo: 'DESC', nome: 'ASC' },
     });
     return users.map((u) => this.sanitize(u));
   }

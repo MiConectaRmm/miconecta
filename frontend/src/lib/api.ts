@@ -83,6 +83,10 @@ export const usersApi = {
   desativarCliente: (id: string) => api.delete(`/users/clients/${id}`),
   reativarCliente: (id: string) => api.put(`/users/clients/${id}/reativar`),
   convidarCliente: (id: string) => api.post(`/users/clients/${id}/invite`),
+  /** Listar usuários do portal de um tenant específico */
+  listarPorTenant: (tenantId: string) => api.get(`/users/clients/tenant/${tenantId}`),
+  /** Contagem de usuários do portal de um tenant (total, ativos, limite, disponível) */
+  contagemPorTenant: (tenantId: string) => api.get(`/users/clients/tenant/${tenantId}/contagem`),
 };
 
 // ── Technicians (Técnicos Maginf) ──

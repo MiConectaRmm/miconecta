@@ -4,6 +4,10 @@
 
 Plataforma completa de Remote Monitoring and Management (RMM) + Help Desk para MSPs.
 
+> 🤖 **Para assistentes de IA:** Leia o arquivo [`AI_CONTEXT.md`](./AI_CONTEXT.md) na raiz do projeto.
+> Ele contém o estado atual, últimas alterações, dívida técnica e próximos passos.
+> Logs detalhados de cada sessão estão em `docs/SESSAO-*.md`.
+
 ---
 
 ## Stack
@@ -191,3 +195,15 @@ dotnet publish -c Release -r win-x64 --self-contained
 ## Licenca
 
 Proprietario - Maginf Tecnologia (c) 2026
+
+---
+
+## Documentacao
+
+| Documento | Descricao |
+|---|---|
+| [`AI_CONTEXT.md`](./AI_CONTEXT.md) | **Estado atual do projeto para assistentes de IA** — leia primeiro |
+| [`FLY_MIGRATION.md`](./FLY_MIGRATION.md) | Guia de migracao e deploy no Fly.io |
+| [`docs/ARQUITETURA-TECNICA-v2.md`](./docs/ARQUITETURA-TECNICA-v2.md) | Arquitetura tecnica detalhada |
+| [`docs/PARTE-A` a `PARTE-J`](./docs/) | 10 documentos tecnicos modulares |
+| [`docs/SESSAO-*.md`](./docs/) | Logs de sessoes de desenvolvimento com IA |

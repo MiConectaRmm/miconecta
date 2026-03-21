@@ -1,6 +1,6 @@
 import {
   Controller, Get, Post, Put, Delete, Body, Param,
-  UseGuards, Req,
+  UseGuards, Req, Query,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -34,6 +34,20 @@ export class ClientUsersController {
     const isTechnician = req.user.userType === 'technician';
     const tenantId = isTechnician ? null : (req.tenantId || req.user.tenantId);
     return this.clientUsersService.listar(tenantId);
+  }
+
+  @Get('tenant/:tenantId')
+  @RequirePermissions('users:read')
+  @ApiOperation({ summary: 'Listar usuários de um tenant específico' })
+  async listarPorTenant(@Param('tenantId') tenantId: string) {
+    return this.clientUsersService.listarPorTenant(tenantId);
+  }
+
+  @Get('tenant/:tenantId/contagem')
+  @RequirePermissions('users:read')
+  @ApiOperation({ summary: 'Contagem de usuários do portal de um tenant' })
+  async contagem(@Param('tenantId') tenantId: string) {
+    return this.clientUsersService.contagem(tenantId);
   }
 
   @Get(':id')
