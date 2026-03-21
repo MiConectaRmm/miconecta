@@ -4,6 +4,7 @@ import { Repository, In } from 'typeorm';
 import { Script } from '../../database/entities/script.entity';
 import { ScriptExecution, ExecutionStatus } from '../../database/entities/script-execution.entity';
 import { Device } from '../../database/entities/device.entity';
+import { RmmGateway } from '../gateway/rmm.gateway';
 
 @Injectable()
 export class ScriptsService {
@@ -14,6 +15,7 @@ export class ScriptsService {
     private readonly execRepo: Repository<ScriptExecution>,
     @InjectRepository(Device)
     private readonly deviceRepo: Repository<Device>,
+    private readonly rmmGateway: RmmGateway,
   ) {}
 
   async criarScript(dados: Partial<Script>) {
@@ -60,7 +62,30 @@ export class ScriptsService {
       }),
     );
 
-    return this.execRepo.save(execucoes);
+    const saved = await this.execRepo.save(execucoes);
+
+    for (const exec of saved) {
+      const dispatched = this.rmmGateway.emitToAgent(exec.deviceId, 'script.dispatch', {
+        executionId: exec.id,
+        deviceId: exec.deviceId,
+        linguagem: script.tipo,
+        conteudo: script.conteudo,
+        timeoutSegundos: script.timeoutSegundos || 300,
+      });
+
+      if (dispatched) {
+        await this.execRepo.update(exec.id, {
+          status: ExecutionStatus.EXECUTANDO,
+          iniciadoEm: new Date(),
+        });
+      }
+    }
+
+    return this.execRepo.find({
+      where: { id: In(saved.map((e) => e.id)) },
+      relations: ['script', 'device'],
+      order: { criadoEm: 'ASC' },
+    });
   }
 
   // Obter comandos pendentes para um dispositivo (usado pelo agente)
