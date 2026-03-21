@@ -17,7 +17,7 @@ public class RealtimeClient : BackgroundService
     private readonly ModuleSupervisor _supervisor;
     private readonly ILogger<RealtimeClient> _logger;
 
-    private SocketIO? _socket;
+    private SocketIOClient.SocketIO? _socket;
     private bool _conectado = false;
 
     public bool Conectado => _conectado;
@@ -93,7 +93,7 @@ public class RealtimeClient : BackgroundService
         // Remove /api/v1 do sufixo para obter a URL base do Socket.IO
         var baseUrl = serverUrl.Replace("/api/v1", "");
 
-        _socket = new SocketIO(baseUrl, new SocketIOOptions
+        _socket = new SocketIOClient.SocketIO(baseUrl, new SocketIOOptions
         {
             Path = "/socket.io",
             Reconnection = false, // gerenciamos manualmente

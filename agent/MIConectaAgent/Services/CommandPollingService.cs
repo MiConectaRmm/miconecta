@@ -80,7 +80,7 @@ public class CommandPollingService : BackgroundService
             var saida = resultado.Saida + (string.IsNullOrEmpty(resultado.SaidaErro) ? "" : $"\n[STDERR]\n{resultado.SaidaErro}");
 
             // Enviar resultado via WebSocket
-            await _realtimeClient.EnviarScriptResultado(payload.ExecutionId, saida, sucesso, resultado.CodigoSaida);
+            await _realtimeClient.EnviarScriptResultado(payload.ExecutionId, saida, sucesso, resultado.CodigoSaida ?? -1);
 
             // Também registrar via HTTP para persistência no backend
             await _apiClient.ReportarResultadoExecucao(payload.ExecutionId, resultado);
