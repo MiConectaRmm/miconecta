@@ -288,19 +288,7 @@ function DashboardSuperAdmin() {
               </div>
               <div>
                 <p className="text-sm font-medium text-dark-200 group-hover:text-white">Empresas (cadastro)</p>
-                <p className="text-xs text-dark-500">CNPJ, contrato, portal</p>
-              </div>
-            </Link>
-            <Link
-              href="/dashboard/clientes"
-              className="flex items-center gap-3 p-3 rounded-lg bg-dark-900 hover:bg-dark-700 transition-colors group"
-            >
-              <div className="w-9 h-9 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                <Users className="w-4 h-4 text-blue-400" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-dark-200 group-hover:text-white">Usuários do portal</p>
-                <p className="text-xs text-dark-500">Acesso cliente ao parque / tickets</p>
+                <p className="text-xs text-dark-500">CNPJ, contrato, usuários do portal</p>
               </div>
             </Link>
             <Link
@@ -472,15 +460,6 @@ function DashboardAdmin() {
               <div>
                 <p className="text-sm font-medium text-dark-200 group-hover:text-white">Empresas</p>
                 <p className="text-xs text-dark-500">Cadastro empresarial e portal</p>
-              </div>
-            </Link>
-            <Link href="/dashboard/clientes" className="flex items-center gap-3 p-3 rounded-lg bg-dark-900 hover:bg-dark-700 transition-colors group">
-              <div className="w-9 h-9 rounded-lg bg-cyan-500/20 flex items-center justify-center">
-                <Users className="w-4 h-4 text-cyan-400" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-dark-200 group-hover:text-white">Usuários do portal</p>
-                <p className="text-xs text-dark-500">Acesso cliente</p>
               </div>
             </Link>
             <Link href="/dashboard/reports" className="flex items-center gap-3 p-3 rounded-lg bg-dark-900 hover:bg-dark-700 transition-colors group">

@@ -64,8 +64,8 @@
 ### Frontend (Dashboard Maginf)
 - [x] Login dual-user
 - [x] Dashboard principal com stats
-- [x] Clientes (lista + detalhe com 13 abas)
-- [x] Aba "Usuários do Portal" no detalhe do cliente (CRUD, limite visual, contagem)
+- [x] Empresas (lista + detalhe com dados, endereço, agente, tokens, orgs, usuários do portal)
+- [x] Usuários do Portal integrados na página de detalhe da empresa (/dashboard/clients/[id])
 - [x] Dispositivos
 - [x] Tickets
 - [x] Alertas
@@ -109,7 +109,13 @@
 ### O que foi feito
 **Feature: Usuários do Portal por Cliente (limite de até 5)**
 
-Implementação completa do gerenciamento de usuários do portal dentro da página de detalhe de cada cliente.
+Implementação completa do gerenciamento de usuários do portal dentro da página de detalhe de cada empresa.
+
+**IMPORTANTE — Reestruturação de navegação (sessão 2):**
+- Usuários do portal **NÃO têm página/rota própria**. Ficam DENTRO de `/dashboard/clients/[id]` (detalhe da empresa).
+- Removido item "Usuários do portal" do Sidebar
+- Removidos links para `/dashboard/clientes` do Dashboard
+- A rota `/dashboard/clientes` e `/dashboard/clientes/[id]` ainda existem nos arquivos mas estão **órfãs** (sem links para elas). Podem ser removidas futuramente.
 
 #### Arquivos modificados:
 
@@ -129,16 +135,22 @@ Implementação completa do gerenciamento de usuários do portal dentro da pági
 4. **`frontend/src/lib/api.ts`**
    - Novos métodos: `usersApi.listarPorTenant(tenantId)` e `usersApi.contagemPorTenant(tenantId)`
 
-5. **`frontend/src/app/dashboard/clientes/[id]/page.tsx`**
-   - Nova aba "Usuários do Portal" (tab id: `portal-users`) com:
-     - Barra de progresso visual X/5 (verde/amarelo/vermelho)
-     - Cards de estatísticas (Total, Ativos, Inativos, Vagas)
-     - Aviso vermelho quando limite atingido
-     - Lista de usuários com badges de perfil (Admin/Gestor/Usuário)
-     - Modal completo de criar/editar (nome, email, senha, perfil, telefone, cargo)
-     - Ações: Editar, Desativar/Reativar, Enviar convite
-     - Lazy loading (carrega só quando aba é clicada)
-     - Botão "Novo Usuário" bloqueado quando limite atingido
+5. **`frontend/src/app/dashboard/clients/[id]/page.tsx`** ← PRINCIPAL
+   - Seção "Usuários do Portal" adicionada na coluna esquerda (após Organizações)
+   - CRUD completo: listar, criar, editar, desativar/reativar, enviar convite
+   - Barra de progresso visual X/limite (verde/amarelo/vermelho)
+   - Aviso quando limite atingido
+   - Botão "Novo" bloqueado quando limite atingido
+   - Modal de criar/editar (nome, email, senha, perfil, telefone, cargo)
+   - Contagem de usuários no Resumo lateral (sidebar direita)
+   - Dados carregados junto com o resto na função `loadData()`
+
+6. **`frontend/src/components/Sidebar.tsx`**
+   - Removido item "Usuários do portal" apontando para `/dashboard/clientes`
+
+7. **`frontend/src/app/dashboard/page.tsx`**
+   - Removidos 2 links "Usuários do portal" (seção Administração e Ações Rápidas)
+   - Link "Empresas" atualizado com descrição "CNPJ, contrato, usuários do portal"
 
 #### Detalhes técnicos:
 - O limite de usuários vem de `tenant.maxUsuarios` (coluna `max_usuarios`, default entity = 10, default service = 5)

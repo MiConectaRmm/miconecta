@@ -19,7 +19,6 @@ import {
   BarChart3,
   Eye,
   Download,
-  UserCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth.store'
@@ -34,7 +33,6 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'Principal' },
   { href: '/dashboard/clients', label: 'Empresas', icon: Building2, section: 'Principal' },
-  { href: '/dashboard/clientes', label: 'Usuários do portal', icon: UserCircle, section: 'Principal' },
   { href: '/dashboard/devices', label: 'Dispositivos', icon: Monitor, section: 'RMM' },
   { href: '/dashboard/alerts', label: 'Alertas', icon: Bell, section: 'RMM' },
   { href: '/dashboard/scripts', label: 'Scripts', icon: Terminal, section: 'RMM' },

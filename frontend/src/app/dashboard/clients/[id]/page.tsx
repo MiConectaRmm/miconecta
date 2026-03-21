@@ -7,8 +7,10 @@ import {
   Building2, ArrowLeft, Copy, CheckCircle2, RefreshCw, Download,
   Monitor, Users, Mail, Phone, MapPin, FileText, Shield, Settings,
   Globe, Calendar, Loader2, AlertCircle, Edit2, Save, X, Terminal,
+  User, Send, AlertTriangle, CheckCircle, XCircle,
 } from 'lucide-react'
-import { tenantsApi, agentsApi, devicesApi } from '@/lib/api'
+import { tenantsApi, agentsApi, devicesApi, usersApi } from '@/lib/api'
+import Modal from '@/components/ui/Modal'
 
 interface TenantDetail {
   id: string
@@ -70,6 +72,15 @@ export default function ClientDetailPage() {
   const [saving, setSaving] = useState(false)
   const [scriptLoading, setScriptLoading] = useState<string | null>(null)
 
+  // ── Usuários do Portal ──
+  const [portalUsers, setPortalUsers] = useState<any[]>([])
+  const [portalContagem, setPortalContagem] = useState<any>(null)
+  const [showUserModal, setShowUserModal] = useState(false)
+  const [editandoUser, setEditandoUser] = useState<any>(null)
+  const [userForm, setUserForm] = useState({
+    nome: '', email: '', senha: '', telefone: '', cargo: '', funcao: 'usuario',
+  })
+
   useEffect(() => {
     if (id) loadData()
   }, [id])
@@ -102,6 +113,16 @@ export default function ClientDetailPage() {
         ])
         setAgents(Array.isArray(agentsRes.data) ? agentsRes.data : [])
         setInstallationTokens(Array.isArray(tokensRes.data) ? tokensRes.data : [])
+      } catch {}
+
+      // Carregar usuários do portal
+      try {
+        const [usersRes, contagemRes] = await Promise.allSettled([
+          usersApi.listarPorTenant(id),
+          usersApi.contagemPorTenant(id),
+        ])
+        if (usersRes.status === 'fulfilled') setPortalUsers(usersRes.value.data)
+        if (contagemRes.status === 'fulfilled') setPortalContagem(contagemRes.value.data)
       } catch {}
     } catch (err: any) {
       setError(err.response?.data?.message || 'Erro ao carregar cliente')
@@ -145,6 +166,99 @@ export default function ClientDetailPage() {
       alert(err.response?.data?.message || 'Erro ao gerar script')
     } finally {
       setScriptLoading(null)
+    }
+  }
+
+  // ── Funções de Usuários do Portal ──
+  const carregarPortalUsers = async () => {
+    try {
+      const [usersRes, contagemRes] = await Promise.allSettled([
+        usersApi.listarPorTenant(id),
+        usersApi.contagemPorTenant(id),
+      ])
+      if (usersRes.status === 'fulfilled') setPortalUsers(usersRes.value.data)
+      if (contagemRes.status === 'fulfilled') setPortalContagem(contagemRes.value.data)
+    } catch (err) {
+      console.error('Erro ao carregar usuários do portal:', err)
+    }
+  }
+
+  const abrirUserModal = (usuario?: any) => {
+    if (usuario) {
+      setEditandoUser(usuario)
+      setUserForm({
+        nome: usuario.nome || '',
+        email: usuario.email || '',
+        senha: '',
+        telefone: usuario.telefone || '',
+        cargo: usuario.cargo || '',
+        funcao: usuario.funcao || 'usuario',
+      })
+    } else {
+      setEditandoUser(null)
+      setUserForm({ nome: '', email: '', senha: '', telefone: '', cargo: '', funcao: 'usuario' })
+    }
+    setShowUserModal(true)
+  }
+
+  const salvarUser = async () => {
+    try {
+      if (editandoUser) {
+        const payload: any = {
+          nome: userForm.nome,
+          email: userForm.email,
+          telefone: userForm.telefone,
+          cargo: userForm.cargo,
+          funcao: userForm.funcao,
+        }
+        if (userForm.senha) payload.senha = userForm.senha
+        await usersApi.atualizarCliente(editandoUser.id, payload)
+      } else {
+        await usersApi.criarCliente(
+          {
+            nome: userForm.nome,
+            email: userForm.email,
+            senha: userForm.senha,
+            telefone: userForm.telefone,
+            cargo: userForm.cargo,
+            funcao: userForm.funcao,
+          },
+          id,
+        )
+      }
+      setShowUserModal(false)
+      carregarPortalUsers()
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Erro ao salvar usuário'
+      alert(typeof msg === 'string' ? msg : JSON.stringify(msg))
+    }
+  }
+
+  const desativarUser = async (userId: string) => {
+    if (!confirm('Deseja desativar este usuário do portal?')) return
+    try {
+      await usersApi.desativarCliente(userId)
+      carregarPortalUsers()
+    } catch (err) {
+      console.error('Erro ao desativar usuário:', err)
+    }
+  }
+
+  const reativarUser = async (userId: string) => {
+    try {
+      await usersApi.reativarCliente(userId)
+      carregarPortalUsers()
+    } catch (err) {
+      console.error('Erro ao reativar usuário:', err)
+    }
+  }
+
+  const enviarConviteUser = async (userId: string) => {
+    try {
+      await usersApi.convidarCliente(userId)
+      alert('Convite enviado com sucesso!')
+    } catch (err) {
+      console.error('Erro ao enviar convite:', err)
     }
   }
 
@@ -447,6 +561,149 @@ export default function ClientDetailPage() {
               <p className="text-dark-500 text-sm text-center py-4">Nenhuma organização cadastrada</p>
             )}
           </div>
+
+          {/* Usuários do Portal */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Users className="w-5 h-5 text-brand-400" /> Usuários do Portal
+                </h3>
+                <p className="text-dark-500 text-xs mt-1">
+                  Usuários que acessam o portal deste cliente (tickets, dispositivos, chat)
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                {portalContagem && (
+                  <div className="flex items-center gap-2">
+                    <div className="text-right">
+                      <p className={`text-sm font-bold ${portalContagem.atingiuLimite ? 'text-red-400' : 'text-brand-400'}`}>
+                        {portalContagem.total}/{portalContagem.limite}
+                      </p>
+                    </div>
+                    <div className="w-20">
+                      <div className="w-full bg-dark-700 rounded-full h-1.5">
+                        <div
+                          className={`h-1.5 rounded-full transition-all ${
+                            portalContagem.atingiuLimite
+                              ? 'bg-red-500'
+                              : portalContagem.total >= portalContagem.limite - 1
+                              ? 'bg-yellow-500'
+                              : 'bg-brand-500'
+                          }`}
+                          style={{ width: `${Math.min(100, (portalContagem.total / portalContagem.limite) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <button
+                  onClick={() => abrirUserModal()}
+                  disabled={portalContagem?.atingiuLimite}
+                  className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={portalContagem?.atingiuLimite ? 'Limite atingido' : 'Novo usuário'}
+                >
+                  <User className="w-3.5 h-3.5" /> Novo
+                </button>
+              </div>
+            </div>
+
+            {portalContagem?.atingiuLimite && (
+              <div className="mb-4 p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                <p className="text-xs text-red-300">
+                  Limite de {portalContagem.limite} usuários atingido. Altere o plano para adicionar mais.
+                </p>
+              </div>
+            )}
+
+            {portalUsers.length === 0 ? (
+              <div className="text-center py-8">
+                <Users className="w-10 h-10 text-dark-600 mx-auto mb-2" />
+                <p className="text-dark-400 text-sm">Nenhum usuário do portal cadastrado</p>
+                <p className="text-dark-500 text-xs mt-1">Clique em "Novo" para criar o primeiro acesso</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {portalUsers.map((usr: any) => (
+                  <div
+                    key={usr.id}
+                    className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
+                      usr.ativo ? 'bg-dark-800/50 hover:bg-dark-700/50' : 'bg-dark-800/30 opacity-60'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        usr.funcao === 'admin_cliente'
+                          ? 'bg-yellow-500/20'
+                          : usr.funcao === 'gestor'
+                          ? 'bg-blue-500/20'
+                          : 'bg-brand-500/20'
+                      }`}>
+                        <User className={`w-4 h-4 ${
+                          usr.funcao === 'admin_cliente'
+                            ? 'text-yellow-400'
+                            : usr.funcao === 'gestor'
+                            ? 'text-blue-400'
+                            : 'text-brand-400'
+                        }`} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-white text-sm font-medium truncate">{usr.nome}</p>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                            usr.funcao === 'admin_cliente'
+                              ? 'bg-yellow-500/15 text-yellow-400'
+                              : usr.funcao === 'gestor'
+                              ? 'bg-blue-500/15 text-blue-400'
+                              : 'bg-dark-700 text-dark-300'
+                          }`}>
+                            {usr.funcao === 'admin_cliente' ? 'Admin' : usr.funcao === 'gestor' ? 'Gestor' : 'Usuário'}
+                          </span>
+                          {!usr.ativo && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400 flex-shrink-0">
+                              Inativo
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-dark-400 truncate mt-0.5">{usr.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                      <button
+                        onClick={() => abrirUserModal(usr)}
+                        className="text-xs py-1 px-2 text-dark-300 hover:text-white hover:bg-dark-600 rounded transition-colors"
+                      >
+                        Editar
+                      </button>
+                      {usr.ativo ? (
+                        <button
+                          onClick={() => desativarUser(usr.id)}
+                          className="text-xs py-1 px-2 text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                        >
+                          Desativar
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => reativarUser(usr.id)}
+                          className="text-xs py-1 px-2 text-green-400 hover:bg-green-500/10 rounded transition-colors"
+                        >
+                          Reativar
+                        </button>
+                      )}
+                      <button
+                        onClick={() => enviarConviteUser(usr.id)}
+                        className="p-1 text-dark-400 hover:text-brand-400 hover:bg-dark-600 rounded transition-colors"
+                        title="Enviar convite por e-mail"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right Column */}
@@ -480,8 +737,10 @@ export default function ClientDetailPage() {
                   <span className="text-green-400 font-medium">{devicesOnline} dispositivos</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-dark-400">Max Usuários</span>
-                  <span className="text-white">{tenant.maxUsuarios}</span>
+                  <span className="text-dark-400">Usuários Portal</span>
+                  <span className={`font-medium ${portalContagem?.atingiuLimite ? 'text-red-400' : 'text-white'}`}>
+                    {portalContagem ? `${portalContagem.ativos}/${portalContagem.limite}` : `0/${tenant.maxUsuarios}`}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-dark-400">Retenção de dados</span>
@@ -560,6 +819,127 @@ export default function ClientDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal de Criar/Editar Usuário do Portal */}
+      <Modal
+        isOpen={showUserModal}
+        onClose={() => setShowUserModal(false)}
+        title={editandoUser ? 'Editar Usuário do Portal' : 'Novo Usuário do Portal'}
+        size="lg"
+      >
+        <div className="space-y-4">
+          <div className="p-3 rounded-lg bg-dark-900 border border-dark-700">
+            <div className="flex items-center gap-2 text-sm">
+              <Building2 className="w-4 h-4 text-brand-400" />
+              <span className="text-dark-300">Empresa:</span>
+              <span className="text-white font-medium">{tenant?.nome}</span>
+            </div>
+            {portalContagem && !editandoUser && (
+              <p className="text-xs text-dark-500 mt-1 ml-6">
+                {portalContagem.disponivel} {portalContagem.disponivel === 1 ? 'vaga restante' : 'vagas restantes'} de {portalContagem.limite}
+              </p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-dark-300 mb-1.5">Nome completo *</label>
+              <input
+                type="text"
+                value={userForm.nome}
+                onChange={(e) => setUserForm({ ...userForm, nome: e.target.value })}
+                className="input w-full"
+                placeholder="João da Silva"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-dark-300 mb-1.5">Email (login) *</label>
+              <input
+                type="email"
+                value={userForm.email}
+                onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
+                className="input w-full"
+                placeholder="joao@empresa.com"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-dark-300 mb-1.5">
+                Senha {editandoUser ? '(deixe vazio para manter)' : '*'}
+              </label>
+              <input
+                type="password"
+                value={userForm.senha}
+                onChange={(e) => setUserForm({ ...userForm, senha: e.target.value })}
+                className="input w-full"
+                placeholder={editandoUser ? '••••••' : 'Mínimo 6 caracteres'}
+                autoComplete="new-password"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-dark-300 mb-1.5">Perfil no portal *</label>
+              <select
+                value={userForm.funcao}
+                onChange={(e) => setUserForm({ ...userForm, funcao: e.target.value })}
+                className="input w-full"
+              >
+                <option value="admin_cliente">Administrador do Cliente</option>
+                <option value="gestor">Gestor</option>
+                <option value="usuario">Usuário</option>
+              </select>
+              <p className="text-[10px] text-dark-500 mt-1">
+                {userForm.funcao === 'admin_cliente'
+                  ? 'Acesso total ao portal do cliente'
+                  : userForm.funcao === 'gestor'
+                  ? 'Gerencia tickets e visualiza relatórios'
+                  : 'Abre e acompanha tickets'}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-dark-300 mb-1.5">Telefone</label>
+              <input
+                type="text"
+                value={userForm.telefone}
+                onChange={(e) => setUserForm({ ...userForm, telefone: e.target.value })}
+                className="input w-full"
+                placeholder="(11) 99999-9999"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-dark-300 mb-1.5">Cargo</label>
+              <input
+                type="text"
+                value={userForm.cargo}
+                onChange={(e) => setUserForm({ ...userForm, cargo: e.target.value })}
+                className="input w-full"
+                placeholder="Gerente de TI"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2 border-t border-dark-700">
+            <button onClick={() => setShowUserModal(false)} className="btn-secondary">
+              Cancelar
+            </button>
+            <button
+              onClick={salvarUser}
+              className="btn-primary"
+              disabled={
+                !userForm.nome ||
+                !userForm.email ||
+                (!editandoUser && (!userForm.senha || userForm.senha.length < 6))
+              }
+            >
+              {editandoUser ? 'Salvar Alterações' : 'Criar Usuário'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
