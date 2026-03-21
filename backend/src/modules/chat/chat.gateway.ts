@@ -215,17 +215,45 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return { ok: true };
   }
 
+  // ── Central de Atendimento: sala global para técnicos ──
+
+  @SubscribeMessage('atendimento:join')
+  handleAtendimentoJoin(@ConnectedSocket() client: AuthenticatedSocket) {
+    const user = this.getUser(client);
+    // Apenas técnicos/admins podem entrar na sala global
+    if (user.userType !== 'technician' && !this.canAccessCrossTenant(user)) {
+      return { ok: false, message: 'Forbidden' };
+    }
+    client.join('atendimento');
+    this.logger.log(`Atendimento joined: ${client.id} (${user.nome})`);
+    return { ok: true };
+  }
+
+  @SubscribeMessage('atendimento:leave')
+  handleAtendimentoLeave(@ConnectedSocket() client: AuthenticatedSocket) {
+    client.leave('atendimento');
+    return { ok: true };
+  }
+
   emitTicketUpdated(ticketId: string, payload: TicketEventPayload) {
     const { ticketId: _ignored, ...rest } = payload as TicketEventPayload & { ticketId?: string };
     this.server.to(`ticket:${ticketId}`).emit('ticket:updated', { ticketId, ...rest });
+    // Broadcast para Central de Atendimento
+    this.server.to('atendimento').emit('atendimento:ticket_updated', { ticketId, ...rest });
   }
 
   emitNotification(tenantId: string, payload: Record<string, unknown>) {
     this.server.to(`tenant:${tenantId}`).emit('notification:new', payload);
+    // Broadcast para Central de Atendimento
+    this.server.to('atendimento').emit('atendimento:update', payload);
   }
 
   emitMessage(ticketId: string, payload: unknown) {
     this.server.to(`ticket:${ticketId}`).emit('message:new', payload);
+  }
+
+  emitAtendimento(event: string, payload: Record<string, unknown>) {
+    this.server.to('atendimento').emit(event, payload);
   }
 
   private extractToken(client: Socket): string | null {

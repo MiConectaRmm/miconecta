@@ -107,12 +107,27 @@
 ## 🔄 Última Sessão de Desenvolvimento (21/03/2026)
 
 ### O que foi feito
-**Reestruturação completa da navegação + Hub do Cliente com Abas (Etapas 1, 2, 4)**
+**Reestruturação completa da navegação + Hub do Cliente com Abas + WebSocket Real-Time (Etapas 1, 2, 3, 4)**
 
 O sidebar foi reduzido de ~13 itens para 5. Dashboard é painel executivo unificado.
-Central de Atendimento criada como inbox. A página de detalhe do cliente agora é um
+Central de Atendimento criada como inbox **com WebSocket em tempo real**. A página de detalhe do cliente agora é um
 **hub central com 9 abas**: Cadastro, Usuários Portal, Dispositivos, Alertas, Tickets,
 Scripts, Software, Patches, Sessões. Cada aba é um componente separado em `tabs/`.
+
+**Etapa 3 — WebSocket Real-Time na Central de Atendimento:**
+- Backend: `ChatGateway` agora emite eventos para sala `atendimento` (broadcast para técnicos)
+- Backend: `AlertsService` agora emite `notification:new` via WebSocket ao criar/reconhecer/resolver alertas
+- Frontend: Central usa `useSocket('/chat')` e entra na sala `atendimento:join`
+- Eventos escutados: `atendimento:update` (ticket_created, ticket_message, alert_created, alert_resolved) e `atendimento:ticket_updated`
+- Indicador visual de conexão WS (⚡ Tempo real / 🔴 Desconectado)
+- Toast notifications com slide-in animado para novos tickets/alertas
+- Som de notificação (Web Audio API) com toggle on/off
+- Badge "N atualizações" quando há pending updates (debounce 3s)
+- Itens com mensagens não lidas têm dot amarelo pulsante
+- Itens novos via WS têm badge "NOVO" e borda azul
+- Ticket resolvido/fechado removido da fila instantaneamente
+- Fallback: polling a cada 60s como backup do WebSocket
+- Contadores expandidos: Total, Tickets, Alertas, Críticas, Não Lidas
 
 #### Decisões de design (aprovadas pelo Maicon):
 - **Maicon** = Super Admin / Dono da Maginf
@@ -148,13 +163,20 @@ Scripts, Software, Patches, Sessões. Cada aba é um componente separado em `tab
    - Auto-refresh 30s + WebSocket
    - *Técnicos card só visível para Super Admin/Admin
 
-3. **`frontend/src/app/dashboard/atendimento/page.tsx`** — NOVO
+3. **`frontend/src/app/dashboard/atendimento/page.tsx`** — REESCRITO (WebSocket Real-Time)
    - Central de Atendimento / Inbox unificado
    - Carrega tickets abertos + em andamento + alertas ativos
-   - Contadores: Total, Tickets, Alertas
-   - Filtros: tipo (todos/tickets/alertas), prioridade (critica/alta/media/baixa), busca textual
-   - Ordenação: crítica primeiro, depois por tempo
-   - Auto-refresh a cada 30s
+   - **WebSocket**: `useSocket('/chat')` → sala `atendimento:join` para receber eventos em tempo real
+   - Eventos: `atendimento:update` (ticket_created, ticket_message, alert_created, alert_resolved)
+   - Eventos: `atendimento:ticket_updated` (status/prioridade mudou, remove resolvidos)
+   - Toast notifications animadas (slide-in-right) com auto-dismiss 8s
+   - Som de notificação via Web Audio API com toggle on/off
+   - Badge "N atualizações" pulsante com debounce (pending updates)
+   - Indicador WS: badge verde "Tempo real" ou vermelho "Desconectado"
+   - Contadores: Total, Tickets, Alertas, Críticas, Não Lidas (grid-cols-5)
+   - Filtros: tipo (todos/tickets/alertas), prioridade, busca textual
+   - Lista com: dot amarelo para não lidas, badge NOVO para itens via WS, borda azul
+   - Fallback: polling 60s como backup do WebSocket
 
 4. **`frontend/src/app/dashboard/clients/[id]/page.tsx`** — REESCRITO (Hub com Abas)
    - Layout: sidebar resumo (1 col) + conteúdo aba (3 col)
@@ -219,6 +241,27 @@ Scripts, Software, Patches, Sessões. Cada aba é um componente separado em `tab
     - Lista de sessões com status, técnico, motivo, duração
     - Botão Conectar para sessões ativas via RustDesk
     - Modal nova sessão: selecionar dispositivo online + motivo
+
+14. **`backend/src/modules/chat/chat.gateway.ts`** — ATUALIZADO (Etapa 3)
+    - Nova sala `atendimento` para técnicos (broadcast global)
+    - `@SubscribeMessage('atendimento:join')` — técnicos entram na sala
+    - `@SubscribeMessage('atendimento:leave')` — técnicos saem da sala
+    - `emitTicketUpdated()` agora também emite para sala `atendimento`
+    - `emitNotification()` agora também emite para sala `atendimento`
+    - Novo `emitAtendimento()` helper para broadcast direto
+
+15. **`backend/src/modules/alerts/alerts.service.ts`** — ATUALIZADO (Etapa 3)
+    - Injeção do `ChatGateway` para emissão de eventos WS
+    - `criarAlerta()` → emite `alert_created` via WS para o tenant
+    - `reconhecerAlerta()` → emite `alert_acknowledged` via WS
+    - `resolverAlerta()` → emite `alert_resolved` via WS
+
+16. **`backend/src/modules/alerts/alerts.module.ts`** — ATUALIZADO (Etapa 3)
+    - Importa `ChatModule` para acesso ao `ChatGateway`
+
+17. **`frontend/tailwind.config.ts`** — ATUALIZADO (Etapa 3)
+    - Keyframes: `slide-in-right`, `fade-out`
+    - Animations: `animate-slide-in-right`, `animate-fade-out`
 
 #### Páginas que continuam existindo (sem link no sidebar):
 - `/dashboard/devices` — Dispositivos (global)
