@@ -62,7 +62,7 @@ const entities = [
         const databaseUrl = config.get<string>('DATABASE_URL');
         const useSsl = config.get<string>('DB_SSL', 'false') === 'true';
         const isProd = config.get<string>('NODE_ENV') === 'production';
-        console.log(`TypeORM: DATABASE_URL=${databaseUrl ? 'set' : 'unset'}, SSL=${useSsl}, ENV=${config.get<string>('NODE_ENV')}`);
+        console.log(`TypeORM: DATABASE_URL=${databaseUrl ? databaseUrl.replace(/:[^:@]+@/, ':***@') : 'unset'}, SSL=${useSsl}, ENV=${config.get<string>('NODE_ENV')}`);
 
         if (isProd) {
           console.warn('⚠️  synchronize=true em produção — mude para migrations quando estável');
@@ -74,21 +74,23 @@ const entities = [
           entities,
           subscribers: [TenantValidationSubscriber],
           synchronize: true, // TODO: migrar para migrations antes de dados reais em produção
-          logging: false,
+          logging: isProd ? ['error', 'warn'] : true,
           ssl: useSsl ? { rejectUnauthorized: false } : false,
-          retryAttempts: 10,
+          retryAttempts: 15,
           retryDelay: 3000,
           keepConnectionAlive: true,
           extra: {
-            // Pool config — essencial para Fly.io Postgres (flycast proxy)
+            // Pool config — conexão direta ao PG (.internal:5433, sem HAProxy)
             max: 10,
             min: 2,
-            idleTimeoutMillis: 30000,       // fecha idle após 30s (flycast pode fechar em 60s)
-            connectionTimeoutMillis: 10000,  // timeout 10s para obter conexão
+            idleTimeoutMillis: 30000,
+            connectionTimeoutMillis: 10000,
             allowExitOnIdle: false,
-            // Keepalive para evitar "Connection terminated unexpectedly"
+            statement_timeout: 30000,        // kill queries >30s
+            query_timeout: 30000,
+            // TCP keepalive — essencial para Fly.io internal network
             keepAlive: true,
-            keepAliveInitialDelayMillis: 10000,
+            keepAliveInitialDelayMillis: 5000,
           },
         };
       },
