@@ -44,7 +44,7 @@ export default function SoftwarePage() {
         <button
           onClick={() => setTab('pacotes')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'pacotes' ? 'bg-brand-600 text-white' : 'bg-dark-800 text-dark-300 hover:bg-dark-700'
+            tab === 'pacotes' ? 'bg-brand-500 text-white' : 'bg-dark-800 text-dark-300 hover:bg-dark-700'
           }`}
         >
           Pacotes ({pacotes.length})
@@ -52,7 +52,7 @@ export default function SoftwarePage() {
         <button
           onClick={() => setTab('deploys')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'deploys' ? 'bg-brand-600 text-white' : 'bg-dark-800 text-dark-300 hover:bg-dark-700'
+            tab === 'deploys' ? 'bg-brand-500 text-white' : 'bg-dark-800 text-dark-300 hover:bg-dark-700'
           }`}
         >
           Deploys ({deploys.length})

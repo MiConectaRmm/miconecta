@@ -47,7 +47,7 @@ export default function PortalDeviceDetailPage() {
       </Link>
 
       <div className="flex items-center gap-4 mb-6">
-        <div className="w-12 h-12 rounded-xl bg-brand-600/20 flex items-center justify-center">
+        <div className="w-12 h-12 rounded-xl bg-brand-500/20 flex items-center justify-center">
           <Monitor className="w-6 h-6 text-brand-400" />
         </div>
         <div>
@@ -60,7 +60,7 @@ export default function PortalDeviceDetailPage() {
       <div className="flex gap-2 mb-6">
         {tabs.map(t => (
           <button key={t.key} onClick={() => setTab(t.key as any)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === t.key ? 'bg-brand-600/20 text-brand-400' : 'text-dark-400 hover:bg-dark-800'}`}>
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === t.key ? 'bg-brand-500/20 text-brand-400' : 'text-dark-400 hover:bg-dark-800'}`}>
             {t.label}
           </button>
         ))}

@@ -73,7 +73,7 @@ export default function SettingsPage() {
               onClick={() => setActiveTab(t.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
                 active
-                  ? 'bg-brand-600/20 text-brand-400'
+                  ? 'bg-brand-500/20 text-brand-400'
                   : 'text-dark-400 hover:text-white hover:bg-dark-800'
               }`}
             >
@@ -152,13 +152,13 @@ function TabGeral() {
           </div>
           <div>
             <span className="text-dark-400 block mb-1">Produto</span>
-            <span className="text-white font-medium">MIConectaRMM Enterprise</span>
+            <span className="text-white font-medium">MIConecta Enterprise</span>
           </div>
           <div>
             <span className="text-dark-400 block mb-1">Cor primária</span>
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-brand-600 rounded" />
-              <span className="text-white font-mono">#ea580c</span>
+              <div className="w-6 h-6 bg-brand-500 rounded" />
+              <span className="text-white font-mono">#3B82F6</span>
             </div>
           </div>
         </div>
@@ -240,7 +240,7 @@ function TabScripts() {
                   <div className="flex items-center gap-2">
                     <span className="text-white font-medium truncate">{s.nome}</span>
                     {s.global && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand-600/20 text-brand-400 font-medium">GLOBAL</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand-500/20 text-brand-400 font-medium">GLOBAL</span>
                     )}
                   </div>
                   {s.descricao && <p className="text-dark-400 text-xs truncate mt-0.5">{s.descricao}</p>}
@@ -374,7 +374,7 @@ function TabPatches() {
                     </span>
                     <div className="flex-1 h-2 bg-dark-800 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-brand-600 rounded-full transition-all"
+                        className="h-full bg-brand-500 rounded-full transition-all"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -732,7 +732,7 @@ function ScriptFormModal({ script, onClose, onSaved }: {
           />
         </div>
         <div className="flex items-center gap-2">
-          <input type="checkbox" id="global-chk" checked={global} onChange={(e) => setGlobal(e.target.checked)} className="accent-brand-600" />
+          <input type="checkbox" id="global-chk" checked={global} onChange={(e) => setGlobal(e.target.checked)} className="accent-brand-500" />
           <label htmlFor="global-chk" className="text-sm text-dark-300">Script global (visível para todos os tenants)</label>
         </div>
         <div className="flex justify-end gap-3 mt-2">

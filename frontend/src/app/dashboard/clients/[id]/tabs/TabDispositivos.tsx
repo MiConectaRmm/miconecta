@@ -132,7 +132,7 @@ export default function TabDispositivos({ tenantId }: Props) {
                       <div className="flex items-center gap-2">
                         {device.rustdeskId && (
                           <button onClick={() => conectarRustDesk(device.rustdeskId)}
-                            className="bg-brand-600 hover:bg-brand-700 text-white px-3 py-1 rounded text-xs font-bold transition-colors">
+                            className="bg-brand-500 hover:bg-brand-700 text-white px-3 py-1 rounded text-xs font-bold transition-colors">
                             CONECTAR
                           </button>
                         )}

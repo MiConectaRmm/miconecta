@@ -77,7 +77,7 @@ export default function DashboardLayout({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-dark-950 flex items-center justify-center">
+      <div className="min-h-screen bg-dark-900 flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full" />
       </div>
     )
@@ -86,7 +86,7 @@ export default function DashboardLayout({
   if (!isAuthenticated) return null
 
   return (
-    <div className="min-h-screen bg-dark-950">
+    <div className="min-h-screen bg-dark-900">
       <Sidebar />
 
       <div className="ml-64">
@@ -135,7 +135,7 @@ export default function DashboardLayout({
                       notifications.map((notif) => (
                         <div
                           key={notif.id}
-                          className={`px-4 py-3 border-b border-dark-700/50 hover:bg-dark-700/50 transition-colors ${!notif.lida ? 'bg-brand-600/5' : ''}`}
+                          className={`px-4 py-3 border-b border-dark-700/50 hover:bg-dark-700/50 transition-colors ${!notif.lida ? 'bg-brand-500/5' : ''}`}
                         >
                           <p className="text-sm text-dark-200 line-clamp-2">{notif.titulo || notif.mensagem || 'Notificação'}</p>
                           <div className="flex items-center gap-2 mt-1">
@@ -157,7 +157,7 @@ export default function DashboardLayout({
                 onClick={() => { setShowUserMenu(!showUserMenu); setShowNotifs(false) }}
                 className="flex items-center gap-3 hover:opacity-80 transition-opacity"
               >
-                <div className="w-8 h-8 bg-brand-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                <div className="w-8 h-8 bg-brand-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
                   {user?.nome?.charAt(0) || 'A'}
                 </div>
                 <div className="text-sm text-left">

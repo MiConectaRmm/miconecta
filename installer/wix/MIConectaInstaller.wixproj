@@ -2,7 +2,8 @@
   <PropertyGroup>
     <OutputType>Package</OutputType>
     <InstallerPlatform>x64</InstallerPlatform>
-    <OutputName>MIConectaRMMSetup</OutputName>
+  <OutputName>MIConectaSetup</OutputName>
+    <Cultures>pt-BR</Cultures>
   </PropertyGroup>
 
   <PropertyGroup>

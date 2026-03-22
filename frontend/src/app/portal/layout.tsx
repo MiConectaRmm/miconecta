@@ -36,7 +36,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-dark-950 flex items-center justify-center">
+      <div className="min-h-screen bg-dark-900 flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full" />
       </div>
     )
@@ -50,12 +50,12 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   }
 
   return (
-    <div className="min-h-screen bg-dark-950">
+    <div className="min-h-screen bg-dark-900">
       {/* Top navigation bar for portal */}
       <header className="h-14 bg-dark-900 border-b border-dark-700 flex items-center justify-between px-6 sticky top-0 z-50">
         <div className="flex items-center gap-8">
           <Link href="/portal" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center">
               <Monitor className="w-4 h-4 text-white" />
             </div>
             <span className="text-white font-bold">MIConecta</span>
@@ -74,7 +74,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                   className={cn(
                     'flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
                     isActive
-                      ? 'bg-brand-600/20 text-brand-400'
+                      ? 'bg-brand-500/20 text-brand-400'
                       : 'text-dark-400 hover:text-dark-200 hover:bg-dark-800'
                   )}
                 >
@@ -91,7 +91,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             <Bell className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-brand-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
+            <div className="w-7 h-7 bg-brand-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
               {user?.nome?.charAt(0) || 'C'}
             </div>
             <span className="text-dark-200 text-sm hidden md:inline">{user?.nome}</span>

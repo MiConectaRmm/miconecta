@@ -230,7 +230,7 @@ export default function DevicesPage() {
                           {device.rustdeskId && (
                             <button
                               onClick={() => conectarRustDesk(device.rustdeskId)}
-                              className="bg-brand-600 hover:bg-brand-700 text-white px-3 py-1 rounded text-xs font-bold transition-colors whitespace-nowrap"
+                              className="bg-brand-500 hover:bg-brand-700 text-white px-3 py-1 rounded text-xs font-bold transition-colors whitespace-nowrap"
                             >
                               CONECTAR
                             </button>

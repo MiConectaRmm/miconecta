@@ -147,6 +147,16 @@ public class RealtimeClient : BackgroundService
             try
             {
                 var data = response.GetValue<JsonElement>();
+                if (data.ValueKind == JsonValueKind.Array && data.GetArrayLength() > 0)
+                    data = data[0];
+
+                if (data.ValueKind == JsonValueKind.Object &&
+                    data.TryGetProperty("payload", out var wrappedPayload) &&
+                    wrappedPayload.ValueKind == JsonValueKind.Object)
+                {
+                    data = wrappedPayload;
+                }
+
                 var payload = new ScriptDispatchPayload
                 {
                     ExecutionId = GetStr(data, "executionId"),
@@ -154,7 +164,14 @@ public class RealtimeClient : BackgroundService
                     Linguagem = GetStr(data, "linguagem", "powershell"),
                     TimeoutSegundos = GetInt(data, "timeoutSegundos", 60),
                 };
-                _logger.LogInformation("WebSocket: script.dispatch — execId={Id}", payload.ExecutionId);
+
+                if (string.IsNullOrWhiteSpace(payload.ExecutionId) || string.IsNullOrWhiteSpace(payload.Conteudo))
+                {
+                    _logger.LogWarning("WebSocket: script.dispatch recebido com payload inválido: {Payload}", data.ToString());
+                    return;
+                }
+
+                _logger.LogInformation("WebSocket: script.dispatch — execId={Id} lang={Lang} timeout={Timeout}", payload.ExecutionId, payload.Linguagem, payload.TimeoutSegundos);
 
                 await _socket!.EmitAsync("script.started", new
                 {

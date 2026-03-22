@@ -81,7 +81,7 @@ export default function TabAlertas({ tenantId }: Props) {
         {['ativo', 'reconhecido', 'resolvido', ''].map((status) => (
           <button key={status} onClick={() => setFiltroStatus(status)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filtroStatus === status ? 'bg-brand-600 text-white' : 'bg-dark-800 text-dark-300 hover:bg-dark-700'
+              filtroStatus === status ? 'bg-brand-500 text-white' : 'bg-dark-800 text-dark-300 hover:bg-dark-700'
             }`}>
             {status || 'Todos'}
           </button>

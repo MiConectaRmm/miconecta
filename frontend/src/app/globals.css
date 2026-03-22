@@ -3,8 +3,26 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --color-primary: #3B82F6;
+    --color-primary-dark: #1D4ED8;
+    --color-secondary: #8B5CF6;
+    --color-secondary-dark: #6D28D9;
+    --color-bg: #0F172A;
+    --color-surface: #1E293B;
+    --color-card: #111827;
+    --color-text: #F8FAFC;
+    --color-text-secondary: #94A3B8;
+    --color-border: #334155;
+    --color-success: #22C55E;
+    --color-error: #EF4444;
+    --color-warning: #F59E0B;
+    --color-info: #3B82F6;
+    --gradient-primary: linear-gradient(135deg, #3B82F6, #8B5CF6);
+  }
+
   body {
-    @apply bg-dark-950 text-dark-100 antialiased;
+    @apply bg-dark-900 text-dark-50 antialiased;
   }
 }
 
@@ -13,7 +31,7 @@
     @apply bg-dark-800 border border-dark-700 rounded-xl p-6;
   }
   .btn-primary {
-    @apply bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg font-medium transition-colors;
+    @apply bg-brand-500 hover:bg-brand-700 text-white px-4 py-2 rounded-lg font-medium transition-colors;
   }
   .btn-secondary {
     @apply bg-dark-700 hover:bg-dark-600 text-dark-100 px-4 py-2 rounded-lg font-medium transition-colors;

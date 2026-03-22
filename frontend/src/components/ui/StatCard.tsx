@@ -10,7 +10,7 @@ interface StatCardProps {
 }
 
 const colorMap = {
-  brand: 'bg-brand-600/20 text-brand-400',
+  brand: 'bg-brand-500/20 text-brand-400',
   emerald: 'bg-emerald-500/20 text-emerald-400',
   red: 'bg-red-500/20 text-red-400',
   amber: 'bg-amber-500/20 text-amber-400',

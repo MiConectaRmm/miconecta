@@ -125,7 +125,7 @@ export default function DashboardReportsPage() {
           return (
             <div key={opt.key} className="card flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-brand-600/20 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-brand-500/20 flex items-center justify-center">
                   <Icon className="w-5 h-5 text-brand-400" />
                 </div>
                 <span className="text-white font-medium">{opt.label}</span>

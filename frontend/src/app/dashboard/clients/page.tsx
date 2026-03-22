@@ -219,7 +219,7 @@ export default function ClientsPage() {
           filtrados.map((tenant: any) => (
             <Link key={tenant.id} href={`/dashboard/clients/${tenant.id}`} className="card hover:border-dark-600 transition-colors group cursor-pointer">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-brand-600/20 rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 bg-brand-500/20 rounded-lg flex items-center justify-center">
                   <Building2 className="w-5 h-5 text-brand-400" />
                 </div>
                 <div className="flex-1 min-w-0">

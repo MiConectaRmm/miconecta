@@ -214,7 +214,7 @@ export default function TabCadastro({
         {agentInfo?.downloadUrl && (
           <div className="mb-4">
             <a href={agentInfo.downloadUrl} target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium transition-colors">
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-500 hover:bg-brand-500 text-white text-sm font-medium transition-colors">
               <Download className="w-4 h-4" /> Baixar MSI do Agente
             </a>
           </div>
@@ -238,10 +238,10 @@ export default function TabCadastro({
           <p className="text-xs text-dark-500 mb-1">Instalação manual via CMD (Admin):</p>
           <div className="relative">
             <code className="text-xs text-green-400 font-mono break-all">
-              msiexec /i MIConectaRMMSetup.msi /qn SERVER_URL={agentInfo?.serverUrl || '...'} TENANT_ID={tenant.id} PROVISION_TOKEN={tenant.provisionToken || '...'}
+              msiexec /i MIConectaSetup.msi /qn SERVER_URL={agentInfo?.serverUrl || '...'} TENANT_ID={tenant.id} PROVISION_TOKEN={tenant.provisionToken || '...'}
             </code>
             <button onClick={() => copyToClipboard(
-              `msiexec /i MIConectaRMMSetup.msi /qn SERVER_URL=${agentInfo?.serverUrl || ''} TENANT_ID=${tenant.id} PROVISION_TOKEN=${tenant.provisionToken || ''}`, 'cmd'
+              `msiexec /i MIConectaSetup.msi /qn SERVER_URL=${agentInfo?.serverUrl || ''} TENANT_ID=${tenant.id} PROVISION_TOKEN=${tenant.provisionToken || ''}`, 'cmd'
             )} className="absolute top-0 right-0 p-1 hover:bg-dark-800 rounded">
               {copied === 'cmd' ? <CheckCircle2 className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5 text-dark-500" />}
             </button>

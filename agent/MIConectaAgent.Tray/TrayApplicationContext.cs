@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Drawing;
 using System.ServiceProcess;
 
 namespace MIConectaAgent.Tray;
@@ -19,16 +20,17 @@ public class TrayApplicationContext : ApplicationContext
     private readonly System.Windows.Forms.Timer _statusTimer;
     private bool _serviceRunning = false;
 
-    private const string SERVICE_NAME = "MIConectaRMM Agent";
-    private const string PORTAL_URL = "https://miconecta.vercel.app";
+    private const string SERVICE_NAME = "MIConectaRMMAgent";
+    private const string PORTAL_URL = "https://app.maginf.com.br";
     private const string LOG_DIR = @"C:\Program Files\MIConectaRMM\logs";
     private const string CONFIG_PATH = @"C:\Program Files\MIConectaRMM\agent.config";
+    private static readonly string ICON_PATH = Path.Combine(AppContext.BaseDirectory, "icon.ico");
 
     public TrayApplicationContext()
     {
         _trayIcon = new NotifyIcon
         {
-            Icon = SystemIcons.Application, // Substituir por ícone customizado
+            Icon = File.Exists(ICON_PATH) ? new Icon(ICON_PATH) : SystemIcons.Application,
             Text = "MIConectaRMM - Verificando...",
             Visible = true,
             ContextMenuStrip = CriarMenu(),

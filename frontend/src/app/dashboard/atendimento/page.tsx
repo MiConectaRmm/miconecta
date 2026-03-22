@@ -383,7 +383,7 @@ export default function CentralAtendimentoPage() {
           {pendingUpdates > 0 && (
             <button
               onClick={() => carregarDados(true)}
-              className="flex items-center gap-2 px-3 py-2 bg-brand-600/20 border border-brand-500/30 rounded-lg text-sm font-medium text-brand-400 hover:bg-brand-600/30 transition-colors animate-pulse"
+              className="flex items-center gap-2 px-3 py-2 bg-brand-500/20 border border-brand-500/30 rounded-lg text-sm font-medium text-brand-400 hover:bg-brand-500/30 transition-colors animate-pulse"
             >
               <BellRing className="w-4 h-4" />
               {pendingUpdates} {pendingUpdates === 1 ? 'atualização' : 'atualizações'}
@@ -475,7 +475,7 @@ export default function CentralAtendimentoPage() {
                 onClick={() => setFiltroTipo(tipo.key)}
                 className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   filtroTipo === tipo.key
-                    ? 'bg-brand-600/20 text-brand-400'
+                    ? 'bg-brand-500/20 text-brand-400'
                     : 'bg-dark-800 text-dark-400 hover:bg-dark-700'
                 }`}
               >
@@ -520,7 +520,7 @@ export default function CentralAtendimentoPage() {
                   key={`${item.tipo}-${item.id}`}
                   onClick={() => abrirCliente(item.clienteId, item.tipo, item.id)}
                   className={`w-full flex items-center gap-4 px-6 py-4 hover:bg-dark-800/50 transition-all text-left ${
-                    item.isNew ? 'bg-brand-600/5 border-l-2 border-l-brand-500' : ''
+                    item.isNew ? 'bg-brand-500/5 border-l-2 border-l-brand-500' : ''
                   } ${item.hasUnreadFromClient ? 'bg-yellow-500/5' : ''}`}
                 >
                   {/* Prioridade */}

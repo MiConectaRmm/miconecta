@@ -61,12 +61,12 @@ export default function Sidebar() {
     <aside className="fixed left-0 top-0 h-screen w-64 bg-dark-900 border-r border-dark-700 flex flex-col z-50">
       <div className="p-6 border-b border-dark-700">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-brand-600 rounded-lg flex items-center justify-center">
+          <div className="w-10 h-10 bg-brand-500 rounded-lg flex items-center justify-center">
             <Monitor className="w-6 h-6 text-white" />
           </div>
           <div>
             <h1 className="text-lg font-bold text-white">MIConecta</h1>
-            <p className="text-xs text-dark-400">RMM Enterprise</p>
+            <p className="text-xs text-dark-400">Enterprise</p>
           </div>
         </div>
       </div>
@@ -84,7 +84,7 @@ export default function Sidebar() {
                   className={cn(
                     'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
                     isActive
-                      ? 'bg-brand-600/20 text-brand-400'
+                      ? 'bg-brand-500/20 text-brand-400'
                       : 'text-dark-300 hover:bg-dark-800 hover:text-dark-100'
                   )}
                 >
@@ -99,7 +99,7 @@ export default function Sidebar() {
 
       <div className="p-4 border-t border-dark-700">
         <div className="flex items-center gap-3 px-3 py-2 mb-3">
-          <div className="w-8 h-8 bg-brand-600 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+          <div className="w-8 h-8 bg-brand-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
             {user?.nome?.charAt(0)?.toUpperCase() || 'U'}
           </div>
           <div className="min-w-0">

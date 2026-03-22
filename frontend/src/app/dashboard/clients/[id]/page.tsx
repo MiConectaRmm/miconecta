@@ -163,7 +163,7 @@ export default function ClientDetailPage() {
             <ArrowLeft className="w-5 h-5 text-dark-400" />
           </button>
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-brand-600/20 rounded-xl flex items-center justify-center">
+            <div className="w-12 h-12 bg-brand-500/20 rounded-xl flex items-center justify-center">
               <Building2 className="w-6 h-6 text-brand-400" />
             </div>
             <div>
@@ -243,7 +243,7 @@ export default function ClientDetailPage() {
                     onClick={() => setActiveTab(tab.id)}
                     className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                       isActive
-                        ? 'bg-brand-600/15 text-brand-400'
+                        ? 'bg-brand-500/15 text-brand-400'
                         : 'text-dark-300 hover:bg-dark-700/50 hover:text-white'
                     }`}
                   >

@@ -609,7 +609,7 @@ export default function TicketDetailPage() {
                         msg.remetenteTipo === 'system'
                           ? 'bg-dark-700 text-dark-400 text-xs text-center w-full max-w-full'
                           : isOwn
-                            ? 'bg-brand-600 text-white'
+                            ? 'bg-brand-500 text-white'
                             : 'bg-dark-700 text-dark-100'
                       }`}>
                         {msg.remetenteTipo !== 'system' && !isOwn && (

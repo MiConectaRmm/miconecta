@@ -1,25 +1,27 @@
 [Setup]
-AppName=MIConectaRMM Agent
+AppName=MIConecta Agent
 AppVersion=1.0.0
 AppPublisher=Maginf Tecnologia
 AppPublisherURL=https://maginf.com.br
-DefaultDirName={pf}\MIConectaRMM
-DefaultGroupName=MIConectaRMM
-OutputBaseFilename=MIConectaRMMSetup
+DefaultDirName={pf}\MIConecta
+DefaultGroupName=MIConecta
+OutputBaseFilename=MIConectaSetup
 Compression=lzma
 SolidCompression=yes
 PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64
-SetupIconFile=icon.ico
+SetupIconFile=assets\miconecta.ico
+WizardImageFile=assets\installer-banner.png
+WizardSmallImageFile=assets\installer-banner.png
 UninstallDisplayIcon={app}\MIConectaAgent.exe
 
 [Files]
-Source: "publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
+Source: "..\agent\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
 [Run]
 ; Instalar como serviço do Windows
-Filename: "sc.exe"; Parameters: "create MIConectaRMMAgent binpath=""{app}\MIConectaAgent.exe"" start=auto displayname=""MIConectaRMM Agent"""; Flags: runhidden
-Filename: "sc.exe"; Parameters: "description MIConectaRMMAgent ""Agente de monitoramento remoto MIConectaRMM by Maginf Tecnologia"""; Flags: runhidden
+Filename: "sc.exe"; Parameters: "create MIConectaRMMAgent binpath=""{app}\MIConectaAgent.exe"" start=auto displayname=""MIConecta Agent"""; Flags: runhidden
+Filename: "sc.exe"; Parameters: "description MIConectaRMMAgent ""Agente de monitoramento e suporte remoto da MIConecta"""; Flags: runhidden
 Filename: "sc.exe"; Parameters: "start MIConectaRMMAgent"; Flags: runhidden
 
 ; Configurar RustDesk (se instalado)
@@ -37,14 +39,14 @@ var
 procedure InitializeWizard;
 begin
   ServerPage := CreateInputQueryPage(wpSelectDir,
-    'Servidor MIConectaRMM', 'Configure a conexão com o servidor',
-    'Informe a URL do servidor MIConectaRMM:');
+  'Servidor MIConecta', 'Configure a conexão com a plataforma',
+  'Informe a URL da API da MIConecta:');
   ServerPage.Add('URL do Servidor:', False);
-  ServerPage.Values[0] := 'http://seu-servidor:3000/api/v1';
+  ServerPage.Values[0] := 'https://api.maginf.com.br/api/v1';
 
   TenantPage := CreateInputQueryPage(ServerPage.ID,
-    'Identificação do Cliente', 'Configure o tenant e organização',
-    'Informe os IDs de identificação:');
+  'Identificação do cliente', 'Configure os dados de vínculo do agente',
+  'Informe os identificadores fornecidos pela MIConecta:');
   TenantPage.Add('Tenant ID:', False);
   TenantPage.Add('Organization ID:', False);
 end;
@@ -55,7 +57,7 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
-    ConfigFile := ExpandConstant('{pf}\MIConectaRMM\agent.config');
+  ConfigFile := ExpandConstant('{pf}\MIConecta\agent.config');
     SaveStringToFile(ConfigFile,
       'ServerUrl=' + ServerPage.Values[0] + #13#10 +
       'TenantId=' + TenantPage.Values[0] + #13#10 +

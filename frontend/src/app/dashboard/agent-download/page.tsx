@@ -41,18 +41,18 @@ export default function AgentDownloadPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-white">Download do Agente</h1>
         <p className="text-dark-400 mt-1">
-          MSI genérico do MIConecta RMM Agent. Para scripts de instalação por cliente, acesse o detalhe do cliente.
+          MSI genérico do MIConecta Agent. Para scripts de instalação por cliente, acesse o detalhe do cliente.
         </p>
       </div>
 
       <div className="card">
         <div className="flex items-start justify-between mb-6">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-brand-600/20 rounded-xl flex items-center justify-center">
+            <div className="w-14 h-14 bg-brand-500/20 rounded-xl flex items-center justify-center">
               <Monitor className="w-7 h-7 text-brand-400" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">MIConecta RMM Agent</h2>
+              <h2 className="text-xl font-bold text-white">MIConecta Agent</h2>
               <p className="text-dark-400 text-sm mt-0.5">
                 Versão {info.agentVersion} &bull; Windows x64 &bull; MSI
               </p>
@@ -68,7 +68,7 @@ export default function AgentDownloadPage() {
             href={info.downloadUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-3 w-full py-4 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl transition-colors text-lg"
+            className="flex items-center justify-center gap-3 w-full py-4 bg-brand-500 hover:bg-brand-500 text-white font-semibold rounded-xl transition-colors text-lg"
           >
             <Download className="w-6 h-6" />
             Baixar MSI

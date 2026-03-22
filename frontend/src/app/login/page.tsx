@@ -53,13 +53,13 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-dark-950 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-dark-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-600 rounded-2xl mb-4 shadow-lg shadow-brand-600/20">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-500 rounded-2xl mb-4 shadow-lg shadow-brand-500/20">
             <Monitor className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-white">MIConectaRMM</h1>
+          <h1 className="text-3xl font-bold text-white">MIConecta</h1>
           <p className="text-dark-400 mt-1">by Maginf Tecnologia</p>
         </div>
 
@@ -124,7 +124,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-dark-600 text-xs mt-6">
-          MIConectaRMM Enterprise v2.0.0 — Maginf Tecnologia © 2026
+          MIConecta Enterprise v2.0.0 — Maginf Tecnologia © 2026
         </p>
       </div>
     </div>

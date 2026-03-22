@@ -125,11 +125,11 @@ export default function PortalTicketDetailPage() {
 
       <div className="flex gap-2 mb-4">
         <button onClick={() => setTab('chat')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'chat' ? 'bg-brand-600/20 text-brand-400' : 'text-dark-400 hover:bg-dark-800'}`}>
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'chat' ? 'bg-brand-500/20 text-brand-400' : 'text-dark-400 hover:bg-dark-800'}`}>
           <MessageSquare className="w-4 h-4" /> Chat
         </button>
         <button onClick={() => setTab('timeline')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'timeline' ? 'bg-brand-600/20 text-brand-400' : 'text-dark-400 hover:bg-dark-800'}`}>
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'timeline' ? 'bg-brand-500/20 text-brand-400' : 'text-dark-400 hover:bg-dark-800'}`}>
           <Clock className="w-4 h-4" /> Timeline ({timeline.length})
         </button>
       </div>
@@ -147,7 +147,7 @@ export default function PortalTicketDetailPage() {
                 const isMe = m.remetenteId === user?.id
                 return (
                   <div key={m.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[75%] rounded-xl px-4 py-2.5 ${isMe ? 'bg-brand-600 text-white' : 'bg-dark-800 text-dark-200'}`}>
+                    <div className={`max-w-[75%] rounded-xl px-4 py-2.5 ${isMe ? 'bg-brand-500 text-white' : 'bg-dark-800 text-dark-200'}`}>
                       {!isMe && <p className="text-xs font-medium mb-1 opacity-70">{m.remetenteNome}</p>}
                       {m.arquivoUrl ? (
                         <a href={m.arquivoUrl} target="_blank" rel="noopener" className="flex items-center gap-2 underline text-sm">

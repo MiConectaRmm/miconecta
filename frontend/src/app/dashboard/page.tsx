@@ -152,7 +152,7 @@ export default function DashboardPage() {
             Olá, {user?.nome?.split(' ')[0] || 'Admin'} 👋
           </h1>
           <p className="text-dark-400 text-sm mt-1">
-            Visão geral da plataforma MIConecta RMM
+            Visão geral da plataforma MIConecta
           </p>
         </div>
         <button

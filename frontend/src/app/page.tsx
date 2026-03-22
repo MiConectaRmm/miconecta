@@ -16,9 +16,9 @@ export default function HomePage() {
   }, [router])
 
   return (
-    <div className="min-h-screen bg-dark-950 flex items-center justify-center">
+    <div className="min-h-screen bg-dark-900 flex items-center justify-center">
       <div className="animate-pulse text-brand-500 text-xl font-semibold">
-        Carregando MIConectaRMM...
+        Carregando MIConecta...
       </div>
     </div>
   )

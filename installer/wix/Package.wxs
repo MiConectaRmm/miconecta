@@ -3,7 +3,7 @@
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
-  <Package Name="MIConectaRMM Agent"
+  <Package Name="MIConecta Agent"
            Manufacturer="Maginf Tecnologia"
            Version="2.0.0.0"
            UpgradeCode="E7A3B1C2-4D5F-6A7B-8C9D-0E1F2A3B4C5D"
@@ -12,10 +12,10 @@
            Codepage="1252"
            InstallerVersion="500">
 
-    <SummaryInformation Description="Agente de monitoramento remoto MIConectaRMM"
+  <SummaryInformation Description="Agente de monitoramento e suporte remoto da MIConecta"
                         Manufacturer="Maginf Tecnologia" />
 
-    <MajorUpgrade DowngradeErrorMessage="Uma versão mais recente do MIConectaRMM Agent já está instalada." />
+  <MajorUpgrade DowngradeErrorMessage="Uma versão mais recente do MIConecta Agent já está instalada." />
 
     <Media Id="1" Cabinet="agent.cab" EmbedCab="yes" CompressionLevel="high" />
 
@@ -25,10 +25,13 @@
     <Property Id="PROVISION_TOKEN" Secure="yes" />
     <Property Id="RUSTDESK_SERVER" Value="136.248.114.218" />
     <Property Id="RUSTDESK_KEY" Value="ev3ic04E+VsgunfupaellTSWgSzmHiQL2H5ywzBE+yI=" />
+  <WixVariable Id="WixUILicenseRtf" Value="..\assets\license.rtf" />
+  <WixVariable Id="WixUIBannerBmp" Value="..\assets\installer-banner.bmp" />
+  <WixVariable Id="WixUIDialogBmp" Value="..\assets\installer-dialog.bmp" />
 
     <!-- Install directory -->
     <StandardDirectory Id="ProgramFiles64Folder">
-      <Directory Id="INSTALLFOLDER" Name="MIConectaRMM">
+  <Directory Id="INSTALLFOLDER" Name="MIConecta">
         <Directory Id="LogsFolder" Name="logs" />
       </Directory>
     </StandardDirectory>
@@ -42,8 +45,8 @@
 
         <ServiceInstall Id="MIConectaService"
                         Name="MIConectaRMMAgent"
-                        DisplayName="MIConectaRMM Agent"
-                        Description="Agente de monitoramento remoto MIConectaRMM by Maginf Tecnologia"
+                        DisplayName="MIConecta Agent"
+                        Description="Agente de monitoramento e suporte remoto da MIConecta"
                         Type="ownProcess"
                         Start="auto"
                         ErrorControl="normal"
@@ -90,23 +93,24 @@
 
     <!-- Start Menu shortcuts -->
     <StandardDirectory Id="ProgramMenuFolder">
-      <Directory Id="MIConectaMenuFolder" Name="MIConectaRMM">
+      <Directory Id="MIConectaMenuFolder" Name="MIConecta">
         <Component Id="MenuShortcuts" Guid="F6A7B8C9-D0E1-2F3A-4B5C-D6E7F8A9B0C1">
           <Shortcut Id="TrayShortcut"
-                    Name="MIConecta RMM"
+                    Name="MIConecta Agent"
                     Target="[INSTALLFOLDER]MIConectaTray.exe"
                     WorkingDirectory="INSTALLFOLDER"
                     Icon="TrayIcon" />
           <RemoveFolder Id="RemoveMenuFolder" On="uninstall" />
-          <RegistryValue Root="HKCU" Key="Software\MIConectaRMM" Name="MenuInstalled" Type="integer" Value="1" KeyPath="yes" />
+          <RegistryValue Root="HKCU" Key="Software\MIConecta" Name="MenuInstalled" Type="integer" Value="1" KeyPath="yes" />
         </Component>
       </Directory>
     </StandardDirectory>
 
-    <Icon Id="TrayIcon" SourceFile="$(var.PublishDir)\tray\MIConectaTray.exe" />
+  <Icon Id="TrayIcon" SourceFile="..\assets\miconecta.ico" />
+  <Property Id="ARPPRODUCTICON" Value="TrayIcon" />
 
     <!-- Feature tree -->
-    <Feature Id="Complete" Title="MIConectaRMM Agent" Level="1">
+  <Feature Id="Complete" Title="MIConecta Agent" Level="1">
       <ComponentGroupRef Id="AgentComponents" />
       <ComponentGroupRef Id="RegistryComponents" />
       <ComponentRef Id="MenuShortcuts" />
