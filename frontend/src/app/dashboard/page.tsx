@@ -51,7 +51,7 @@ export default function DashboardPage() {
     try {
       const [tenantsRes, techRes, resumoRes, alertasRes, ticketsRes, ticketsListRes] = await Promise.allSettled([
         tenantsApi.listar(),
-        techniciansApi.contagem(),
+        isSuperAdmin ? techniciansApi.contagem() : Promise.resolve({ data: { total: 0 } }),
         devicesApi.resumo(),
         alertsApi.contagem(),
         ticketsApi.contagem(),
