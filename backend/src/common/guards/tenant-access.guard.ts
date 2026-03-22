@@ -1,7 +1,9 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, ForbiddenException, Logger } from '@nestjs/common';
 
 @Injectable()
 export class TenantAccessGuard implements CanActivate {
+  private readonly logger = new Logger(TenantAccessGuard.name);
+
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
@@ -17,11 +19,13 @@ export class TenantAccessGuard implements CanActivate {
         } else if (user.tenantId) {
           request.tenantId = user.tenantId;
         }
+        this.logger.debug(`[TenantAccessGuard] super/admin: userId=${user.sub}, role=${user.role}, tenantId=${request.tenantId}`);
         return true;
       }
       // Técnicos comuns: usar tenant do JWT ou header
       const headerTenantId = request.headers['x-tenant-id'];
       request.tenantId = headerTenantId || user.tenantId;
+      this.logger.debug(`[TenantAccessGuard] tecnico: userId=${user.sub}, role=${user.role}, tenantId=${request.tenantId}`);
       return true;
     }
 

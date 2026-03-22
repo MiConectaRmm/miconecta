@@ -222,6 +222,7 @@ export class AuthService {
     const tecnico = await this.technicianRepo.findOne({ where: { id: payload.sub } });
     if (!tecnico || !tecnico.ativo) throw new UnauthorizedException('Token inválido');
     // Permissões e função sempre do banco — evita JWT antigo sem novas permissões após deploy
+    console.log('[validarToken]', { userId: tecnico.id, role: tecnico.funcao, tenantId: tecnico.tenantId });
     return {
       ...payload,
       tenantId: tecnico.tenantId,

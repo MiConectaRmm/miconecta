@@ -53,7 +53,11 @@ export class AlertsController {
   @RequirePermissions('alerts:read')
   @ApiOperation({ summary: 'Listar alertas do tenant' })
   listar(@Req() req: any, @Query() filtros: any) {
-    const tenantId = filtros.tenantId || req.tenantId || req.user.tenantId;
+    const isSuperRole = ['super_admin', 'admin_maginf', 'admin'].includes(req.user?.role);
+    const tenantId = isSuperRole
+      ? (filtros.tenantId || req.tenantId || req.user.tenantId)
+      : (req.tenantId || req.user.tenantId);
+    console.log('[alerts:listar]', { userId: req.user?.sub, role: req.user?.role, tenantId });
     return this.service.listarAlertas(tenantId, filtros);
   }
 
@@ -62,8 +66,12 @@ export class AlertsController {
   @Get('contagem')
   @RequirePermissions('alerts:read')
   @ApiOperation({ summary: 'Contar alertas ativos' })
-  contar(@Req() req: any) {
-    const tenantId = req.tenantId || req.user.tenantId;
+  contar(@Req() req: any, @Query() filtros: any) {
+    const isSuperRole = ['super_admin', 'admin_maginf', 'admin'].includes(req.user?.role);
+    const tenantId = isSuperRole
+      ? (filtros?.tenantId || req.tenantId || req.user.tenantId)
+      : (req.tenantId || req.user.tenantId);
+    console.log('[alerts:contagem]', { userId: req.user?.sub, role: req.user?.role, tenantId });
     return this.service.contarAlertas(tenantId);
   }
 

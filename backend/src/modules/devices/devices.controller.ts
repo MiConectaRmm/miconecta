@@ -24,15 +24,25 @@ export class DevicesController {
   @RequirePermissions('devices:read')
   @ApiOperation({ summary: 'Listar dispositivos do tenant' })
   listar(@Req() req: any, @Query() filtros: DeviceFilterDto) {
-    const tenantId = filtros.tenantId || req.tenantId || req.user.tenantId;
+    // Para superadmin com tenantId explícito no filtro, respeitar
+    // Para técnicos, sempre usar o tenantId do guard/jwt
+    const isSuperRole = ['super_admin', 'admin_maginf', 'admin'].includes(req.user?.role);
+    const tenantId = isSuperRole
+      ? (filtros.tenantId || req.tenantId || req.user.tenantId)
+      : (req.tenantId || req.user.tenantId);
+    console.log('[devices:listar]', { userId: req.user?.sub, role: req.user?.role, tenantId });
     return this.service.listarDispositivos(tenantId, filtros);
   }
 
   @Get('resumo')
   @RequirePermissions('devices:read')
   @ApiOperation({ summary: 'Resumo dos dispositivos (online/offline/alerta)' })
-  resumo(@Req() req: any) {
-    const tenantId = req.tenantId || req.user.tenantId;
+  resumo(@Req() req: any, @Query() filtros: any) {
+    const isSuperRole = ['super_admin', 'admin_maginf', 'admin'].includes(req.user?.role);
+    const tenantId = isSuperRole
+      ? (filtros?.tenantId || req.tenantId || req.user.tenantId)
+      : (req.tenantId || req.user.tenantId);
+    console.log('[devices:resumo]', { userId: req.user?.sub, role: req.user?.role, tenantId });
     return this.service.resumo(tenantId);
   }
 

@@ -55,7 +55,15 @@ export class TenantsService {
     }
 
     const tecnico = await this.technicianRepo.findOne({ where: { id: user.sub } });
-    const ids = (tecnico?.tenantsAtribuidos ?? []).filter(Boolean);
+
+    // Combinar tenant próprio + tenants atribuídos (garantir que o técnico
+    // sempre vê pelo menos o tenant ao qual pertence)
+    const atribuidos = (tecnico?.tenantsAtribuidos ?? []).filter(Boolean);
+    const ids = [...new Set([
+      ...(tecnico?.tenantId ? [tecnico.tenantId] : []),
+      ...atribuidos,
+    ])];
+
     if (ids.length === 0) {
       return [];
     }
@@ -75,6 +83,8 @@ export class TenantsService {
       return false;
     }
     if (this.isTecnicoCampo(user)) {
+      // Sempre pode ler o próprio tenant
+      if (user.tenantId === id) return true;
       const tecnico = await this.technicianRepo.findOne({ where: { id: user.sub } });
       const ids = tecnico?.tenantsAtribuidos ?? [];
       return ids.includes(id);

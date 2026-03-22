@@ -41,15 +41,23 @@ export class TicketsController {
   @RequirePermissions('tickets:read')
   @ApiOperation({ summary: 'Listar tickets do tenant' })
   async listar(@Req() req: any, @Query() filtros: TicketFilterDto) {
-    const tenantId = filtros.tenantId || req.tenantId || req.user.tenantId;
+    const isSuperRole = ['super_admin', 'admin_maginf', 'admin'].includes(req.user?.role);
+    const tenantId = isSuperRole
+      ? (filtros.tenantId || req.tenantId || req.user.tenantId)
+      : (req.tenantId || req.user.tenantId);
+    console.log('[tickets:listar]', { userId: req.user?.sub, role: req.user?.role, tenantId });
     return this.ticketsService.listar(tenantId, filtros);
   }
 
   @Get('contagem')
   @RequirePermissions('tickets:read')
   @ApiOperation({ summary: 'Contagem de tickets por status' })
-  async contagem(@Req() req: any) {
-    const tenantId = req.tenantId || req.user.tenantId;
+  async contagem(@Req() req: any, @Query() filtros: any) {
+    const isSuperRole = ['super_admin', 'admin_maginf', 'admin'].includes(req.user?.role);
+    const tenantId = isSuperRole
+      ? (filtros?.tenantId || req.tenantId || req.user.tenantId)
+      : (req.tenantId || req.user.tenantId);
+    console.log('[tickets:contagem]', { userId: req.user?.sub, role: req.user?.role, tenantId });
     return this.ticketsService.contagem(tenantId);
   }
 
