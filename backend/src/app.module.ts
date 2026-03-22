@@ -76,8 +76,20 @@ const entities = [
           synchronize: true, // TODO: migrar para migrations antes de dados reais em produção
           logging: false,
           ssl: useSsl ? { rejectUnauthorized: false } : false,
-          retryAttempts: 5,
+          retryAttempts: 10,
           retryDelay: 3000,
+          keepConnectionAlive: true,
+          extra: {
+            // Pool config — essencial para Fly.io Postgres (flycast proxy)
+            max: 10,
+            min: 2,
+            idleTimeoutMillis: 30000,       // fecha idle após 30s (flycast pode fechar em 60s)
+            connectionTimeoutMillis: 10000,  // timeout 10s para obter conexão
+            allowExitOnIdle: false,
+            // Keepalive para evitar "Connection terminated unexpectedly"
+            keepAlive: true,
+            keepAliveInitialDelayMillis: 10000,
+          },
         };
       },
     }),
