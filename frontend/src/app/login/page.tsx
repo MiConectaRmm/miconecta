@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Monitor, Eye, EyeOff, Loader2 } from 'lucide-react'
+import Image from 'next/image'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { authApi } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth.store'
 
@@ -56,8 +57,15 @@ export default function LoginPage() {
     <div className="min-h-screen bg-dark-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-500 rounded-2xl mb-4 shadow-lg shadow-brand-500/20">
-            <Monitor className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-4">
+            <Image
+              src="/branding/logo-mark.png"
+              alt="MIConecta"
+              width={80}
+              height={80}
+              className="rounded-2xl"
+              priority
+            />
           </div>
           <h1 className="text-3xl font-bold text-white">MIConecta</h1>
           <p className="text-dark-400 mt-1">by Maginf Tecnologia</p>

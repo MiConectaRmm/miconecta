@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import {
   Monitor, Ticket, MessageSquare, BarChart3,
   History, Bell, LogOut, Package, Radio, Users,
@@ -55,9 +56,13 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       <header className="h-14 bg-dark-900 border-b border-dark-700 flex items-center justify-between px-6 sticky top-0 z-50">
         <div className="flex items-center gap-8">
           <Link href="/portal" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center">
-              <Monitor className="w-4 h-4 text-white" />
-            </div>
+            <Image
+              src="/branding/logo-mark.png"
+              alt="MIConecta"
+              width={32}
+              height={32}
+              className="rounded-lg"
+            />
             <span className="text-white font-bold">MIConecta</span>
             <span className="text-dark-500 text-xs">Portal</span>
           </Link>

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
@@ -61,9 +62,13 @@ export default function Sidebar() {
     <aside className="fixed left-0 top-0 h-screen w-64 bg-dark-900 border-r border-dark-700 flex flex-col z-50">
       <div className="p-6 border-b border-dark-700">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-brand-500 rounded-lg flex items-center justify-center">
-            <Monitor className="w-6 h-6 text-white" />
-          </div>
+          <Image
+            src="/branding/logo-mark.png"
+            alt="MIConecta"
+            width={40}
+            height={40}
+            className="rounded-lg"
+          />
           <div>
             <h1 className="text-lg font-bold text-white">MIConecta</h1>
             <p className="text-xs text-dark-400">Enterprise</p>
