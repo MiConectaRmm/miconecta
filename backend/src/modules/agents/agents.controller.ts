@@ -39,8 +39,13 @@ export class AgentsController {
   @Get('download/msi')
   @ApiOperation({ summary: 'Download do instalador MSI do agente (público)' })
   async downloadMsi(@Res() res: Response) {
-    const msiPath = path.join(process.cwd(), 'uploads', 'packages', 'MIConectaSetup.msi');
-    if (!fs.existsSync(msiPath)) {
+    // Procurar MSI em assets/ (commitado no git) ou uploads/packages/ (volume persistente)
+    const candidates = [
+      path.join(process.cwd(), 'assets', 'MIConectaSetup.msi'),
+      path.join(process.cwd(), 'uploads', 'packages', 'MIConectaSetup.msi'),
+    ];
+    const msiPath = candidates.find(p => fs.existsSync(p));
+    if (!msiPath) {
       return res.status(404).json({ message: 'Instalador não disponível. Entre em contato com o suporte.' });
     }
     res.setHeader('Content-Type', 'application/octet-stream');

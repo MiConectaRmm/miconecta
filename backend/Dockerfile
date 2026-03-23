@@ -32,6 +32,7 @@ RUN mkdir -p /app/uploads && chown -R nestjs:nodejs /app/uploads
 COPY --from=deps --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 COPY --chown=nestjs:nodejs package*.json ./
+COPY --chown=nestjs:nodejs assets ./assets
 
 USER nestjs
 
