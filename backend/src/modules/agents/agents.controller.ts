@@ -1,7 +1,10 @@
 import {
   Controller, Post, Get, Body, Req, Param, Delete,
-  UseGuards, Headers,
+  UseGuards, Headers, Res,
 } from '@nestjs/common';
+import { Response } from 'express';
+import * as path from 'path';
+import * as fs from 'fs';
 import { ConfigService } from '@nestjs/config';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -31,6 +34,18 @@ export class AgentsController {
   async downloadInfo(@Req() req: any) {
     const tenantId = req.tenantId || req.user.tenantId;
     return this.agentsService.getDownloadInfo(tenantId, this.configService);
+  }
+
+  @Get('download/msi')
+  @ApiOperation({ summary: 'Download do instalador MSI do agente (público)' })
+  async downloadMsi(@Res() res: Response) {
+    const msiPath = path.join(process.cwd(), 'uploads', 'packages', 'MIConectaSetup.msi');
+    if (!fs.existsSync(msiPath)) {
+      return res.status(404).json({ message: 'Instalador não disponível. Entre em contato com o suporte.' });
+    }
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', 'attachment; filename="MIConectaSetup.msi"');
+    return res.sendFile(msiPath);
   }
 
   @Post('provision')
