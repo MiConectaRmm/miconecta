@@ -24,7 +24,7 @@ export class AgentsController {
 
   @Get('download-info')
   @UseGuards(JwtAuthGuard, TenantAccessGuard, RolesGuard, PermissionsGuard)
-  @Roles('super_admin', 'admin_maginf', 'admin')
+  @Roles('super_admin', 'admin_maginf', 'admin', 'tecnico')
   @RequirePermissions('devices:read')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Obter informações de download do agente para o tenant' })
@@ -46,7 +46,7 @@ export class AgentsController {
 
   @Get('installation-tokens')
   @UseGuards(JwtAuthGuard, TenantAccessGuard, RolesGuard, PermissionsGuard)
-  @Roles('super_admin', 'admin_maginf', 'admin')
+  @Roles('super_admin', 'admin_maginf', 'admin', 'tecnico')
   @RequirePermissions('devices:read')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Listar tokens de instalação do tenant' })
@@ -79,7 +79,7 @@ export class AgentsController {
 
   @Get('agents')
   @UseGuards(JwtAuthGuard, TenantAccessGuard, RolesGuard, PermissionsGuard)
-  @Roles('super_admin', 'admin_maginf', 'admin')
+  @Roles('super_admin', 'admin_maginf', 'admin', 'tecnico')
   @RequirePermissions('devices:read')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Listar agentes do tenant' })
@@ -90,7 +90,7 @@ export class AgentsController {
 
   @Get('install-script/:tenantId')
   @UseGuards(JwtAuthGuard, TenantAccessGuard, RolesGuard, PermissionsGuard)
-  @Roles('super_admin', 'admin_maginf', 'admin')
+  @Roles('super_admin', 'admin_maginf', 'admin', 'tecnico')
   @RequirePermissions('devices:read')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Gerar script de instalação (.bat ou .ps1) para o tenant' })

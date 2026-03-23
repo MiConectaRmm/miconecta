@@ -18,32 +18,63 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Mutex para evitar múltiplos refreshes simultâneos (race condition)
+let isRefreshing = false;
+let refreshSubscribers: ((token: string) => void)[] = [];
+
+function subscribeTokenRefresh(cb: (token: string) => void) {
+  refreshSubscribers.push(cb);
+}
+
+function onRefreshed(token: string) {
+  refreshSubscribers.forEach((cb) => cb(token));
+  refreshSubscribers = [];
+}
+
 // Interceptor: refresh token on 401
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
     if (error.response?.status === 401 && !originalRequest._retry && typeof window !== 'undefined') {
-      originalRequest._retry = true;
       const refreshToken = localStorage.getItem('miconecta_refresh');
-      if (refreshToken) {
-        try {
-          const { data } = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
-          localStorage.setItem('miconecta_token', data.access_token);
-          localStorage.setItem('miconecta_refresh', data.refresh_token);
-          localStorage.setItem('miconecta_user', JSON.stringify(data.user));
-          originalRequest.headers.Authorization = `Bearer ${data.access_token}`;
-          return api(originalRequest);
-        } catch {
-          localStorage.removeItem('miconecta_token');
-          localStorage.removeItem('miconecta_refresh');
-          localStorage.removeItem('miconecta_user');
-          window.location.href = '/login';
-        }
-      } else {
+      if (!refreshToken) {
         localStorage.removeItem('miconecta_token');
         localStorage.removeItem('miconecta_user');
         window.location.href = '/login';
+        return Promise.reject(error);
+      }
+
+      if (isRefreshing) {
+        // Outro request já está fazendo refresh — esperar ele terminar
+        return new Promise((resolve) => {
+          subscribeTokenRefresh((newToken: string) => {
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            resolve(api(originalRequest));
+          });
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const { data } = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
+        const newToken = data.access_token;
+        localStorage.setItem('miconecta_token', newToken);
+        localStorage.setItem('miconecta_refresh', data.refresh_token);
+        localStorage.setItem('miconecta_user', JSON.stringify(data.user));
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        onRefreshed(newToken);
+        return api(originalRequest);
+      } catch {
+        localStorage.removeItem('miconecta_token');
+        localStorage.removeItem('miconecta_refresh');
+        localStorage.removeItem('miconecta_user');
+        window.location.href = '/login';
+        return Promise.reject(error);
+      } finally {
+        isRefreshing = false;
       }
     }
     return Promise.reject(error);
