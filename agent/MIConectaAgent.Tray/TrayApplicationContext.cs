@@ -20,23 +20,31 @@ public class TrayApplicationContext : ApplicationContext
     private readonly System.Windows.Forms.Timer _statusTimer;
     private bool _serviceRunning = false;
 
+    // Chat
+    private ChatForm? _chatForm;
+    private ChatApiClient? _chatApi;
+    private readonly Dictionary<string, string> _agentConfig = [];
+
     private const string SERVICE_NAME = "MIConectaRMMAgent";
     private const string PORTAL_URL = "https://app.maginf.com.br";
-    private const string LOG_DIR = @"C:\Program Files\MIConectaRMM\logs";
-    private const string CONFIG_PATH = @"C:\Program Files\MIConectaRMM\agent.config";
+    private const string LOG_DIR = @"C:\Program Files\MIConecta\logs";
+    private const string CONFIG_PATH = @"C:\Program Files\MIConecta\agent.config";
     private static readonly string ICON_PATH = Path.Combine(AppContext.BaseDirectory, "icon.ico");
 
     public TrayApplicationContext()
     {
+        CarregarConfig();
+        InicializarChatApi();
+
         _trayIcon = new NotifyIcon
         {
             Icon = File.Exists(ICON_PATH) ? new Icon(ICON_PATH) : SystemIcons.Application,
-            Text = "MIConectaRMM - Verificando...",
+            Text = "MIConecta - Verificando...",
             Visible = true,
             ContextMenuStrip = CriarMenu(),
         };
 
-        _trayIcon.DoubleClick += (s, e) => AbrirPortal();
+        _trayIcon.DoubleClick += (s, e) => AbrirChat();
 
         // Timer para verificar status do serviço
         _statusTimer = new System.Windows.Forms.Timer { Interval = 5000 };
@@ -44,7 +52,34 @@ public class TrayApplicationContext : ApplicationContext
         _statusTimer.Start();
 
         AtualizarStatus();
-        MostrarNotificacao("MIConectaRMM", "Agente ativo na bandeja do sistema.");
+        MostrarNotificacao("MIConecta", "Agente ativo na bandeja do sistema. Clique duplo para abrir o chat.");
+    }
+
+    private void CarregarConfig()
+    {
+        try
+        {
+            if (!File.Exists(CONFIG_PATH)) return;
+            foreach (var line in File.ReadAllLines(CONFIG_PATH))
+            {
+                var parts = line.Split('=', 2);
+                if (parts.Length == 2)
+                    _agentConfig[parts[0].Trim()] = parts[1].Trim();
+            }
+        }
+        catch { }
+    }
+
+    private void InicializarChatApi()
+    {
+        var serverUrl = _agentConfig.GetValueOrDefault("ServerUrl", "");
+        var deviceId = _agentConfig.GetValueOrDefault("DeviceId", "");
+        var deviceToken = _agentConfig.GetValueOrDefault("DeviceToken", "");
+
+        if (!string.IsNullOrEmpty(serverUrl) && !string.IsNullOrEmpty(deviceToken))
+        {
+            _chatApi = new ChatApiClient(serverUrl, deviceId, deviceToken);
+        }
     }
 
     private ContextMenuStrip CriarMenu()
@@ -64,6 +99,10 @@ public class TrayApplicationContext : ApplicationContext
 
         var suporteItem = new ToolStripMenuItem("Solicitar Suporte", null, (s, e) => SolicitarSuporte());
         menu.Items.Add(suporteItem);
+
+        var chatItem = new ToolStripMenuItem("💬 Chat de Suporte", null, (s, e) => AbrirChat());
+        chatItem.Font = new Font(chatItem.Font, FontStyle.Bold);
+        menu.Items.Add(chatItem);
 
         menu.Items.Add(new ToolStripSeparator());
 
@@ -92,7 +131,7 @@ public class TrayApplicationContext : ApplicationContext
             _serviceRunning = sc.Status == ServiceControllerStatus.Running;
 
             var statusText = _serviceRunning ? "Online" : "Offline";
-            _trayIcon.Text = $"MIConectaRMM - {statusText}";
+            _trayIcon.Text = $"MIConecta - {statusText}";
 
             var statusItem = _trayIcon.ContextMenuStrip?.Items["status"] as ToolStripMenuItem;
             if (statusItem != null)
@@ -103,7 +142,7 @@ public class TrayApplicationContext : ApplicationContext
         }
         catch
         {
-            _trayIcon.Text = "MIConectaRMM - Serviço não encontrado";
+            _trayIcon.Text = "MIConecta - Serviço não encontrado";
         }
     }
 
@@ -123,6 +162,33 @@ public class TrayApplicationContext : ApplicationContext
             Process.Start(new ProcessStartInfo($"{PORTAL_URL}/portal/tickets") { UseShellExecute = true });
         }
         catch { }
+    }
+
+    private void AbrirChat()
+    {
+        if (_chatApi == null)
+        {
+            // Config não carregado / agente não registrado — retentar
+            CarregarConfig();
+            InicializarChatApi();
+
+            if (_chatApi == null)
+            {
+                MessageBox.Show(
+                    "O agente ainda não está registrado no servidor.\n" +
+                    "Aguarde alguns minutos e tente novamente.",
+                    "MIConecta Chat",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+        }
+
+        if (_chatForm == null || _chatForm.IsDisposed)
+        {
+            _chatForm = new ChatForm(_chatApi, Environment.MachineName);
+        }
+
+        _chatForm.ShowChat();
     }
 
     private void AbrirLogs()

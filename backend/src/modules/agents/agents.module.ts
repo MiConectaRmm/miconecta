@@ -9,14 +9,16 @@ import { Agent } from '../../database/entities/agent.entity';
 import { InstallationToken } from '../../database/entities/installation-token.entity';
 import { DeviceMetric } from '../../database/entities/device-metric.entity';
 import { DeviceInventory } from '../../database/entities/device-inventory.entity';
+import { Ticket } from '../../database/entities/ticket.entity';
 import { AlertsModule } from '../alerts/alerts.module';
+import { ChatModule } from '../chat/chat.module';
 import { AgentsController } from './agents.controller';
 import { AgentsService } from './agents.service';
 import { AgentAuthGuard } from '../auth/guards/agent-auth.guard';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Device, Organization, Tenant, Agent, InstallationToken, DeviceMetric, DeviceInventory]),
+    TypeOrmModule.forFeature([Device, Organization, Tenant, Agent, InstallationToken, DeviceMetric, DeviceInventory, Ticket]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -25,6 +27,7 @@ import { AgentAuthGuard } from '../auth/guards/agent-auth.guard';
       }),
     }),
     AlertsModule,
+    ChatModule,
   ],
   controllers: [AgentsController],
   providers: [AgentsService, AgentAuthGuard],
