@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
-     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
-     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
 
   <Package Name="MIConecta Agent"
            Manufacturer="Maginf Tecnologia"
@@ -38,9 +37,11 @@
       </Directory>
     </StandardDirectory>
 
-    <!-- Agent files: ALL files from publish\agent (exe + 250+ DLLs) -->
+    <!-- Agent files: ALL files from publish\agent EXCEPT the main exe (handled in AgentService component) -->
     <ComponentGroup Id="AgentFiles" Directory="INSTALLFOLDER">
-      <Files Include="$(var.PublishDir)\agent\**" />
+      <Files Include="$(var.PublishDir)\agent\**">
+        <Exclude Files="$(var.PublishDir)\agent\MIConectaAgent.exe" />
+      </Files>
     </ComponentGroup>
 
     <!-- Tray files: in subfolder tray\ to avoid DLL conflicts with agent -->
@@ -48,8 +49,12 @@
       <Files Include="$(var.PublishDir)\tray\**" />
     </ComponentGroup>
 
-    <!-- Service definition — separate component referencing the agent exe already installed above -->
+    <!-- Service component: contains the agent exe + service definition -->
     <Component Id="AgentService" Directory="INSTALLFOLDER" Guid="A1B2C3D4-E5F6-7A8B-9C0D-E1F2A3B4C5D6">
+      <File Id="AgentExe"
+            Source="$(var.PublishDir)\agent\MIConectaAgent.exe"
+            KeyPath="yes" />
+
       <ServiceInstall Id="MIConectaService"
                       Name="MIConectaRMMAgent"
                       DisplayName="MIConecta Agent"
@@ -57,26 +62,13 @@
                       Type="ownProcess"
                       Start="auto"
                       ErrorControl="normal"
-                      Account="LocalSystem">
-        <util:ServiceConfig FirstFailureActionType="restart"
-                            SecondFailureActionType="restart"
-                            ThirdFailureActionType="restart"
-                            RestartServiceDelayInSeconds="60"
-                            ResetPeriodInDays="1" />
-      </ServiceInstall>
+                      Account="LocalSystem" />
 
-      <ServiceControl Id="StartMIConectaService"
+      <ServiceControl Id="StopMIConectaService"
                       Name="MIConectaRMMAgent"
                       Stop="both"
                       Remove="uninstall"
-                      Wait="yes" />
-
-      <RegistryValue Root="HKLM"
-                     Key="SOFTWARE\MIConecta"
-                     Name="ServiceInstalled"
-                     Type="integer"
-                     Value="1"
-                     KeyPath="yes" />
+                      Wait="no" />
     </Component>
 
     <!-- WriteConfig.ps1 script -->
