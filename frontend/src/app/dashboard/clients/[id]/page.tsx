@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   Building2, ArrowLeft, Loader2, AlertCircle, Monitor, Users,
-  AlertTriangle, Ticket, Terminal, Package, Wrench, MonitorSmartphone,
+  AlertTriangle, Ticket, Terminal, Package, Wrench, MonitorSmartphone, Bot,
 } from 'lucide-react'
 import { tenantsApi, agentsApi, devicesApi, usersApi } from '@/lib/api'
 
@@ -18,6 +18,7 @@ import TabScripts from './tabs/TabScripts'
 import TabSoftware from './tabs/TabSoftware'
 import TabPatches from './tabs/TabPatches'
 import TabSessoes from './tabs/TabSessoes'
+import TabAgente from './tabs/TabAgente'
 
 interface TenantDetail {
   id: string
@@ -63,6 +64,7 @@ const TABS = [
   { id: 'cadastro', label: 'Cadastro', icon: Building2 },
   { id: 'usuarios', label: 'Usuários Portal', icon: Users },
   { id: 'dispositivos', label: 'Dispositivos', icon: Monitor },
+  { id: 'agente', label: 'Instalar Agente', icon: Bot },
   { id: 'alertas', label: 'Alertas', icon: AlertTriangle },
   { id: 'tickets', label: 'Tickets', icon: Ticket },
   { id: 'scripts', label: 'Scripts', icon: Terminal },
@@ -286,6 +288,7 @@ export default function ClientDetailPage() {
             <TabUsuarios tenantId={id} tenantNome={tenant.nome} maxUsuarios={tenant.maxUsuarios} />
           )}
           {activeTab === 'dispositivos' && <TabDispositivos tenantId={id} />}
+          {activeTab === 'agente' && <TabAgente tenantId={id} tenantNome={tenant.nome} />}
           {activeTab === 'alertas' && <TabAlertas tenantId={id} />}
           {activeTab === 'tickets' && <TabTickets tenantId={id} />}
           {activeTab === 'scripts' && <TabScripts tenantId={id} />}
