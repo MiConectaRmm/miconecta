@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger, forwardRef, Inject } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
@@ -7,6 +7,7 @@ import { RemoteSessionLog, RemoteSessionLogTipo } from '../../database/entities/
 import { ConsentRecord, ConsentTipo } from '../../database/entities/consent-record.entity';
 import { Device } from '../../database/entities/device.entity';
 import { AccessPolicyDto, AccessPolicyType } from './dto/remote-session.dto';
+import { RmmGateway } from '../gateway/rmm.gateway';
 
 /**
  * Políticas padrão por tipo de dispositivo.
@@ -68,6 +69,8 @@ export class RemoteSessionsService {
     private readonly consentRepo: Repository<ConsentRecord>,
     @InjectRepository(Device)
     private readonly deviceRepo: Repository<Device>,
+    @Inject(forwardRef(() => RmmGateway))
+    private readonly gateway: RmmGateway,
   ) {}
 
   // ══════════════════════════════════════════════════
@@ -223,6 +226,32 @@ export class RemoteSessionsService {
       `Sessão ${saved.id} solicitada: device=${device.hostname} policy=${saved.policyTipo} consent=${policy.exigeConsentimento}`,
     );
 
+    // ── Disparar evento para o agente via WebSocket ──
+    if (policy.exigeConsentimento) {
+      // Estação: enviar pedido de consentimento ao agente
+      const agentNotified = this.gateway.emitToAgent(dados.deviceId, 'remote.request', {
+        sessionId: saved.id,
+        tecnico: dados.technicianId,
+        motivo: dados.motivo || '',
+      });
+      if (!agentNotified) {
+        this.logger.warn(`Agente ${dados.deviceId} não está conectado via WS — consentimento pendente por polling`);
+      }
+      // Notifica dashboard que sessão está aguardando consentimento
+      this.gateway.emitToDashboard('session:updated', {
+        id: saved.id,
+        deviceId: dados.deviceId,
+        status: RemoteSessionStatus.CONSENTIMENTO_PENDENTE,
+      });
+    } else {
+      // Servidor: sessão já consentida automaticamente → notifica frontend para abrir RustDesk
+      this.gateway.emitToDashboard('session:started', {
+        sessionId: saved.id,
+        deviceId: dados.deviceId,
+        rustdeskId: device.rustdeskId,
+      });
+    }
+
     return this.buscar(saved.id, dados.tenantId);
   }
 
@@ -283,6 +312,14 @@ export class RemoteSessionsService {
         detalhes: { usuarioLocal: dados.usuarioLocal, ip: dados.ip },
       });
       this.logger.log(`Sessão ${sessionId} CONSENTIDA por ${dados.usuarioLocal}`);
+
+      // Buscar rustdeskId do dispositivo para enviar ao frontend
+      const device = await this.deviceRepo.findOne({ where: { id: session.deviceId } });
+      this.gateway.emitToDashboard('session:started', {
+        sessionId,
+        deviceId: session.deviceId,
+        rustdeskId: device?.rustdeskId,
+      });
     } else {
       await this.sessionRepo.update(sessionId, {
         status: RemoteSessionStatus.RECUSADA,
@@ -295,6 +332,11 @@ export class RemoteSessionsService {
         detalhes: { usuarioLocal: dados.usuarioLocal },
       });
       this.logger.log(`Sessão ${sessionId} RECUSADA por ${dados.usuarioLocal}`);
+
+      this.gateway.emitToDashboard('session:denied', {
+        sessionId,
+        deviceId: session.deviceId,
+      });
     }
 
     return this.sessionRepo.findOne({ where: { id: sessionId } });

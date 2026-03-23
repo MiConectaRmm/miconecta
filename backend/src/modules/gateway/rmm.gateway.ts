@@ -7,11 +7,12 @@ import {
   MessageBody,
   ConnectedSocket,
 } from '@nestjs/websockets';
-import { Logger } from '@nestjs/common';
+import { Logger, forwardRef, Inject } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Device, DeviceStatus } from '../../database/entities/device.entity';
+import { RemoteSessionsService } from '../remote-sessions/remote-sessions.service';
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -28,6 +29,8 @@ export class RmmGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     @InjectRepository(Device)
     private readonly deviceRepo: Repository<Device>,
+    @Inject(forwardRef(() => RemoteSessionsService))
+    private readonly sessionsService: RemoteSessionsService,
   ) {}
 
   handleConnection(client: Socket) {
@@ -127,14 +130,21 @@ export class RmmGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to('dashboard').emit('script:started', data);
   }
 
-  // ── Consentimento de sessão remota ──
+  // ── Consentimento de sessão remota (agente → backend) ──
   @SubscribeMessage('remote.consent')
-  handleRemoteConsent(
+  async handleRemoteConsent(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { sessionId: string; deviceId: string; consentido: boolean },
   ) {
     this.logger.log(`Consentimento recebido: sessionId=${data.sessionId} consentido=${data.consentido}`);
-    this.server.to('dashboard').emit('remote:consent', data);
+    try {
+      await this.sessionsService.registrarConsentimento(data.sessionId, data.consentido, {
+        deviceId: data.deviceId,
+        usuarioLocal: 'usuário_dispositivo',
+      });
+    } catch (err) {
+      this.logger.error(`Erro ao registrar consentimento sessão ${data.sessionId}: ${err.message}`);
+    }
     return { status: 'ok' };
   }
 
