@@ -23,8 +23,8 @@
   <Property Id="SERVER_URL" Value="https://api.maginf.com.br/api/v1" />
     <Property Id="TENANT_ID" Secure="yes" />
     <Property Id="PROVISION_TOKEN" Secure="yes" />
-    <Property Id="RUSTDESK_SERVER" Value="136.248.114.218" />
-    <Property Id="RUSTDESK_KEY" Value="ev3ic04E+VsgunfupaellTSWgSzmHiQL2H5ywzBE+yI=" />
+    <Property Id="RUSTDESK_SERVER" Value="SEU_IP_ORACLE_AQUI" />
+    <Property Id="RUSTDESK_KEY" Value="SUA_CHAVE_RUSTDESK_AQUI" />
   <WixVariable Id="WixUILicenseRtf" Value="..\assets\license.rtf" />
   <WixVariable Id="WixUIBannerBmp" Value="..\assets\installer-banner.bmp" />
   <WixVariable Id="WixUIDialogBmp" Value="..\assets\installer-dialog.bmp" />

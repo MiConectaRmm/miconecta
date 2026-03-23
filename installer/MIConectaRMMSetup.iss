@@ -25,7 +25,7 @@ Filename: "sc.exe"; Parameters: "description MIConectaRMMAgent ""Agente de monit
 Filename: "sc.exe"; Parameters: "start MIConectaRMMAgent"; Flags: runhidden
 
 ; Configurar RustDesk (se instalado)
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""$configDir = Join-Path $env:APPDATA 'RustDesk\config'; if (Test-Path $configDir) {{ $toml = Join-Path $configDir 'RustDesk2.toml'; $content = 'rendezvous_server = \'136.248.114.218\'' + [Environment]::NewLine + 'key = \'ev3ic04E+VsgunfupaellTSWgSzmHiQL2H5ywzBE+yI=\''; Set-Content -Path $toml -Value $content }}"""; Flags: runhidden
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""$configDir = Join-Path $env:APPDATA 'RustDesk\config'; if (Test-Path $configDir) {{ $toml = Join-Path $configDir 'RustDesk2.toml'; $content = 'rendezvous_server = \'SEU_IP_ORACLE_AQUI\'' + [Environment]::NewLine + 'key = \'SUA_CHAVE_RUSTDESK_AQUI\''; Set-Content -Path $toml -Value $content }}"""; Flags: runhidden
 
 [UninstallRun]
 Filename: "sc.exe"; Parameters: "stop MIConectaRMMAgent"; Flags: runhidden

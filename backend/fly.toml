@@ -2,6 +2,7 @@ app = "miconecta-backend"
 primary_region = "gru"
 
 [build]
+  dockerfile = "Dockerfile"
 
 [env]
   PORT = "3000"

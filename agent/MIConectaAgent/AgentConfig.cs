@@ -11,8 +11,8 @@ public class AgentConfig
     public string ProvisionToken { get; set; } = "";
 
     // ── RustDesk ──
-    public string RustDeskServer { get; set; } = "136.248.114.218";
-    public string RustDeskKey { get; set; } = "ev3ic04E+VsgunfupaellTSWgSzmHiQL2H5ywzBE+yI=";
+    public string RustDeskServer { get; set; } = "SEU_IP_ORACLE_AQUI";
+    public string RustDeskKey { get; set; } = "SUA_CHAVE_RUSTDESK_AQUI";
 
     // ── Intervalos (segundos) ──
     public int HeartbeatIntervalSeconds { get; set; } = 60;

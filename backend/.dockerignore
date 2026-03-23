@@ -8,3 +8,4 @@ dist
 coverage
 test
 .vscode
+uploads/packages
