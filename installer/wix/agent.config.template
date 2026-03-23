@@ -1,6 +1,6 @@
 ServerUrl=https://api.maginf.com.br/api/v1
 TenantId=
 ProvisionToken=
-RustDeskServer=SEU_IP_ORACLE_AQUI
-RustDeskKey=SUA_CHAVE_RUSTDESK_AQUI
+RustDeskServer=136.248.114.218
+RustDeskKey=ev3ic04E+VsgunfupaellTSWgSzmHiQL2H5ywzBE+yI=
 HeartbeatIntervalSeconds=60
