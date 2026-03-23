@@ -29,7 +29,7 @@ export class TechniciansController {
   }
 
   @Get()
-  @Roles('super_admin', 'admin_maginf', 'admin')
+  @Roles('super_admin', 'admin_maginf', 'admin', 'tecnico_senior', 'tecnico')
   @RequirePermissions('users:read')
   @ApiOperation({ summary: 'Listar técnicos' })
   async listar(@Query('tenantId') tenantId?: string, @Query('funcao') funcao?: TechnicianRole, @Query('ativo') ativo?: boolean) {
@@ -37,7 +37,7 @@ export class TechniciansController {
   }
 
   @Get('contagem')
-  @Roles('super_admin', 'admin_maginf', 'admin')
+  @Roles('super_admin', 'admin_maginf', 'admin', 'tecnico_senior', 'tecnico')
   @RequirePermissions('users:read')
   @ApiOperation({ summary: 'Contagem de técnicos' })
   async contagem() {
@@ -45,7 +45,7 @@ export class TechniciansController {
   }
 
   @Get(':id')
-  @Roles('super_admin', 'admin_maginf', 'admin', 'tecnico_senior')
+  @Roles('super_admin', 'admin_maginf', 'admin', 'tecnico_senior', 'tecnico')
   @RequirePermissions('users:read')
   @ApiOperation({ summary: 'Buscar técnico por ID' })
   async buscar(@Param('id') id: string) {
@@ -55,7 +55,7 @@ export class TechniciansController {
   @Put(':id')
   @Roles('super_admin', 'admin_maginf', 'admin')
   @RequirePermissions('users:write')
-  @ApiOperation({ summary: 'Atualizar técnico' })
+  @ApiOperation({ summary: 'Atualizar técnico (somente admins)' })
   async atualizar(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateTechnicianDto) {
     return this.techniciansService.atualizar(id, dto, req.user.role || req.user.funcao);
   }
@@ -63,7 +63,7 @@ export class TechniciansController {
   @Delete(':id')
   @Roles('super_admin', 'admin_maginf', 'admin')
   @RequirePermissions('users:write')
-  @ApiOperation({ summary: 'Desativar técnico' })
+  @ApiOperation({ summary: 'Desativar técnico (somente admins)' })
   async desativar(@Param('id') id: string) {
     return this.techniciansService.desativar(id);
   }
@@ -71,7 +71,7 @@ export class TechniciansController {
   @Put(':id/reativar')
   @Roles('super_admin', 'admin_maginf', 'admin')
   @RequirePermissions('users:write')
-  @ApiOperation({ summary: 'Reativar técnico' })
+  @ApiOperation({ summary: 'Reativar técnico (somente admins)' })
   async reativar(@Param('id') id: string) {
     return this.techniciansService.reativar(id);
   }

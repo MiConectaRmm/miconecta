@@ -61,7 +61,7 @@ export class DevicesController {
   }
 
   @Delete(':id')
-  @Roles('super_admin', 'admin_maginf', 'admin')
+  @Roles('super_admin', 'admin_maginf', 'admin', 'tecnico_senior', 'tecnico')
   @RequirePermissions('devices:write')
   @ApiOperation({ summary: 'Remover dispositivo' })
   remover(@Param('id') id: string) {

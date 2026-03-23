@@ -12,16 +12,18 @@ import { RegisterDto } from './dto/register.dto';
 import { JwtPayload } from '../../common/interfaces';
 
 // Mapeamento de roles para permissions
+// Sistema uso interno Maginf — todos os técnicos são de confiança
 const ROLE_PERMISSIONS: Record<string, string[]> = {
-  super_admin: ['*'],
-  admin_maginf: ['tenants:*', 'devices:*', 'tickets:*', 'chat:*', 'scripts:*', 'reports:*', 'audit:*', 'users:*', 'sessions:*', 'alerts:*'],
-  admin: ['tenants:*', 'devices:*', 'tickets:*', 'chat:*', 'scripts:*', 'reports:*', 'audit:*', 'users:*', 'sessions:*', 'alerts:*'],
-  tecnico_senior: ['tenants:read', 'devices:read', 'devices:write', 'devices:remote_access', 'tickets:*', 'chat:*', 'scripts:*', 'reports:read', 'audit:read', 'users:read', 'sessions:*', 'alerts:*'],
-  tecnico: ['tenants:read', 'devices:read', 'devices:remote_access', 'tickets:read', 'tickets:write', 'chat:*', 'scripts:execute', 'users:read', 'alerts:read', 'alerts:acknowledge', 'sessions:initiate'],
-  visualizador: ['tenants:read', 'devices:read', 'tickets:read', 'alerts:read', 'reports:read'],
-  admin_cliente: ['devices:read', 'tickets:*', 'chat:*', 'reports:read', 'users:read', 'users:write', 'users:invite', 'sessions:read', 'alerts:read'],
-  gestor: ['devices:read', 'tickets:read', 'tickets:write', 'chat:*', 'reports:read', 'sessions:read', 'alerts:read'],
-  usuario: ['tickets:read', 'tickets:write', 'chat:read', 'chat:write'],
+  super_admin:    ['*'],
+  admin_maginf:   ['*'],
+  admin:          ['*'],
+  tecnico_senior: ['*'],
+  tecnico:        ['tenants:read', 'devices:*', 'tickets:*', 'chat:*', 'scripts:*', 'reports:read', 'audit:read', 'users:read', 'sessions:*', 'alerts:*', 'agents:*'],
+  visualizador:   ['tenants:read', 'devices:read', 'tickets:read', 'alerts:read', 'reports:read'],
+  // Portal do cliente
+  admin_cliente:  ['devices:read', 'tickets:*', 'chat:*', 'reports:read', 'users:read', 'users:write', 'users:invite', 'sessions:read', 'alerts:read'],
+  gestor:         ['devices:read', 'tickets:read', 'tickets:write', 'chat:*', 'reports:read', 'sessions:read', 'alerts:read'],
+  usuario:        ['tickets:read', 'tickets:write', 'chat:read', 'chat:write'],
 };
 
 @Injectable()

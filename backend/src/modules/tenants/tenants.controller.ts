@@ -21,9 +21,9 @@ export class TenantsController {
   constructor(private readonly service: TenantsService) {}
 
   @Post()
-  @Roles('super_admin', 'admin_maginf', 'admin')
+  @Roles('super_admin', 'admin_maginf', 'admin', 'tecnico')
   @RequirePermissions('tenants:write')
-  @ApiOperation({ summary: 'Criar novo tenant (apenas admins Maginf)' })
+  @ApiOperation({ summary: 'Criar novo tenant (técnicos Maginf)' })
   criar(@Body() dto: CreateTenantDto) {
     return this.service.criarTenant(dto);
   }
@@ -37,7 +37,7 @@ export class TenantsController {
   }
 
   @Get('cnpj/:cnpj')
-  @Roles('super_admin', 'admin_maginf', 'admin')
+  @Roles('super_admin', 'admin_maginf', 'admin', 'tecnico')
   @RequirePermissions('tenants:read')
   @ApiOperation({ summary: 'Consultar dados do CNPJ na Receita Federal (BrasilAPI)' })
   consultarCnpj(@Param('cnpj') cnpj: string) {
@@ -52,7 +52,7 @@ export class TenantsController {
   }
 
   @Put(':id')
-  @Roles('super_admin', 'admin_maginf', 'admin')
+  @Roles('super_admin', 'admin_maginf', 'admin', 'tecnico')
   @RequirePermissions('tenants:write')
   @ApiOperation({ summary: 'Atualizar tenant' })
   atualizar(@Param('id') id: string, @Body() dto: UpdateTenantDto) {
@@ -91,9 +91,9 @@ export class TenantsController {
   }
 
   @Delete('organizacoes/:id')
-  @Roles('super_admin', 'admin_maginf', 'admin')
+  @Roles('super_admin', 'admin_maginf')
   @RequirePermissions('tenants:delete')
-  @ApiOperation({ summary: 'Remover organização' })
+  @ApiOperation({ summary: 'Remover organização (super_admin/admin_maginf)' })
   removerOrg(@Param('id') id: string) {
     return this.service.removerOrganizacao(id);
   }
