@@ -76,8 +76,9 @@ public class TrayApplicationContext : ApplicationContext
         var deviceId = _agentConfig.GetValueOrDefault("DeviceId", "");
         var deviceToken = _agentConfig.GetValueOrDefault("DeviceToken", "");
 
-        if (!string.IsNullOrEmpty(serverUrl) && !string.IsNullOrEmpty(deviceToken))
+        if (!string.IsNullOrEmpty(serverUrl) && !string.IsNullOrEmpty(deviceId) && !string.IsNullOrEmpty(deviceToken))
         {
+            _chatApi?.Dispose();
             _chatApi = new ChatApiClient(serverUrl, deviceId, deviceToken);
         }
     }
@@ -166,25 +167,25 @@ public class TrayApplicationContext : ApplicationContext
 
     private void AbrirChat()
     {
+        // Sempre recarregar config para pegar DeviceId/DeviceToken atualizados
+        CarregarConfig();
+        var oldApi = _chatApi;
+        InicializarChatApi();
+
         if (_chatApi == null)
         {
-            // Config não carregado / agente não registrado — retentar
-            CarregarConfig();
-            InicializarChatApi();
-
-            if (_chatApi == null)
-            {
-                MessageBox.Show(
-                    "O agente ainda não está registrado no servidor.\n" +
-                    "Aguarde alguns minutos e tente novamente.",
-                    "MIConecta Chat",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
+            MessageBox.Show(
+                "O agente ainda não está registrado no servidor.\n" +
+                "Aguarde alguns minutos e tente novamente.",
+                "MIConecta Chat",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
         }
 
-        if (_chatForm == null || _chatForm.IsDisposed)
+        // Recriar form se api mudou ou form fechado
+        if (_chatForm == null || _chatForm.IsDisposed || _chatApi != oldApi)
         {
+            _chatForm?.Dispose();
             _chatForm = new ChatForm(_chatApi, Environment.MachineName);
         }
 

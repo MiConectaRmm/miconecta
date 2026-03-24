@@ -125,9 +125,14 @@ public class ChatApiClient : IDisposable
         {
             var body = new { titulo, descricao, prioridade = "media" };
             var resp = await _http.PostAsJsonAsync("agents/me/tickets", body);
-            if (!resp.IsSuccessStatusCode) return null;
+            var raw = await resp.Content.ReadAsStringAsync();
+            if (!resp.IsSuccessStatusCode)
+            {
+                System.Diagnostics.Debug.WriteLine($"CriarTicket ERRO {resp.StatusCode}: {raw}");
+                return null;
+            }
 
-            var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
+            var json = JsonSerializer.Deserialize<JsonElement>(raw);
             return new ChatTicket
             {
                 Id = json.GetProperty("id").GetString() ?? "",
@@ -135,8 +140,9 @@ public class ChatApiClient : IDisposable
                 Status = "aberto",
             };
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"CriarTicket exception: {ex.Message}");
             return null;
         }
     }

@@ -99,15 +99,16 @@ public class ChatForm : Form
             Text = "✕",
             FlatStyle = FlatStyle.Flat,
             ForeColor = TextWhite,
-            Font = new Font("Segoe UI", 11f),
-            Size = new Size(32, 32),
-            Location = new Point(Width - 44, 16),
+            Font = new Font("Segoe UI", 12f, FontStyle.Bold),
+            Size = new Size(36, 36),
+            Location = new Point(Width - 48, 14),
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
             Cursor = Cursors.Hand,
+            TabIndex = 0,
         };
         closeBtn.FlatAppearance.BorderSize = 0;
-        closeBtn.FlatAppearance.MouseOverBackColor = Color.FromArgb(40, 255, 255, 255);
-        closeBtn.Click += (s, e) => Hide();
+        closeBtn.FlatAppearance.MouseOverBackColor = Color.FromArgb(200, 220, 50, 50);
+        closeBtn.Click += (s, e) => { _pollTimer.Stop(); Hide(); };
 
         _headerTitle = new Label
         {
@@ -129,7 +130,8 @@ public class ChatForm : Form
             BackColor = Color.Transparent,
         };
 
-        _headerPanel.Controls.AddRange([_backBtn, closeBtn, _headerTitle, _headerSubtitle]);
+        _headerPanel.Controls.AddRange([_backBtn, _headerTitle, _headerSubtitle, closeBtn]);
+        closeBtn.BringToFront();
 
         // ── Ticket list panel ──
         _ticketListPanel = new Panel
