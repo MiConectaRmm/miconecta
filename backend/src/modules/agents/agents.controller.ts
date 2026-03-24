@@ -16,6 +16,7 @@ import { RequirePermissions } from '../../common/decorators/require-permissions.
 import { AgentAuthGuard } from '../auth/guards/agent-auth.guard';
 import { AgentsService } from './agents.service';
 import { ChatService } from '../chat/chat.service';
+import { ChatGateway } from '../chat/chat.gateway';
 import { ChatRemetenteTipo } from '../../database/entities/chat-message.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Not } from 'typeorm';
@@ -29,6 +30,7 @@ export class AgentsController {
     private readonly agentsService: AgentsService,
     private readonly configService: ConfigService,
     private readonly chatService: ChatService,
+    private readonly chatGateway: ChatGateway,
     @InjectRepository(Ticket)
     private readonly ticketRepo: Repository<Ticket>,
   ) {}
@@ -224,10 +226,22 @@ export class AgentsController {
     const saved = await this.ticketRepo.save(ticket);
 
     // Enviar mensagem de sistema no ticket
-    await this.chatService.enviarMensagemSistema(
+    const sysMsg = await this.chatService.enviarMensagemSistema(
       saved.id,
       `Ticket criado pelo dispositivo ${device.hostname || device.id}`,
     );
+
+    // Emitir via WebSocket para técnicos receberem em tempo real
+    this.chatGateway.emitAtendimento('ticket:new', {
+      id: saved.id,
+      numero: saved.numero,
+      titulo: saved.titulo,
+      status: saved.status,
+      tenantId,
+      deviceId: device.id,
+      origem: 'agente',
+      criadoEm: saved.criadoEm,
+    });
 
     return {
       id: saved.id,
@@ -308,16 +322,37 @@ export class AgentsController {
       conteudo: body.conteudo,
     });
 
-    return {
+    // Emitir via WebSocket para técnicos receberem em tempo real
+    const normalized = {
       id: message.id,
-      conteudo: message.conteudo,
-      content: message.conteudo,
-      remetenteTipo: message.remetenteTipo,
+      ticketId: message.ticketId,
+      deviceId: message.deviceId,
       senderType: message.remetenteTipo,
-      remetenteNome: message.remetenteNome,
+      senderId: message.remetenteId,
       senderName: message.remetenteNome,
-      criadoEm: message.criadoEm,
+      type: message.tipo,
+      content: message.conteudo,
+      read: message.lido,
+      readAt: message.lidoEm,
       createdAt: message.criadoEm,
+      remetenteTipo: message.remetenteTipo,
+      remetenteId: message.remetenteId,
+      remetenteNome: message.remetenteNome,
+      tipo: message.tipo,
+      conteudo: message.conteudo,
+      lido: message.lido,
+      lidoEm: message.lidoEm,
+      criadoEm: message.criadoEm,
     };
+    this.chatGateway.emitMessage(ticketId, normalized);
+    this.chatGateway.emitAtendimento('notification:new', {
+      type: 'ticket_message',
+      ticketId,
+      tenantId,
+      message: normalized,
+      timestamp: new Date(),
+    });
+
+    return normalized;
   }
 }

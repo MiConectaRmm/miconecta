@@ -94,21 +94,28 @@ public class ChatForm : Form
         _backBtn.FlatAppearance.MouseOverBackColor = Color.FromArgb(40, 255, 255, 255);
         _backBtn.Click += (s, e) => VoltarParaLista();
 
+        // ── Close button in a right-docked panel to guarantee visibility ──
+        var closeBtnPanel = new Panel
+        {
+            Dock = DockStyle.Right,
+            Width = 44,
+            BackColor = Color.Transparent,
+        };
         var closeBtn = new Button
         {
             Text = "✕",
             FlatStyle = FlatStyle.Flat,
             ForeColor = TextWhite,
-            Font = new Font("Segoe UI", 12f, FontStyle.Bold),
-            Size = new Size(36, 36),
-            Location = new Point(Width - 48, 14),
-            Anchor = AnchorStyles.Top | AnchorStyles.Right,
+            Font = new Font("Segoe UI", 14f, FontStyle.Bold),
+            Size = new Size(40, 40),
+            Location = new Point(2, 12),
             Cursor = Cursors.Hand,
             TabIndex = 0,
         };
         closeBtn.FlatAppearance.BorderSize = 0;
         closeBtn.FlatAppearance.MouseOverBackColor = Color.FromArgb(200, 220, 50, 50);
         closeBtn.Click += (s, e) => { _pollTimer.Stop(); Hide(); };
+        closeBtnPanel.Controls.Add(closeBtn);
 
         _headerTitle = new Label
         {
@@ -130,8 +137,11 @@ public class ChatForm : Form
             BackColor = Color.Transparent,
         };
 
-        _headerPanel.Controls.AddRange([_backBtn, _headerTitle, _headerSubtitle, closeBtn]);
-        closeBtn.BringToFront();
+        // Dock order matters: right-docked closeBtnPanel first, then add labels
+        _headerPanel.Controls.Add(closeBtnPanel);
+        _headerPanel.Controls.Add(_backBtn);
+        _headerPanel.Controls.Add(_headerTitle);
+        _headerPanel.Controls.Add(_headerSubtitle);
 
         // ── Ticket list panel ──
         _ticketListPanel = new Panel
@@ -631,6 +641,7 @@ public class NovoTicketDialog : Form
         StartPosition = FormStartPosition.CenterParent;
         MaximizeBox = false;
         MinimizeBox = false;
+        TopMost = true;
         BackColor = Color.FromArgb(32, 32, 44);
         ForeColor = Color.White;
 
