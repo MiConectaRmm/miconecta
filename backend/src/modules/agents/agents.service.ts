@@ -413,17 +413,34 @@ export class AgentsService {
     }
 
     const agentTokenPlain = this.gerarTokenSeguro(48);
-    const agent = await this.agentRepo.save({
-      tenantId: tenant.id,
-      deviceId: device.id,
-      installationTokenId: installationToken?.id || null,
-      agentTokenHash: this.hashToken(agentTokenPlain),
-      agentTokenPreview: agentTokenPlain.slice(0, 8),
-      status: AgentStatus.ONLINE,
-      agentVersion: dados.agentVersion || null,
-      lastSeen: new Date(),
-      remoteStatus: dados.rustdeskId ? 'ready' : null,
-    });
+
+    // Upsert agent: verificar se já existe para este tenant+device
+    let agent = await this.agentRepo.findOne({ where: { tenantId: tenant.id, deviceId: device.id } });
+    if (agent) {
+      await this.agentRepo.update(agent.id, {
+        installationTokenId: installationToken?.id || agent.installationTokenId,
+        agentTokenHash: this.hashToken(agentTokenPlain),
+        agentTokenPreview: agentTokenPlain.slice(0, 8),
+        status: AgentStatus.ONLINE,
+        agentVersion: dados.agentVersion || agent.agentVersion,
+        lastSeen: new Date(),
+        remoteStatus: dados.rustdeskId ? 'ready' : agent.remoteStatus,
+      });
+      this.logger.log(`Agent re-registrado: ${dados.hostname} (${agent.id})`);
+    } else {
+      agent = await this.agentRepo.save({
+        tenantId: tenant.id,
+        deviceId: device.id,
+        installationTokenId: installationToken?.id || null,
+        agentTokenHash: this.hashToken(agentTokenPlain),
+        agentTokenPreview: agentTokenPlain.slice(0, 8),
+        status: AgentStatus.ONLINE,
+        agentVersion: dados.agentVersion || null,
+        lastSeen: new Date(),
+        remoteStatus: dados.rustdeskId ? 'ready' : null,
+      });
+      this.logger.log(`Novo agent registrado: ${dados.hostname} (${agent.id})`);
+    }
 
     await this.deviceRepo.update(device.id, {
       agentId: agent.id,
