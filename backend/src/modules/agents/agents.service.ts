@@ -188,14 +188,12 @@ export class AgentsService {
         `# 3. Criar agent.config`,
         `Write-Host "[3/5] Criando configuracao..." -ForegroundColor Yellow`,
         `$configContent = @"`,
-        `{`,
-        `  "ServerUrl": "$ServerUrl",`,
-        `  "TenantId": "$TenantId",`,
-        `  "ProvisionToken": "$ProvisionToken",`,
-        `  "HeartbeatIntervalSeconds": 60,`,
-        `  "RustDeskServer": "136.248.114.218",`,
-        `  "RustDeskKey": "ev3ic04E+VsgunfupaellTSWgSzmHiQL2H5ywzBE+yI="`,
-        `}`,
+        `ServerUrl=$ServerUrl`,
+        `TenantId=$TenantId`,
+        `ProvisionToken=$ProvisionToken`,
+        `HeartbeatIntervalSeconds=60`,
+        `RustDeskServer=136.248.114.218`,
+        `RustDeskKey=ev3ic04E+VsgunfupaellTSWgSzmHiQL2H5ywzBE+yI=`,
         `"@`,
         `Set-Content -Path $ConfigFile -Value $configContent -Encoding UTF8`,
         `Write-Host "[OK] Configuracao criada" -ForegroundColor Green`,
@@ -295,14 +293,12 @@ export class AgentsService {
       ``,
       `echo [3/5] Criando configuracao...`,
       `(`,
-      `echo {`,
-      `echo   "ServerUrl": "%SERVER_URL%",`,
-      `echo   "TenantId": "%TENANT_ID%",`,
-      `echo   "ProvisionToken": "%PROVISION_TOKEN%",`,
-      `echo   "HeartbeatIntervalSeconds": 60,`,
-      `echo   "RustDeskServer": "136.248.114.218",`,
-      `echo   "RustDeskKey": "ev3ic04E+VsgunfupaellTSWgSzmHiQL2H5ywzBE+yI="`,
-      `echo }`,
+      `echo ServerUrl=%SERVER_URL%`,
+      `echo TenantId=%TENANT_ID%`,
+      `echo ProvisionToken=%PROVISION_TOKEN%`,
+      `echo HeartbeatIntervalSeconds=60`,
+      `echo RustDeskServer=136.248.114.218`,
+      `echo RustDeskKey=ev3ic04E+VsgunfupaellTSWgSzmHiQL2H5ywzBE+yI=`,
       `) > "%CONFIG_FILE%"`,
       `echo [OK] Configuracao criada`,
       ``,
@@ -354,12 +350,21 @@ export class AgentsService {
   }
 
   async registrar(provisionToken: string, dados: AgentRegisterDto) {
-    const installationToken = await this.installationTokenRepo.findOne({ where: { tokenHash: this.hashToken(provisionToken) }, relations: ['tenant'] });
-    if (!installationToken || installationToken.status !== InstallationTokenStatus.ATIVO || (installationToken.expiresAt && installationToken.expiresAt < new Date())) {
-      throw new UnauthorizedException('Token de instalação inválido ou expirado');
+    // Tentar primeiro via installation_tokens (token hash)
+    let installationToken = await this.installationTokenRepo.findOne({ where: { tokenHash: this.hashToken(provisionToken) }, relations: ['tenant'] });
+    let tenant: Tenant | null = null;
+
+    if (installationToken && installationToken.status === InstallationTokenStatus.ATIVO && (!installationToken.expiresAt || installationToken.expiresAt >= new Date())) {
+      tenant = installationToken.tenant;
+    } else {
+      // Fallback: buscar via provision_token do tenant
+      installationToken = null;
+      tenant = await this.tenantRepo.findOne({ where: { provisionToken } });
+      if (!tenant || !tenant.provisionTokenExpires || tenant.provisionTokenExpires < new Date()) {
+        throw new UnauthorizedException('Token de instalação inválido ou expirado');
+      }
     }
 
-    const tenant = installationToken.tenant;
     if (!tenant) throw new UnauthorizedException('Tenant não identificado');
 
     const fingerprint = this.calcularFingerprint(dados);
@@ -411,7 +416,7 @@ export class AgentsService {
     const agent = await this.agentRepo.save({
       tenantId: tenant.id,
       deviceId: device.id,
-      installationTokenId: installationToken.id,
+      installationTokenId: installationToken?.id || null,
       agentTokenHash: this.hashToken(agentTokenPlain),
       agentTokenPreview: agentTokenPlain.slice(0, 8),
       status: AgentStatus.ONLINE,
@@ -427,8 +432,10 @@ export class AgentsService {
       lastCheckin: new Date(),
     } as any);
 
-    installationToken.status = InstallationTokenStatus.INATIVO;
-    await this.installationTokenRepo.save(installationToken);
+    if (installationToken) {
+      installationToken.status = InstallationTokenStatus.INATIVO;
+      await this.installationTokenRepo.save(installationToken);
+    }
 
     const agentToken = this.jwtService.sign(
       { sub: agent.id, tenantId: tenant.id, deviceId: device.id, type: 'agent', role: 'agent' },

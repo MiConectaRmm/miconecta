@@ -40,7 +40,7 @@ public class AgentConfig
     {
         AppDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-            "MIConectaRMM"
+            "MIConecta"
         );
         LogDir = Path.Combine(AppDir, "logs");
         Directory.CreateDirectory(AppDir);
