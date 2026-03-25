@@ -11,7 +11,7 @@
     <Product>MIConectaRMM Agent</Product>
     <Description>Agente RMM para monitoramento e gerenciamento remoto</Description>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <SelfContained>false</SelfContained>
+    <SelfContained>true</SelfContained>
   </PropertyGroup>
 
   <ItemGroup>
