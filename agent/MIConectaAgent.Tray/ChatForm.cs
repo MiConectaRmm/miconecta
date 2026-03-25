@@ -470,7 +470,7 @@ public class ChatForm : Form
         _headerSubtitle.Location = new Point(44, 38);
 
         // Show concluir button only for active tickets
-        var canConcluir = ticket.Status is "aberto" or "em_atendimento";
+        var canConcluir = ticket.Status is "aberto" or "em_atendimento" or "aguardando_cliente" or "aguardando_tecnico";
         _concluirBtn.Visible = canConcluir;
         _inputPanel.Visible = canConcluir; // hide input for resolved/closed
 

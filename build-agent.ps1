@@ -87,8 +87,8 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-$msiSource = "$Root\installer\wix\bin\Release\MIConectaRMMSetup.msi"
-$msiDest = "$OutputDir\MIConectaRMMSetup-v$Version.msi"
+$msiSource = "$Root\installer\wix\bin\Release\MIConectaSetup.msi"
+$msiDest = "$OutputDir\MIConectaSetup-v$Version.msi"
 Copy-Item $msiSource $msiDest -Force
 
 $msiSize = [math]::Round((Get-Item $msiDest).Length / 1MB, 2)
@@ -102,10 +102,10 @@ Write-Host "  MSI: $msiDest" -ForegroundColor White
 Write-Host "  Tamanho: $msiSize MB" -ForegroundColor White
 Write-Host ""
 Write-Host "  Instalacao interativa:" -ForegroundColor Cyan
-Write-Host "    msiexec /i MIConectaRMMSetup-v$Version.msi" -ForegroundColor White
+Write-Host "    msiexec /i MIConectaSetup-v$Version.msi" -ForegroundColor White
 Write-Host ""
 Write-Host "  Instalacao silenciosa:" -ForegroundColor Cyan
-Write-Host "    msiexec /i MIConectaRMMSetup-v$Version.msi /qn SERVER_URL=https://api.maginf.com.br/api/v1 TENANT_ID=xxx PROVISION_TOKEN=yyy" -ForegroundColor White
+Write-Host "    msiexec /i MIConectaSetup-v$Version.msi /qn SERVER_URL=https://api.maginf.com.br/api/v1 TENANT_ID=xxx PROVISION_TOKEN=yyy" -ForegroundColor White
 Write-Host ""
 Write-Host "  Via GPO:" -ForegroundColor Cyan
 Write-Host "    Adicione o .msi em Software Installation da GPO" -ForegroundColor White

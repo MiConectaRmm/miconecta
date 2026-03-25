@@ -38,7 +38,7 @@ public class TrayApplicationContext : ApplicationContext
 
         _trayIcon = new NotifyIcon
         {
-            Icon = File.Exists(ICON_PATH) ? new Icon(ICON_PATH) : SystemIcons.Application,
+            Icon = CarregarIcone(),
             Text = "MIConecta - Verificando...",
             Visible = true,
             ContextMenuStrip = CriarMenu(),
@@ -53,6 +53,28 @@ public class TrayApplicationContext : ApplicationContext
 
         AtualizarStatus();
         MostrarNotificacao("MIConecta", "Agente ativo na bandeja do sistema. Clique duplo para abrir o chat.");
+    }
+
+    private static Icon CarregarIcone()
+    {
+        try
+        {
+            // 1) icon.ico copiado para output via csproj
+            if (File.Exists(ICON_PATH))
+                return new Icon(ICON_PATH);
+        }
+        catch { }
+
+        try
+        {
+            // 2) fallback: extrair ícone embutido no próprio EXE
+            var exeIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            if (exeIcon != null) return exeIcon;
+        }
+        catch { }
+
+        // 3) ícone genérico do sistema
+        return SystemIcons.Application;
     }
 
     private void CarregarConfig()

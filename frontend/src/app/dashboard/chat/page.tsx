@@ -430,10 +430,10 @@ export default function MultiChatPage() {
               {activeTicket && !['resolvido', 'fechado', 'cancelado'].includes(activeTicket.status) && (
                 <button
                   onClick={concluirTicket}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 text-xs font-medium transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-500 text-sm font-semibold transition-colors shadow-lg shadow-green-600/20"
                   title="Concluir chamado"
                 >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <CheckCircle2 className="w-4 h-4" />
                   Concluir
                 </button>
               )}
