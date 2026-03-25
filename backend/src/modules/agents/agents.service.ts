@@ -226,7 +226,7 @@ export class AgentsService {
       ].join('\r\n');
 
       return {
-        filename: `instalar-${clientName.replace(/\s+/g, '-').toLowerCase()}.ps1`,
+        filename: `instalar-${clientName.replace(/\s+/g, '-').toLowerCase()}-v${agentVersion}.ps1`,
         content: script,
         contentType: 'application/octet-stream',
       };
@@ -330,7 +330,7 @@ export class AgentsService {
     ].join('\r\n');
 
     return {
-      filename: `instalar-${clientName.replace(/\s+/g, '-').toLowerCase()}.bat`,
+      filename: `instalar-${clientName.replace(/\s+/g, '-').toLowerCase()}-v${agentVersion}.bat`,
       content: bat,
       contentType: 'application/octet-stream',
     };
