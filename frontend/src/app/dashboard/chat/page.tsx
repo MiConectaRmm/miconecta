@@ -285,12 +285,13 @@ export default function MultiChatPage() {
   // ── Concluir ticket (técnico) ──
   const concluirTicket = async () => {
     if (!activeTicketId) return
-    if (!confirm('Deseja concluir este chamado?')) return
+    if (!confirm('Deseja finalizar este chamado? Ele será removido da lista ativa e ficará apenas no histórico.')) return
     try {
       await ticketsApi.resolver(activeTicketId)
-      setTickets((prev) => prev.map((t) =>
-        t.id === activeTicketId ? { ...t, status: 'resolvido' } : t
-      ))
+      // Remover da lista ativa — fica só no histórico
+      setTickets((prev) => prev.filter((t) => t.id !== activeTicketId))
+      setActiveTicketId(null)
+      setMessages([])
     } catch (err) {
       console.error('Erro ao concluir:', err)
     }

@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Send, Clock, MessageSquare, FileText, Paperclip } from 'lucide-react'
+import { ArrowLeft, Send, Clock, MessageSquare, FileText, Paperclip, CheckCircle2 } from 'lucide-react'
 import { ticketsApi, chatApi } from '@/lib/api'
 import StatusBadge from '@/components/ui/StatusBadge'
 import { useAuthStore } from '@/stores/auth.store'
@@ -11,6 +11,7 @@ import { useChatSocket } from '@/hooks/useSocket'
 
 export default function PortalTicketDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const router = useRouter()
   const { user } = useAuthStore()
   const [ticket, setTicket] = useState<any>(null)
   const [mensagens, setMensagens] = useState<any[]>([])
@@ -111,9 +112,24 @@ export default function PortalTicketDetailPage() {
             {ticket.tecnicoAtribuido && ` · Técnico: ${ticket.tecnicoAtribuido.nome}`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <StatusBadge status={ticket.prioridade} />
           <StatusBadge status={ticket.status} />
+          {!['resolvido', 'fechado', 'cancelado'].includes(ticket.status) && (
+            <button
+              onClick={async () => {
+                if (!confirm('Deseja finalizar este chamado?')) return
+                try {
+                  await ticketsApi.resolver(id)
+                  router.push('/portal/chat')
+                } catch {}
+              }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-500 text-sm font-semibold transition-colors"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              Finalizar Chamado
+            </button>
+          )}
         </div>
       </div>
 

@@ -124,7 +124,7 @@ public class ChatForm : Form
         // ── Concluir (resolve) button ──
         _concluirBtn = new Button
         {
-            Text = "✔ Concluir",
+            Text = "✔ Finalizar",
             FlatStyle = FlatStyle.Flat,
             ForeColor = TextWhite,
             BackColor = AccentGreen,
@@ -664,8 +664,8 @@ public class ChatForm : Form
         if (_activeTicketId == null) return;
 
         var confirm = MessageBox.Show(
-            "Deseja concluir este chamado?",
-            "Concluir Chamado",
+            "Deseja finalizar este chamado?\nEle será removido da lista ativa e ficará no histórico.",
+            "Finalizar Chamado",
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Question);
 
@@ -681,7 +681,7 @@ public class ChatForm : Form
             {
                 MessageBox.Show("Não foi possível concluir o chamado.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 _concluirBtn.Enabled = true;
-                _concluirBtn.Text = "✔ Concluir";
+                _concluirBtn.Text = "✔ Finalizar";
                 return;
             }
 
@@ -696,9 +696,9 @@ public class ChatForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Erro ao concluir: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show($"Erro ao finalizar: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             _concluirBtn.Enabled = true;
-            _concluirBtn.Text = "✔ Concluir";
+            _concluirBtn.Text = "✔ Finalizar";
         }
     }
 
