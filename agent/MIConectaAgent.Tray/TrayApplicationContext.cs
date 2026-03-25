@@ -196,11 +196,30 @@ public class TrayApplicationContext : ApplicationContext
 
         if (_chatApi == null)
         {
-            MessageBox.Show(
-                "O agente ainda não está registrado no servidor.\n" +
-                "Aguarde alguns minutos e tente novamente.",
-                "MIConecta Chat",
-                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            var serverUrl = _agentConfig.GetValueOrDefault("ServerUrl", "(vazio)");
+            var deviceId = _agentConfig.GetValueOrDefault("DeviceId", "(vazio)");
+            var hasToken = !string.IsNullOrEmpty(_agentConfig.GetValueOrDefault("DeviceToken", ""));
+
+            var detalhes = $"ServerUrl: {serverUrl}\nDeviceId: {deviceId}\nDeviceToken: {(hasToken ? "presente" : "AUSENTE")}";
+
+            if (string.IsNullOrEmpty(_agentConfig.GetValueOrDefault("ServerUrl", "")))
+            {
+                MessageBox.Show(
+                    "Arquivo de configuração não encontrado ou sem ServerUrl.\n" +
+                    $"Verifique: {CONFIG_PATH}\n\n{detalhes}",
+                    "MIConecta Chat",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            else
+            {
+                MessageBox.Show(
+                    "O agente ainda não está registrado no servidor.\n" +
+                    "O serviço MIConectaRMMAgent precisa estar rodando.\n" +
+                    "Aguarde alguns minutos e tente novamente.\n\n" +
+                    detalhes,
+                    "MIConecta Chat",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
             return;
         }
 

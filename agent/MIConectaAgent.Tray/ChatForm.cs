@@ -312,7 +312,7 @@ public class ChatForm : Form
         // Loading
         var loadingLabel = new Label
         {
-            Text = "Carregando chamados...",
+            Text = "Conectando ao servidor...",
             ForeColor = TextMuted,
             Font = new Font("Segoe UI", 10f),
             Dock = DockStyle.Top,
@@ -321,8 +321,58 @@ public class ChatForm : Form
         };
         _ticketListPanel.Controls.Add(loadingLabel);
 
+        // Testar conexão primeiro
+        var connected = await _api.TestarConexaoAsync();
+        if (!connected)
+        {
+            _ticketListPanel.Controls.Clear();
+            var errorLabel = new Label
+            {
+                Text = $"⚠ Não foi possível conectar ao servidor.\n\n{_api.LastError ?? "Verifique a conexão de internet."}\n\nServidor: {_api.ToString()}",
+                ForeColor = Color.FromArgb(239, 68, 68),
+                Font = new Font("Segoe UI", 9f),
+                Dock = DockStyle.Top,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Height = 120,
+                Padding = new Padding(12, 20, 12, 0),
+            };
+            var retryBtn = new Button
+            {
+                Text = "Tentar novamente",
+                Dock = DockStyle.Top,
+                Height = 36,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = BrandColor,
+                ForeColor = TextWhite,
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                Margin = new Padding(40, 8, 40, 0),
+            };
+            retryBtn.FlatAppearance.BorderSize = 0;
+            retryBtn.Click += async (s, e) => await LoadTicketsAsync();
+            _ticketListPanel.Controls.Add(retryBtn);
+            _ticketListPanel.Controls.Add(errorLabel);
+            return;
+        }
+
+        loadingLabel.Text = "Carregando chamados...";
         var tickets = await _api.ListarTicketsAsync();
         _ticketListPanel.Controls.Clear();
+
+        // Mostrar erro da API se houver
+        if (_api.LastError != null)
+        {
+            var apiErrorLabel = new Label
+            {
+                Text = $"⚠ {_api.LastError}",
+                ForeColor = Color.FromArgb(251, 191, 36),
+                Font = new Font("Segoe UI", 8f),
+                Dock = DockStyle.Top,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Height = 24,
+            };
+            _ticketListPanel.Controls.Add(apiErrorLabel);
+        }
 
         // New ticket button — always at top
         var newTicketBtn = CriarBotaoNovoTicket();

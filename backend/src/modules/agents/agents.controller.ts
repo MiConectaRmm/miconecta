@@ -179,12 +179,15 @@ export class AgentsController {
     const device = req.device;
     const tenantId = req.tenantId;
 
+    // Buscar tickets deste device OU do mesmo tenant sem device (criados pelo portal)
     const tickets = await this.ticketRepo.find({
-      where: {
-        deviceId: device.id,
-        tenantId,
-        status: Not(In([TicketStatus.FECHADO, TicketStatus.CANCELADO])),
-      },
+      where: [
+        {
+          deviceId: device.id,
+          tenantId,
+          status: Not(In([TicketStatus.FECHADO, TicketStatus.CANCELADO])),
+        },
+      ],
       order: { criadoEm: 'DESC' },
       take: 50,
     });
@@ -266,9 +269,9 @@ export class AgentsController {
     const device = req.device;
     const tenantId = req.tenantId;
 
-    // Verificar se o ticket pertence ao device
+    // Verificar se o ticket pertence ao device ou ao tenant
     const ticket = await this.ticketRepo.findOne({
-      where: { id: ticketId, deviceId: device.id, tenantId },
+      where: [{ id: ticketId, deviceId: device.id, tenantId }],
     });
     if (!ticket) {
       return { error: 'Ticket não encontrado', messages: [] };
@@ -307,9 +310,9 @@ export class AgentsController {
     const device = req.device;
     const tenantId = req.tenantId;
 
-    // Verificar se o ticket pertence ao device
+    // Verificar se o ticket pertence ao device ou ao tenant
     const ticket = await this.ticketRepo.findOne({
-      where: { id: ticketId, deviceId: device.id, tenantId },
+      where: [{ id: ticketId, deviceId: device.id, tenantId }],
     });
     if (!ticket) {
       return { error: 'Ticket não encontrado' };
@@ -371,7 +374,7 @@ export class AgentsController {
     const tenantId = req.tenantId;
 
     const ticket = await this.ticketRepo.findOne({
-      where: { id: ticketId, deviceId: device.id, tenantId },
+      where: [{ id: ticketId, deviceId: device.id, tenantId }],
     });
     if (!ticket) {
       return { error: 'Ticket não encontrado' };
@@ -420,7 +423,7 @@ export class AgentsController {
     const tenantId = req.tenantId;
 
     const ticket = await this.ticketRepo.findOne({
-      where: { id: ticketId, deviceId: device.id, tenantId },
+      where: [{ id: ticketId, deviceId: device.id, tenantId }],
     });
     if (!ticket) {
       return { error: 'Ticket não encontrado' };

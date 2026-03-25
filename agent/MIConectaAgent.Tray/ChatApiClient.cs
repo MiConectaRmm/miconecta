@@ -12,6 +12,12 @@ public class ChatApiClient : IDisposable
 {
     private readonly HttpClient _http;
 
+    /// <summary>Último erro ocorrido (para diagnóstico no UI).</summary>
+    public string? LastError { get; private set; }
+
+    /// <summary>True se o último TestarConexao foi bem-sucedido.</summary>
+    public bool Connected { get; private set; }
+
     public ChatApiClient(string serverUrl, string deviceId, string deviceToken)
     {
         _http = new HttpClient
@@ -24,6 +30,31 @@ public class ChatApiClient : IDisposable
     }
 
     /// <summary>
+    /// Testa conexão com o servidor (GET /health fora do prefix, ou agents/me/tickets como fallback).
+    /// </summary>
+    public async Task<bool> TestarConexaoAsync()
+    {
+        try
+        {
+            // health fica fora do /api/v1, então montar URL absoluta
+            var baseUri = _http.BaseAddress!;
+            var healthUri = new Uri(baseUri.GetLeftPart(UriPartial.Authority) + "/health");
+            using var req = new HttpRequestMessage(HttpMethod.Get, healthUri);
+            var resp = await _http.SendAsync(req);
+            Connected = resp.IsSuccessStatusCode;
+            if (!Connected)
+                LastError = $"Servidor respondeu {(int)resp.StatusCode} ({resp.StatusCode})";
+            return Connected;
+        }
+        catch (Exception ex)
+        {
+            Connected = false;
+            LastError = $"Sem conexão: {ex.Message}";
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Lista tickets abertos associados ao dispositivo.
     /// GET /agents/me/tickets
     /// </summary>
@@ -32,8 +63,13 @@ public class ChatApiClient : IDisposable
         try
         {
             var resp = await _http.GetAsync("agents/me/tickets");
-            if (!resp.IsSuccessStatusCode) return [];
+            if (!resp.IsSuccessStatusCode)
+            {
+                LastError = $"Erro ao listar tickets: {(int)resp.StatusCode} {resp.StatusCode}";
+                return [];
+            }
 
+            LastError = null;
             var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
             var tickets = new List<ChatTicket>();
 
@@ -58,8 +94,9 @@ public class ChatApiClient : IDisposable
 
             return tickets;
         }
-        catch
+        catch (Exception ex)
         {
+            LastError = $"Erro de conexão: {ex.Message}";
             return [];
         }
     }
@@ -73,7 +110,11 @@ public class ChatApiClient : IDisposable
         try
         {
             var resp = await _http.GetAsync($"agents/me/tickets/{ticketId}/messages?limit=50");
-            if (!resp.IsSuccessStatusCode) return [];
+            if (!resp.IsSuccessStatusCode)
+            {
+                LastError = $"Erro ao listar mensagens: {(int)resp.StatusCode}";
+                return [];
+            }
 
             var arr = await resp.Content.ReadFromJsonAsync<JsonElement>();
             var msgs = new List<ChatMessage>();
@@ -88,8 +129,9 @@ public class ChatApiClient : IDisposable
 
             return msgs;
         }
-        catch
+        catch (Exception ex)
         {
+            LastError = $"Erro de conexão: {ex.Message}";
             return [];
         }
     }
@@ -104,13 +146,18 @@ public class ChatApiClient : IDisposable
         {
             var body = new { conteudo, tipo = "texto" };
             var resp = await _http.PostAsJsonAsync($"agents/me/tickets/{ticketId}/messages", body);
-            if (!resp.IsSuccessStatusCode) return null;
+            if (!resp.IsSuccessStatusCode)
+            {
+                LastError = $"Erro ao enviar: {(int)resp.StatusCode}";
+                return null;
+            }
 
             var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
             return ParseMessage(json);
         }
-        catch
+        catch (Exception ex)
         {
+            LastError = $"Erro de conexão: {ex.Message}";
             return null;
         }
     }
@@ -191,6 +238,8 @@ public class ChatApiClient : IDisposable
                       : m.TryGetProperty("criadoEm", out var ce) ? ce.GetString() ?? "" : "",
         };
     }
+
+    public override string ToString() => _http.BaseAddress?.ToString() ?? "(desconhecido)";
 
     public void Dispose() => _http.Dispose();
 }
