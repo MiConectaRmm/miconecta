@@ -133,10 +133,12 @@ export class AgentsService {
     const msiDownloadUrl = `${serverUrl}/agents/download/msi`;
     const clientName = tenant.nome.replace(/[^a-zA-Z0-9 ]/g, '').trim();
 
+    const agentVersion = configService.get('AGENT_VERSION') || '1.0.0';
     if (format === 'ps1') {
       const script = [
         `# MIConectaRMM - Instalacao Automatica`,
         `# Cliente: ${tenant.nome}`,
+        `# Versao do agente: ${agentVersion}`,
         `# Gerado em: ${new Date().toISOString()}`,
         `# Execute como Administrador`,
         ``,
@@ -236,6 +238,7 @@ export class AgentsService {
       `chcp 65001 > nul`,
       `REM MIConectaRMM - Instalacao Automatica`,
       `REM Cliente: ${tenant.nome}`,
+      `REM Versao do agente: ${agentVersion}`,
       `REM Gerado em: ${new Date().toISOString()}`,
       `REM Execute como Administrador`,
       ``,
