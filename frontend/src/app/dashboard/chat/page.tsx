@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   MessageSquare, Send, Search, Clock, Building2,
   Wifi, WifiOff, ChevronLeft, User, Paperclip,
-  Bell, Volume2, VolumeX, RefreshCw, CheckCircle2,
+  Bell, Volume2, VolumeX, RefreshCw, CheckCircle2, MonitorPlay,
 } from 'lucide-react'
 import { ticketsApi, chatApi, storageApi } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth.store'
@@ -18,7 +18,10 @@ interface ChatTicket {
   status: string
   prioridade: string
   cliente: string
+  deviceId?: string
   deviceHostname?: string
+  rustdeskId?: string
+  deviceStatus?: string
   criadoEm: string
   unread: number
   lastMessage?: string
@@ -105,7 +108,10 @@ export default function MultiChatPage() {
         status: t.status,
         prioridade: t.prioridade === 'urgente' ? 'critica' : (t.prioridade || 'media'),
         cliente: t.tenant?.nomeFantasia || t.tenant?.razaoSocial || t.tenant?.nome || t.criadoPorNome || 'N/A',
+        deviceId: t.device?.id || t.deviceId,
         deviceHostname: t.device?.hostname,
+        rustdeskId: t.device?.rustdeskId,
+        deviceStatus: t.device?.status,
         criadoEm: t.criadoEm || t.createdAt,
         unread: t.unreadCount || 0,
         lastMessage: t.lastMessageContent,
@@ -428,14 +434,24 @@ export default function MultiChatPage() {
                   <StatusBadge status={activeTicket?.status || ''} />
                 </div>
               </div>
+              {activeTicket?.rustdeskId && (
+                <button
+                  onClick={() => window.open(`rustdesk://connection/new/${activeTicket.rustdeskId}`, '_blank')}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-600 text-white hover:bg-brand-500 text-sm font-semibold transition-colors shadow-lg shadow-brand-600/20"
+                  title={activeTicket.deviceStatus === 'online' ? 'Conectar ao dispositivo via RustDesk' : 'Dispositivo pode estar offline'}
+                >
+                  <MonitorPlay className="w-4 h-4" />
+                  Conectar
+                </button>
+              )}
               {activeTicket && !['resolvido', 'fechado', 'cancelado'].includes(activeTicket.status) && (
                 <button
                   onClick={concluirTicket}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-500 text-sm font-semibold transition-colors shadow-lg shadow-green-600/20"
-                  title="Concluir chamado"
+                  title="Finalizar chamado"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  Concluir
+                  Finalizar
                 </button>
               )}
             </div>
