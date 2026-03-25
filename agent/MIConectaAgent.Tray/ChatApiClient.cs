@@ -147,6 +147,35 @@ public class ChatApiClient : IDisposable
         }
     }
 
+    /// <summary>
+    /// Concluir/resolver um ticket pelo cliente.
+    /// PUT /agents/me/tickets/{ticketId}/concluir
+    /// </summary>
+    public async Task<bool> ConcluirTicketAsync(string ticketId)
+    {
+        try
+        {
+            var resp = await _http.PutAsync($"agents/me/tickets/{ticketId}/concluir", null);
+            return resp.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Avaliar satisfação de um ticket.
+    /// POST /agents/me/tickets/{ticketId}/avaliar
+    /// </summary>
+    public async Task<bool> AvaliarTicketAsync(string ticketId, int nota, string? comentario = null)
+    {
+        try
+        {
+            var body = new { nota, comentario = comentario ?? "" };
+            var resp = await _http.PostAsJsonAsync($"agents/me/tickets/{ticketId}/avaliar", body);
+            return resp.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
     private static ChatMessage ParseMessage(JsonElement m)
     {
         return new ChatMessage

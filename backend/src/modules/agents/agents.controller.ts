@@ -1,5 +1,5 @@
 import {
-  Controller, Post, Get, Body, Req, Param, Delete, Query,
+  Controller, Post, Get, Put, Body, Req, Param, Delete, Query,
   UseGuards, Headers, Res,
 } from '@nestjs/common';
 import { Response } from 'express';
@@ -17,6 +17,7 @@ import { AgentAuthGuard } from '../auth/guards/agent-auth.guard';
 import { AgentsService } from './agents.service';
 import { ChatService } from '../chat/chat.service';
 import { ChatGateway } from '../chat/chat.gateway';
+import { TicketsService } from '../tickets/tickets.service';
 import { ChatRemetenteTipo } from '../../database/entities/chat-message.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Not } from 'typeorm';
@@ -31,6 +32,7 @@ export class AgentsController {
     private readonly configService: ConfigService,
     private readonly chatService: ChatService,
     private readonly chatGateway: ChatGateway,
+    private readonly ticketsService: TicketsService,
     @InjectRepository(Ticket)
     private readonly ticketRepo: Repository<Ticket>,
   ) {}
@@ -354,5 +356,103 @@ export class AgentsController {
     });
 
     return normalized;
+  }
+
+  // ── Concluir ticket pelo cliente (agente) ──
+
+  @Put('me/tickets/:ticketId/concluir')
+  @UseGuards(AgentAuthGuard)
+  @ApiOperation({ summary: 'Concluir/resolver ticket pelo cliente (agent chat)' })
+  async meTicketConcluir(
+    @Req() req: any,
+    @Param('ticketId') ticketId: string,
+  ) {
+    const device = req.device;
+    const tenantId = req.tenantId;
+
+    const ticket = await this.ticketRepo.findOne({
+      where: { id: ticketId, deviceId: device.id, tenantId },
+    });
+    if (!ticket) {
+      return { error: 'Ticket não encontrado' };
+    }
+
+    // Atualizar status para resolvido
+    await this.ticketRepo.update(ticketId, {
+      status: TicketStatus.RESOLVIDO,
+      resolvidoEm: new Date(),
+    });
+
+    // Mensagem de sistema
+    await this.chatService.enviarMensagemSistema(
+      ticketId,
+      `Ticket concluído pelo cliente (${device.hostname || 'Dispositivo'})`,
+    );
+
+    // Emitir via WebSocket
+    this.chatGateway.emitTicketUpdated(ticketId, {
+      ticketId,
+      status: TicketStatus.RESOLVIDO,
+    });
+    this.chatGateway.emitAtendimento('atendimento:ticket_updated', {
+      type: 'ticket_resolved',
+      ticketId,
+      tenantId,
+      resolvedBy: 'client',
+      deviceHostname: device.hostname,
+      timestamp: new Date(),
+    });
+
+    return { id: ticketId, status: 'resolvido', message: 'Ticket concluído com sucesso' };
+  }
+
+  // ── Avaliar ticket pelo cliente (agente) ──
+
+  @Post('me/tickets/:ticketId/avaliar')
+  @UseGuards(AgentAuthGuard)
+  @ApiOperation({ summary: 'Avaliar satisfação do atendimento (agent chat)' })
+  async meTicketAvaliar(
+    @Req() req: any,
+    @Param('ticketId') ticketId: string,
+    @Body() body: { nota: number; comentario?: string },
+  ) {
+    const device = req.device;
+    const tenantId = req.tenantId;
+
+    const ticket = await this.ticketRepo.findOne({
+      where: { id: ticketId, deviceId: device.id, tenantId },
+    });
+    if (!ticket) {
+      return { error: 'Ticket não encontrado' };
+    }
+
+    const nota = Math.min(5, Math.max(1, Math.round(body.nota)));
+
+    await this.ticketRepo.update(ticketId, {
+      avaliacaoNota: nota,
+      avaliacaoComentario: body.comentario || undefined,
+    });
+
+    // Mensagem de sistema com a avaliação
+    const labels = ['', 'Péssimo', 'Ruim', 'Mediano', 'Bom', 'Excelente'];
+    const emojis = ['', '😠', '😟', '😐', '😊', '😄'];
+    await this.chatService.enviarMensagemSistema(
+      ticketId,
+      `Avaliação: ${emojis[nota]} ${labels[nota]} (${nota}/5)${body.comentario ? ' - ' + body.comentario : ''}`,
+    );
+
+    // Fechar ticket após avaliação
+    await this.ticketRepo.update(ticketId, {
+      status: TicketStatus.FECHADO,
+      fechadoEm: new Date(),
+    });
+
+    // Emitir via WebSocket
+    this.chatGateway.emitTicketUpdated(ticketId, {
+      ticketId,
+      status: TicketStatus.FECHADO,
+    } as any);
+
+    return { id: ticketId, nota, status: 'fechado', message: 'Avaliação registrada' };
   }
 }

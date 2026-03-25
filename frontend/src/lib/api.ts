@@ -186,6 +186,8 @@ export const ticketsApi = {
     api.post(`/tickets/${id}/nota-interna`, { conteudo }),
   avaliar: (id: string, nota: number, comentario?: string) =>
     api.post(`/tickets/${id}/avaliar`, { nota, comentario }),
+  satisfacao: (tenantId?: string) =>
+    api.get('/tickets/satisfacao', { params: tenantId ? { tenantId } : {} }),
 };
 
 // ── Chat ──

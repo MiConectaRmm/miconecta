@@ -308,6 +308,59 @@ export class TicketsService {
     return this.buscar(id, tenantId);
   }
 
+  async satisfacao(tenantId?: string) {
+    const qb = this.ticketRepo.createQueryBuilder('t')
+      .select('AVG(t.avaliacaoNota)', 'media')
+      .addSelect('COUNT(t.avaliacaoNota)', 'total')
+      .addSelect(`SUM(CASE WHEN t.avaliacaoNota = 1 THEN 1 ELSE 0 END)`, 'pessimo')
+      .addSelect(`SUM(CASE WHEN t.avaliacaoNota = 2 THEN 1 ELSE 0 END)`, 'ruim')
+      .addSelect(`SUM(CASE WHEN t.avaliacaoNota = 3 THEN 1 ELSE 0 END)`, 'mediano')
+      .addSelect(`SUM(CASE WHEN t.avaliacaoNota = 4 THEN 1 ELSE 0 END)`, 'bom')
+      .addSelect(`SUM(CASE WHEN t.avaliacaoNota = 5 THEN 1 ELSE 0 END)`, 'excelente')
+      .where('t.avaliacaoNota IS NOT NULL');
+
+    if (tenantId) {
+      qb.andWhere('t.tenantId = :tenantId', { tenantId });
+    }
+
+    const raw = await qb.getRawOne();
+    const media = raw?.media ? parseFloat(Number(raw.media).toFixed(2)) : 0;
+    const total = Number(raw?.total) || 0;
+
+    // Por cliente (top 20)
+    const porClienteQb = this.ticketRepo.createQueryBuilder('t')
+      .select('t.tenantId', 'tenantId')
+      .addSelect('AVG(t.avaliacaoNota)', 'media')
+      .addSelect('COUNT(t.avaliacaoNota)', 'total')
+      .where('t.avaliacaoNota IS NOT NULL')
+      .groupBy('t.tenantId')
+      .orderBy('AVG(t.avaliacaoNota)', 'DESC')
+      .limit(20);
+
+    if (tenantId) {
+      porClienteQb.andWhere('t.tenantId = :tenantId', { tenantId });
+    }
+
+    const porCliente = await porClienteQb.getRawMany();
+
+    return {
+      media,
+      total,
+      distribuicao: {
+        pessimo: Number(raw?.pessimo) || 0,
+        ruim: Number(raw?.ruim) || 0,
+        mediano: Number(raw?.mediano) || 0,
+        bom: Number(raw?.bom) || 0,
+        excelente: Number(raw?.excelente) || 0,
+      },
+      porCliente: porCliente.map(c => ({
+        tenantId: c.tenantId,
+        media: parseFloat(Number(c.media).toFixed(2)),
+        total: Number(c.total),
+      })),
+    };
+  }
+
   async contagem(tenantId: string) {
     const abertos = await this.ticketRepo.count({ where: { tenantId, status: TicketStatus.ABERTO } });
     const emAtendimento = await this.ticketRepo.count({ where: { tenantId, status: TicketStatus.EM_ATENDIMENTO } });

@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Media;
 
 namespace MIConectaAgent.Tray;
 
@@ -33,12 +34,15 @@ public class ChatForm : Form
     private Label _headerSubtitle = null!;
     private FlowLayoutPanel _messagesFlow = null!;
     private System.Windows.Forms.Timer _pollTimer = null!;
+    private Button _concluirBtn = null!;
+    private NotifyIcon? _notifyIcon;
 
     // ── State ──
     private readonly ChatApiClient _api;
     private readonly string _hostname;
     private string? _activeTicketId;
     private string? _activeTicketTitle;
+    private string? _activeTicketStatus;
     private readonly HashSet<string> _renderedMessageIds = [];
     private bool _isTicketListView = true;
 
@@ -117,6 +121,31 @@ public class ChatForm : Form
         closeBtn.Click += (s, e) => { _pollTimer.Stop(); Hide(); };
         closeBtnPanel.Controls.Add(closeBtn);
 
+        // ── Concluir (resolve) button ──
+        _concluirBtn = new Button
+        {
+            Text = "✔ Concluir",
+            FlatStyle = FlatStyle.Flat,
+            ForeColor = TextWhite,
+            BackColor = AccentGreen,
+            Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
+            Size = new Size(90, 30),
+            Location = new Point(0, 17),
+            Cursor = Cursors.Hand,
+            Visible = false,
+        };
+        _concluirBtn.FlatAppearance.BorderSize = 0;
+        _concluirBtn.FlatAppearance.MouseOverBackColor = Color.FromArgb(28, 170, 80);
+        _concluirBtn.Click += async (s, e) => await ConcluirTicketAsync();
+
+        var concluirPanel = new Panel
+        {
+            Dock = DockStyle.Right,
+            Width = 96,
+            BackColor = Color.Transparent,
+        };
+        concluirPanel.Controls.Add(_concluirBtn);
+
         _headerTitle = new Label
         {
             Text = "💬 MIConecta Chat",
@@ -139,6 +168,7 @@ public class ChatForm : Form
 
         // Dock order matters: right-docked closeBtnPanel first, then add labels
         _headerPanel.Controls.Add(closeBtnPanel);
+        _headerPanel.Controls.Add(concluirPanel);
         _headerPanel.Controls.Add(_backBtn);
         _headerPanel.Controls.Add(_headerTitle);
         _headerPanel.Controls.Add(_headerSubtitle);
@@ -244,6 +274,31 @@ public class ChatForm : Form
             if (_activeTicketId != null && Visible)
                 await LoadMessagesAsync(_activeTicketId);
         };
+
+        // ── Notification timer (poll when chat is hidden to alert new messages) ──
+        var notifyTimer = new System.Windows.Forms.Timer { Interval = 15000 };
+        notifyTimer.Tick += async (s, e) =>
+        {
+            try
+            {
+                if (Visible) return; // already watching live
+                var tickets = await _api.ListarTicketsAsync();
+                // If we have any active ticket, check messages for new tech replies
+                foreach (var t in tickets)
+                {
+                    if (t.Status is "resolvido" or "fechado" or "cancelado") continue;
+                    var msgs = await _api.ListarMensagensAsync(t.Id);
+                    var lastMsg = msgs.LastOrDefault();
+                    if (lastMsg != null && lastMsg.IsTechnician && !_renderedMessageIds.Contains(lastMsg.Id))
+                    {
+                        MostrarNotificacao($"💬 {t.Titulo}", $"{lastMsg.RemetenteNome}: {lastMsg.Conteudo}");
+                        break; // one notification at a time
+                    }
+                }
+            }
+            catch { /* silent */ }
+        };
+        notifyTimer.Start();
     }
 
     // ══════════════════════════════════════════════════════
@@ -400,6 +455,7 @@ public class ChatForm : Form
     {
         _activeTicketId = ticket.Id;
         _activeTicketTitle = ticket.Titulo;
+        _activeTicketStatus = ticket.Status;
         _renderedMessageIds.Clear();
         _messagesFlow.Controls.Clear();
 
@@ -413,21 +469,28 @@ public class ChatForm : Form
         _headerSubtitle.Text = ticket.Status.Replace("_", " ");
         _headerSubtitle.Location = new Point(44, 38);
 
+        // Show concluir button only for active tickets
+        var canConcluir = ticket.Status is "aberto" or "em_atendimento";
+        _concluirBtn.Visible = canConcluir;
+        _inputPanel.Visible = canConcluir; // hide input for resolved/closed
+
         await LoadMessagesAsync(ticket.Id);
         _pollTimer.Start();
-        _inputBox.Focus();
+        if (canConcluir) _inputBox.Focus();
     }
 
     private void VoltarParaLista()
     {
         _pollTimer.Stop();
         _activeTicketId = null;
+        _activeTicketStatus = null;
         _isTicketListView = true;
 
         _messagesPanel.Visible = false;
         _inputPanel.Visible = false;
         _ticketListPanel.Visible = true;
         _backBtn.Visible = false;
+        _concluirBtn.Visible = false;
         _headerTitle.Text = "💬 MIConecta Chat";
         _headerTitle.Location = new Point(12, 12);
         _headerSubtitle.Text = "Suporte técnico";
@@ -546,6 +609,70 @@ public class ChatForm : Form
     // ACTIONS
     // ══════════════════════════════════════════════════════
 
+    private async Task ConcluirTicketAsync()
+    {
+        if (_activeTicketId == null) return;
+
+        var confirm = MessageBox.Show(
+            "Deseja concluir este chamado?",
+            "Concluir Chamado",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question);
+
+        if (confirm != DialogResult.Yes) return;
+
+        _concluirBtn.Enabled = false;
+        _concluirBtn.Text = "…";
+
+        try
+        {
+            var ok = await _api.ConcluirTicketAsync(_activeTicketId);
+            if (!ok)
+            {
+                MessageBox.Show("Não foi possível concluir o chamado.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                _concluirBtn.Enabled = true;
+                _concluirBtn.Text = "✔ Concluir";
+                return;
+            }
+
+            // Show satisfaction dialog
+            using var satisfacaoDialog = new SatisfacaoDialog();
+            if (satisfacaoDialog.ShowDialog(this) == DialogResult.OK && satisfacaoDialog.Nota > 0)
+            {
+                await _api.AvaliarTicketAsync(_activeTicketId, satisfacaoDialog.Nota, satisfacaoDialog.Comentario);
+            }
+
+            VoltarParaLista();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Erro ao concluir: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            _concluirBtn.Enabled = true;
+            _concluirBtn.Text = "✔ Concluir";
+        }
+    }
+
+    private void MostrarNotificacao(string titulo, string mensagem)
+    {
+        if (_notifyIcon == null)
+        {
+            _notifyIcon = new NotifyIcon
+            {
+                Icon = Icon ?? SystemIcons.Information,
+                Visible = true,
+            };
+            _notifyIcon.BalloonTipClicked += (s, e) => ShowChat();
+        }
+
+        _notifyIcon.BalloonTipTitle = titulo;
+        _notifyIcon.BalloonTipText = mensagem.Length > 80 ? mensagem[..80] + "…" : mensagem;
+        _notifyIcon.BalloonTipIcon = ToolTipIcon.Info;
+        _notifyIcon.ShowBalloonTip(5000);
+
+        // Play system notification sound
+        try { SystemSounds.Asterisk.Play(); } catch { }
+    }
+
     private async Task EnviarMensagemAsync()
     {
         var text = _inputBox.Text.Trim();
@@ -602,6 +729,7 @@ public class ChatForm : Form
         }
         _pollTimer.Stop();
         _pollTimer.Dispose();
+        if (_notifyIcon != null) { _notifyIcon.Visible = false; _notifyIcon.Dispose(); }
         base.OnFormClosing(e);
     }
 
@@ -704,5 +832,179 @@ public class NovoTicketDialog : Form
         Titulo = _tituloBox.Text.Trim();
         Descricao = _descricaoBox.Text.Trim();
         base.OnFormClosing(e);
+    }
+}
+
+// ══════════════════════════════════════════════════════
+// Dialog: Pesquisa de satisfação (5 carinhas)
+// ══════════════════════════════════════════════════════
+
+public class SatisfacaoDialog : Form
+{
+    public int Nota { get; private set; }
+    public string Comentario { get; private set; } = "";
+
+    private TextBox _comentarioBox = null!;
+    private Button? _selectedBtn;
+
+    private static readonly (string emoji, string label, int nota, Color color)[] Opcoes =
+    [
+        ("😠", "Péssimo", 1, Color.FromArgb(239, 68, 68)),
+        ("😟", "Ruim",    2, Color.FromArgb(249, 115, 22)),
+        ("😐", "Mediano", 3, Color.FromArgb(234, 179, 8)),
+        ("😊", "Bom",     4, Color.FromArgb(132, 204, 22)),
+        ("😄", "Excelente", 5, Color.FromArgb(34, 197, 94)),
+    ];
+
+    public SatisfacaoDialog()
+    {
+        Text = "Avaliação do Atendimento";
+        Size = new Size(400, 340);
+        FormBorderStyle = FormBorderStyle.FixedDialog;
+        StartPosition = FormStartPosition.CenterParent;
+        MaximizeBox = false;
+        MinimizeBox = false;
+        TopMost = true;
+        BackColor = Color.FromArgb(32, 32, 44);
+        ForeColor = Color.White;
+
+        var questionLabel = new Label
+        {
+            Text = "Como foi o atendimento?",
+            ForeColor = Color.White,
+            Font = new Font("Segoe UI", 12f, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Dock = DockStyle.Top,
+            Height = 44,
+            Padding = new Padding(0, 12, 0, 0),
+        };
+        Controls.Add(questionLabel);
+
+        // Emoji face buttons panel
+        var facesPanel = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 90,
+            Padding = new Padding(16, 4, 16, 4),
+        };
+        Controls.Add(facesPanel);
+
+        int btnWidth = 64;
+        int spacing = (360 - btnWidth * 5) / 4;
+        int x = 10;
+
+        foreach (var (emoji, label, nota, color) in Opcoes)
+        {
+            var btn = new Button
+            {
+                Text = emoji,
+                Font = new Font("Segoe UI Emoji", 24f),
+                Size = new Size(btnWidth, btnWidth),
+                Location = new Point(x, 2),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(48, 48, 64),
+                ForeColor = Color.White,
+                Cursor = Cursors.Hand,
+                Tag = nota,
+            };
+            btn.FlatAppearance.BorderSize = 2;
+            btn.FlatAppearance.BorderColor = Color.FromArgb(60, 60, 80);
+            btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(60, 60, 80);
+
+            var lbl = new Label
+            {
+                Text = label,
+                ForeColor = color,
+                Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Size = new Size(btnWidth, 16),
+                Location = new Point(x, btnWidth + 4),
+            };
+
+            btn.Click += (s, e) =>
+            {
+                // Deselect previous
+                if (_selectedBtn != null)
+                {
+                    _selectedBtn.BackColor = Color.FromArgb(48, 48, 64);
+                    _selectedBtn.FlatAppearance.BorderColor = Color.FromArgb(60, 60, 80);
+                }
+
+                Nota = nota;
+                _selectedBtn = btn;
+                btn.BackColor = Color.FromArgb(color.R / 4, color.G / 4, color.B / 4);
+                btn.FlatAppearance.BorderColor = color;
+            };
+
+            facesPanel.Controls.Add(btn);
+            facesPanel.Controls.Add(lbl);
+
+            x += btnWidth + spacing;
+        }
+
+        // Comment box
+        var commentLabel = new Label
+        {
+            Text = "Comentário (opcional):",
+            Location = new Point(16, 146),
+            AutoSize = true,
+            Font = new Font("Segoe UI", 9f),
+        };
+        Controls.Add(commentLabel);
+
+        _comentarioBox = new TextBox
+        {
+            Location = new Point(16, 168),
+            Size = new Size(352, 70),
+            Multiline = true,
+            BackColor = Color.FromArgb(40, 40, 56),
+            ForeColor = Color.White,
+            Font = new Font("Segoe UI", 9.5f),
+            BorderStyle = BorderStyle.FixedSingle,
+        };
+        Controls.Add(_comentarioBox);
+
+        // Buttons
+        var enviarBtn = new Button
+        {
+            Text = "Enviar avaliação",
+            Location = new Point(16, 252),
+            Size = new Size(170, 36),
+            BackColor = Color.FromArgb(34, 197, 94),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+            Cursor = Cursors.Hand,
+        };
+        enviarBtn.FlatAppearance.BorderSize = 0;
+        enviarBtn.Click += (s, e) =>
+        {
+            if (Nota == 0)
+            {
+                MessageBox.Show("Por favor, selecione uma avaliação.", "Avaliação", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            Comentario = _comentarioBox.Text.Trim();
+            DialogResult = DialogResult.OK;
+            Close();
+        };
+        Controls.Add(enviarBtn);
+
+        var pularBtn = new Button
+        {
+            Text = "Pular",
+            Location = new Point(200, 252),
+            Size = new Size(168, 36),
+            BackColor = Color.FromArgb(60, 60, 80),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Font = new Font("Segoe UI", 10f),
+            Cursor = Cursors.Hand,
+            DialogResult = DialogResult.Cancel,
+        };
+        pularBtn.FlatAppearance.BorderSize = 0;
+        Controls.Add(pularBtn);
+
+        CancelButton = pularBtn;
     }
 }

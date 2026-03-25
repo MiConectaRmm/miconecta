@@ -61,6 +61,15 @@ export class TicketsController {
     return this.ticketsService.contagem(tenantId);
   }
 
+  @Get('satisfacao')
+  @RequirePermissions('tickets:read')
+  @ApiOperation({ summary: 'Estatísticas de satisfação (média, distribuição, por cliente)' })
+  async satisfacao(@Req() req: any, @Query('tenantId') tenantIdParam?: string) {
+    const isSuperRole = ['super_admin', 'admin_maginf', 'admin'].includes(req.user?.role);
+    const tenantId = isSuperRole ? tenantIdParam : (req.tenantId || req.user.tenantId);
+    return this.ticketsService.satisfacao(tenantId);
+  }
+
   @Get(':id')
   @RequirePermissions('tickets:read')
   @ApiOperation({ summary: 'Buscar ticket por ID' })

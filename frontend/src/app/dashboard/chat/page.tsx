@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   MessageSquare, Send, Search, Clock, Building2,
   Wifi, WifiOff, ChevronLeft, User, Paperclip,
-  Bell, Volume2, VolumeX, RefreshCw,
+  Bell, Volume2, VolumeX, RefreshCw, CheckCircle2,
 } from 'lucide-react'
 import { ticketsApi, chatApi, storageApi } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth.store'
@@ -282,6 +282,20 @@ export default function MultiChatPage() {
     return () => clearInterval(interval)
   }, [carregarTickets])
 
+  // ── Concluir ticket (técnico) ──
+  const concluirTicket = async () => {
+    if (!activeTicketId) return
+    if (!confirm('Deseja concluir este chamado?')) return
+    try {
+      await ticketsApi.resolver(activeTicketId)
+      setTickets((prev) => prev.map((t) =>
+        t.id === activeTicketId ? { ...t, status: 'resolvido' } : t
+      ))
+    } catch (err) {
+      console.error('Erro ao concluir:', err)
+    }
+  }
+
   const activeTicket = tickets.find((t) => t.id === activeTicketId)
   const ticketsFiltrados = tickets.filter((t) => {
     if (!busca) return true
@@ -413,6 +427,16 @@ export default function MultiChatPage() {
                   <StatusBadge status={activeTicket?.status || ''} />
                 </div>
               </div>
+              {activeTicket && !['resolvido', 'fechado', 'cancelado'].includes(activeTicket.status) && (
+                <button
+                  onClick={concluirTicket}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 text-xs font-medium transition-colors"
+                  title="Concluir chamado"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Concluir
+                </button>
+              )}
             </div>
 
             {/* Messages */}

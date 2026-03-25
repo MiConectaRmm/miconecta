@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   Monitor, MonitorOff, AlertTriangle, CheckCircle2,
   Ticket, MessageSquare, Building2, Activity, Shield, Users, Eye,
-  Inbox, ChevronRight, Clock, RefreshCw,
+  Inbox, ChevronRight, Clock, RefreshCw, Star,
 } from 'lucide-react'
 import { devicesApi, alertsApi, ticketsApi, tenantsApi, techniciansApi } from '@/lib/api'
 import StatCard from '@/components/ui/StatCard'
@@ -25,6 +25,7 @@ export default function DashboardPage() {
   const [tickets, setTickets] = useState({ abertos: 0, emAtendimento: 0, total: 0 })
   const [clientesResumo, setClientesResumo] = useState<any[]>([])
   const [ticketsRecentes, setTicketsRecentes] = useState<any[]>([])
+  const [satisfacao, setSatisfacao] = useState<{ media: number; total: number; distribuicao: Record<string, number> } | null>(null)
   const [carregando, setCarregando] = useState(true)
   const { on } = useSocket('/chat')
 
@@ -49,13 +50,14 @@ export default function DashboardPage() {
 
   const carregar = async () => {
     try {
-      const [tenantsRes, techRes, resumoRes, alertasRes, ticketsRes, ticketsListRes] = await Promise.allSettled([
+      const [tenantsRes, techRes, resumoRes, alertasRes, ticketsRes, ticketsListRes, satisfacaoRes] = await Promise.allSettled([
         tenantsApi.listar(),
         isSuperAdmin ? techniciansApi.contagem() : Promise.resolve({ data: { total: 0 } }),
         devicesApi.resumo(),
         alertsApi.contagem(),
         ticketsApi.contagem(),
         ticketsApi.listar({ limit: 8 }),
+        ticketsApi.satisfacao(),
       ])
 
       if (tenantsRes.status === 'fulfilled') {
@@ -116,6 +118,9 @@ export default function DashboardPage() {
         const tl = ticketsListRes.value.data
         setTicketsRecentes(Array.isArray(tl) ? tl.slice(0, 8) : (tl?.items || []).slice(0, 8))
       }
+      if (satisfacaoRes.status === 'fulfilled') {
+        setSatisfacao(satisfacaoRes.value.data)
+      }
     } catch (err) {
       console.error('Erro ao carregar dashboard:', err)
     } finally {
@@ -173,6 +178,54 @@ export default function DashboardPage() {
         <StatCard title="Alertas" value={alertas.ativos} icon={AlertTriangle} color="amber" subtitle="ativos" />
         <StatCard title="Tickets" value={tickets.abertos} icon={Ticket} color="blue" subtitle="abertos" />
       </div>
+
+      {/* Satisfação do Cliente */}
+      {satisfacao && satisfacao.total > 0 && (
+        <div className="card mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Star className="w-5 h-5 text-yellow-400" />
+              Satisfação do Cliente
+            </h2>
+            <span className="text-xs text-dark-400">{satisfacao.total} avaliações</span>
+          </div>
+          <div className="flex items-center gap-8">
+            {/* Média grande */}
+            <div className="text-center">
+              <div className="text-4xl font-bold text-white">{satisfacao.media.toFixed(1)}</div>
+              <div className="flex items-center gap-0.5 mt-1 justify-center">
+                {[1, 2, 3, 4, 5].map(i => (
+                  <Star key={i} className={`w-4 h-4 ${i <= Math.round(satisfacao.media) ? 'text-yellow-400 fill-yellow-400' : 'text-dark-600'}`} />
+                ))}
+              </div>
+              <p className="text-xs text-dark-400 mt-1">de 5.0</p>
+            </div>
+            {/* Distribuição com carinhas */}
+            <div className="flex-1 space-y-1.5">
+              {[
+                { key: 'excelente', label: 'Excelente', emoji: '😄', color: 'bg-green-500' },
+                { key: 'bom', label: 'Bom', emoji: '😊', color: 'bg-lime-500' },
+                { key: 'mediano', label: 'Mediano', emoji: '😐', color: 'bg-yellow-500' },
+                { key: 'ruim', label: 'Ruim', emoji: '😟', color: 'bg-orange-500' },
+                { key: 'pessimo', label: 'Péssimo', emoji: '😠', color: 'bg-red-500' },
+              ].map(item => {
+                const count = satisfacao.distribuicao?.[item.key] || 0
+                const pct = satisfacao.total > 0 ? (count / satisfacao.total) * 100 : 0
+                return (
+                  <div key={item.key} className="flex items-center gap-2">
+                    <span className="text-sm w-5 text-center">{item.emoji}</span>
+                    <span className="text-xs text-dark-400 w-16">{item.label}</span>
+                    <div className="flex-1 h-2 bg-dark-800 rounded-full overflow-hidden">
+                      <div className={`h-full ${item.color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-xs text-dark-500 w-8 text-right">{count}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Saúde por cliente */}
