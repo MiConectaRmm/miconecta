@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Monitor,
   Inbox,
+  MessageSquare,
   Users,
   Building2,
   Settings,
@@ -26,6 +27,7 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/atendimento', label: 'Central de Atendimento', icon: Inbox },
+  { href: '/dashboard/chat', label: 'Chat Multi', icon: MessageSquare },
   { href: '/dashboard/clients', label: 'Clientes', icon: Building2 },
   { href: '/dashboard/technicians', label: 'Técnicos', icon: Users, roles: ['super_admin', 'admin', 'admin_maginf'] },
   { href: '/dashboard/settings', label: 'Configurações', icon: Settings, roles: ['super_admin', 'admin', 'admin_maginf'] },
