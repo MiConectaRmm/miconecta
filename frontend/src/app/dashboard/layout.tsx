@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import { Bell, Search, Check, BellOff, Clock, LogOut } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth.store'
 import { notificationsApi } from '@/lib/api'
+import { useSocket } from '@/hooks/useSocket'
+import { useChatNotificationsStore } from '@/stores/chat-notifications.store'
 
 export default function DashboardLayout({
   children,
@@ -13,7 +15,10 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
+  const pathname = usePathname()
   const { user, isAuthenticated, isLoading, hydrate, logout } = useAuthStore()
+  const { socket, on } = useSocket('/chat')
+  const incrementUnread = useChatNotificationsStore((s) => s.increment)
   const [notifCount, setNotifCount] = useState(0)
   const [notifications, setNotifications] = useState<any[]>([])
   const [showNotifs, setShowNotifs] = useState(false)
@@ -38,6 +43,21 @@ export default function DashboardLayout({
       return () => clearInterval(interval)
     }
   }, [isAuthenticated])
+
+  // ── Global WS listener for chat badge (only when NOT on chat page) ──
+  useEffect(() => {
+    if (!socket || !isAuthenticated) return
+    const isOnChat = pathname?.startsWith('/dashboard/chat')
+    if (isOnChat) return // chat page manages its own unread
+
+    const offConv = on('conversation:message:new', (raw: any) => {
+      if (raw.senderUserId !== user?.id) incrementUnread(`conv-${raw.conversationId}`)
+    })
+    const offTicket = on('message:new', (raw: any) => {
+      if (raw.remetenteId !== user?.id && raw.senderId !== user?.id) incrementUnread(`ticket-${raw.ticketId}`)
+    })
+    return () => { offConv(); offTicket() }
+  }, [socket, on, isAuthenticated, pathname, user?.id, incrementUnread])
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth.store'
+import { useChatNotificationsStore } from '@/stores/chat-notifications.store'
 
 interface MenuItem {
   href: string
@@ -27,7 +28,7 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/atendimento', label: 'Central de Atendimento', icon: Inbox },
-  { href: '/dashboard/chat', label: 'Chat Multi', icon: MessageSquare },
+  { href: '/dashboard/chat', label: 'Inbox', icon: MessageSquare },
   { href: '/dashboard/clients', label: 'Clientes', icon: Building2 },
   { href: '/dashboard/technicians', label: 'Técnicos', icon: Users, roles: ['super_admin', 'admin', 'admin_maginf'] },
   { href: '/dashboard/settings', label: 'Configurações', icon: Settings, roles: ['super_admin', 'admin', 'admin_maginf'] },
@@ -97,6 +98,7 @@ export default function Sidebar() {
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
                   {item.label}
+                  {item.href === '/dashboard/chat' && <ChatBadge />}
                 </Link>
               </li>
             )
@@ -128,5 +130,15 @@ export default function Sidebar() {
         </p>
       </div>
     </aside>
+  )
+}
+
+function ChatBadge() {
+  const totalUnread = useChatNotificationsStore((s) => s.totalUnread)
+  if (totalUnread <= 0) return null
+  return (
+    <span className="ml-auto flex-shrink-0 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+      {totalUnread > 9 ? '9+' : totalUnread}
+    </span>
   )
 }

@@ -11,6 +11,7 @@ import { ticketsApi, chatApi, conversationsApi } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth.store'
 import { useSocket } from '@/hooks/useSocket'
 import StatusBadge from '@/components/ui/StatusBadge'
+import { useChatNotificationsStore } from '@/stores/chat-notifications.store'
 
 // ── Types ──
 
@@ -91,6 +92,8 @@ export default function InboxPage() {
   const joinedRoomsRef = useRef<Set<string>>(new Set())
 
   const { socket, emit, on } = useSocket('/chat')
+  const setChatTotal = useChatNotificationsStore((s) => s.setTotal)
+  const incrementUnread = useChatNotificationsStore((s) => s.increment)
 
   // ── Som ──
   const playSound = useCallback(() => {
@@ -196,12 +199,16 @@ export default function InboxPage() {
       })
 
       setItems(inboxItems)
+
+      // Sync unread to global store for sidebar badge
+      const total = inboxItems.reduce((sum, i) => sum + i.unread, 0)
+      setChatTotal(total)
     } catch (err) {
       console.error('Erro ao carregar inbox:', err)
     } finally {
       setLoading(false)
     }
-  }, [user?.nome])
+  }, [user?.nome, setChatTotal])
 
   useEffect(() => { carregarInbox() }, [carregarInbox])
 
@@ -231,7 +238,10 @@ export default function InboxPage() {
         const isActive = activeItem?.conversationId === convId
         return { ...i, unread: isActive ? i.unread : i.unread + 1, lastMessage: msg.content, lastMessageAt: msg.criadoEm }
       }))
-      if (msg.senderId !== user?.id && activeItem?.conversationId !== convId) playSound()
+      if (msg.senderId !== user?.id && activeItem?.conversationId !== convId) {
+        playSound()
+        incrementUnread(`conv-${convId}`)
+      }
     })
 
     // Legacy ticket messages
@@ -246,7 +256,10 @@ export default function InboxPage() {
         const isActive = activeItem?.ticketId === ticketId
         return { ...i, unread: isActive ? i.unread : i.unread + 1, lastMessage: msg.content, lastMessageAt: msg.criadoEm }
       }))
-      if (msg.senderId !== user?.id && activeItem?.ticketId !== ticketId) playSound()
+      if (msg.senderId !== user?.id && activeItem?.ticketId !== ticketId) {
+        playSound()
+        incrementUnread(`ticket-${ticketId}`)
+      }
     })
 
     const offConvNew = on('conversation:new', () => { carregarInbox(true); playSound() })
