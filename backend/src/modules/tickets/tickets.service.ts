@@ -7,6 +7,9 @@ import { ChatMessage, ChatRemetenteTipo } from '../../database/entities/chat-mes
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { ChatGateway } from '../chat/chat.gateway';
 import { TicketIntelligenceService } from './ticket-intelligence.service';
+import { ConversationsService } from '../conversations/conversations.service';
+import { ConversationType } from '../../database/entities/conversation.entity';
+import { ParticipantRole } from '../../database/entities/conversation-participant.entity';
 
 @Injectable()
 export class TicketsService {
@@ -19,6 +22,7 @@ export class TicketsService {
     private readonly chatRepo: Repository<ChatMessage>,
     private readonly chatGateway: ChatGateway,
     private readonly intelligenceService: TicketIntelligenceService,
+    private readonly conversationsService: ConversationsService,
   ) {}
 
   async criar(tenantId: string, dto: CreateTicketDto, criadoPor: { id: string; nome: string; tipo: string }) {
@@ -44,6 +48,29 @@ export class TicketsService {
       categoriaId: automacao.categoriaId,
       atribuidoA: automacao.atribuidoA,
     } as any);
+
+    // Criar Conversation vinculada ao ticket
+    try {
+      const conversation = await this.conversationsService.criar({
+        tenantId,
+        type: ConversationType.SUPPORT,
+        titulo: dto.titulo,
+        deviceId: dto.deviceId,
+      });
+      await this.ticketRepo.update(salvo.id, { conversationId: conversation.id });
+
+      // Adicionar criador como participante
+      const participantRole = criadoPor.tipo === 'client_user' ? ParticipantRole.CLIENT : ParticipantRole.TECHNICIAN;
+      await this.conversationsService.adicionarParticipante({
+        conversationId: conversation.id,
+        userId: criadoPor.id,
+        participantName: criadoPor.nome,
+        role: participantRole,
+      });
+    } catch (err) {
+      // Não falhar o ticket se a conversation falhar
+      console.warn('Falha ao criar conversation para ticket:', err);
+    }
 
     // Calcular SLA baseado na prioridade
     const ticketAtualizado = await this.buscar(salvo.id, tenantId);
@@ -132,7 +159,7 @@ export class TicketsService {
   async buscar(id: string, tenantId: string) {
     const ticket = await this.ticketRepo.findOne({
       where: { id, tenantId },
-      relations: ['device', 'organization', 'tecnicoAtribuido', 'tenant'],
+      relations: ['device', 'organization', 'tecnicoAtribuido', 'tenant', 'conversation'],
     });
     if (!ticket) throw new NotFoundException('Ticket não encontrado');
     ticket.slaStatus = this.calcularStatusSla(ticket);
