@@ -60,6 +60,15 @@ export class ConversationsService {
     return query.orderBy('c.lastMessageAt', 'DESC', 'NULLS LAST').take(100).getMany();
   }
 
+  async listarPorTenant(tenantId: string) {
+    return this.conversationRepo.find({
+      where: { tenantId },
+      relations: ['participants'],
+      order: { lastMessageAt: { direction: 'DESC', nulls: 'LAST' } },
+      take: 100,
+    });
+  }
+
   async listarPorParticipante(userId: string, tenantId: string) {
     return this.conversationRepo.createQueryBuilder('c')
       .leftJoinAndSelect('c.participants', 'p')

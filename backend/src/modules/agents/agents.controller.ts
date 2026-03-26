@@ -18,7 +18,11 @@ import { AgentsService } from './agents.service';
 import { ChatService } from '../chat/chat.service';
 import { ChatGateway } from '../chat/chat.gateway';
 import { TicketsService } from '../tickets/tickets.service';
+import { ConversationsService } from '../conversations/conversations.service';
 import { ChatRemetenteTipo } from '../../database/entities/chat-message.entity';
+import { ConversationType } from '../../database/entities/conversation.entity';
+import { ParticipantRole } from '../../database/entities/conversation-participant.entity';
+import { ConversationMessageType } from '../../database/entities/conversation-message.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Not } from 'typeorm';
 import { Ticket, TicketStatus, TicketOrigem, TicketPrioridade } from '../../database/entities/ticket.entity';
@@ -33,6 +37,7 @@ export class AgentsController {
     private readonly chatService: ChatService,
     private readonly chatGateway: ChatGateway,
     private readonly ticketsService: TicketsService,
+    private readonly conversationsService: ConversationsService,
     @InjectRepository(Ticket)
     private readonly ticketRepo: Repository<Ticket>,
   ) {}
@@ -457,5 +462,112 @@ export class AgentsController {
     } as any);
 
     return { id: ticketId, nota, status: 'fechado', message: 'Avaliação registrada' };
+  }
+
+  // ─── Agent Conversation Endpoints ─────────────────────────────
+
+  @Get('me/conversations')
+  @UseGuards(AgentAuthGuard)
+  @ApiOperation({ summary: 'Listar conversas do dispositivo autenticado' })
+  async meConversations(@Req() req: any) {
+    const device = req.device;
+    const tenantId = req.tenantId;
+    return this.conversationsService.listarPorTenant(tenantId);
+  }
+
+  @Post('me/conversations')
+  @UseGuards(AgentAuthGuard)
+  @ApiOperation({ summary: 'Criar conversa a partir do agente (sem ticket)' })
+  async meCreateConversation(
+    @Req() req: any,
+    @Body() body: { titulo?: string; mensagemInicial?: string },
+  ) {
+    const device = req.device;
+    const tenantId = req.tenantId;
+
+    const conversation = await this.conversationsService.criar({
+      tenantId,
+      type: ConversationType.DEVICE,
+      titulo: body.titulo || `Chat - ${device.hostname || 'Dispositivo'}`,
+      deviceId: device.id,
+    });
+
+    // Adicionar device como participante
+    await this.conversationsService.adicionarParticipante({
+      conversationId: conversation.id,
+      deviceId: device.id,
+      participantName: device.hostname || 'Dispositivo',
+      role: ParticipantRole.CLIENT,
+    });
+
+    // Mensagem inicial se fornecida
+    if (body.mensagemInicial) {
+      await this.conversationsService.enviarMensagem({
+        conversationId: conversation.id,
+        senderDeviceId: device.id,
+        senderName: device.hostname || 'Dispositivo',
+        senderType: 'device',
+        content: body.mensagemInicial,
+        type: ConversationMessageType.TEXT,
+      });
+    }
+
+    // Emitir via WebSocket
+    this.chatGateway.emitConversationNew(tenantId, conversation);
+
+    return conversation;
+  }
+
+  @Get('me/conversations/:conversationId/messages')
+  @UseGuards(AgentAuthGuard)
+  @ApiOperation({ summary: 'Listar mensagens de uma conversa do dispositivo' })
+  async meConversationMessages(
+    @Req() req: any,
+    @Param('conversationId') conversationId: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    const tenantId = req.tenantId;
+    const conversation = await this.conversationsService.buscar(conversationId, tenantId);
+    return this.conversationsService.listarMensagens(
+      conversation.id,
+      limit ? parseInt(limit, 10) : 50,
+      offset ? parseInt(offset, 10) : 0,
+    );
+  }
+
+  @Post('me/conversations/:conversationId/messages')
+  @UseGuards(AgentAuthGuard)
+  @ApiOperation({ summary: 'Enviar mensagem em uma conversa do dispositivo' })
+  async meConversationSendMessage(
+    @Req() req: any,
+    @Param('conversationId') conversationId: string,
+    @Body() body: { content: string },
+  ) {
+    const device = req.device;
+    const tenantId = req.tenantId;
+
+    const conversation = await this.conversationsService.buscar(conversationId, tenantId);
+
+    const message = await this.conversationsService.enviarMensagem({
+      conversationId: conversation.id,
+      senderDeviceId: device.id,
+      senderName: device.hostname || 'Dispositivo',
+      senderType: 'device',
+      content: body.content,
+      type: ConversationMessageType.TEXT,
+    });
+
+    // Emitir via WebSocket
+    this.chatGateway.emitConversationMessage(conversation.id, message);
+    this.chatGateway.emitAtendimento('notification:new', {
+      type: 'conversation_message',
+      conversationId: conversation.id,
+      tenantId,
+      message,
+      timestamp: new Date(),
+    });
+
+    return message;
   }
 }

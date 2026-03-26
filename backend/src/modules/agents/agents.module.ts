@@ -13,6 +13,7 @@ import { Ticket } from '../../database/entities/ticket.entity';
 import { AlertsModule } from '../alerts/alerts.module';
 import { ChatModule } from '../chat/chat.module';
 import { TicketsModule } from '../tickets/tickets.module';
+import { ConversationsModule } from '../conversations/conversations.module';
 import { AgentsController } from './agents.controller';
 import { AgentsService } from './agents.service';
 import { AgentAuthGuard } from '../auth/guards/agent-auth.guard';
@@ -30,6 +31,7 @@ import { AgentAuthGuard } from '../auth/guards/agent-auth.guard';
     AlertsModule,
     ChatModule,
     TicketsModule,
+    ConversationsModule,
   ],
   controllers: [AgentsController],
   providers: [AgentsService, AgentAuthGuard],
