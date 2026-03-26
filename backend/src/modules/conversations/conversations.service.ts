@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger, Inject, forwardRef } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan, Not } from 'typeorm';
+import { ChatConversationAdapter } from './chat-conversation.adapter';
 import { Conversation, ConversationStatus, ConversationType } from '../../database/entities/conversation.entity';
 import { ConversationParticipant, ParticipantRole } from '../../database/entities/conversation-participant.entity';
 import { ConversationMessage, ConversationMessageType } from '../../database/entities/conversation-message.entity';
@@ -17,6 +18,8 @@ export class ConversationsService {
     private readonly participantRepo: Repository<ConversationParticipant>,
     @InjectRepository(ConversationMessage)
     private readonly messageRepo: Repository<ConversationMessage>,
+    @Inject(forwardRef(() => ChatConversationAdapter))
+    private readonly chatConversationAdapter: ChatConversationAdapter,
   ) {}
 
   async criar(dados: {
@@ -129,19 +132,22 @@ export class ConversationsService {
 
   // ── Mensagens ──
 
-  async enviarMensagem(dados: {
-    conversationId: string;
-    senderUserId?: string;
-    senderDeviceId?: string;
-    senderName: string;
-    senderType: string;
-    content: string;
-    type?: ConversationMessageType;
-    arquivoUrl?: string;
-    arquivoNome?: string;
-    arquivoTamanho?: number;
-    metadata?: Record<string, any>;
-  }): Promise<ConversationMessage> {
+  async enviarMensagem(
+    dados: {
+      conversationId: string;
+      senderUserId?: string;
+      senderDeviceId?: string;
+      senderName: string;
+      senderType: string;
+      content: string;
+      type?: ConversationMessageType;
+      arquivoUrl?: string;
+      arquivoNome?: string;
+      arquivoTamanho?: number;
+      metadata?: Record<string, any>;
+    },
+    opts?: { skipReplicationToLegacy?: boolean },
+  ): Promise<ConversationMessage> {
     // Business rule: block messages on closed/archived conversations (except system)
     if (dados.senderType !== 'system') {
       const conv = await this.conversationRepo.findOne({ where: { id: dados.conversationId } });
@@ -175,17 +181,24 @@ export class ConversationsService {
       lastMessagePreview: dados.content.substring(0, 200),
     });
 
+    if (!opts?.skipReplicationToLegacy) {
+      void this.chatConversationAdapter.replicarMensagemConversationParaLegado(saved).catch(() => {});
+    }
+
     return saved;
   }
 
   async enviarMensagemSistema(conversationId: string, content: string): Promise<ConversationMessage> {
-    return this.enviarMensagem({
-      conversationId,
-      senderName: 'Sistema',
-      senderType: 'system',
-      content,
-      type: ConversationMessageType.SYSTEM,
-    });
+    return this.enviarMensagem(
+      {
+        conversationId,
+        senderName: 'Sistema',
+        senderType: 'system',
+        content,
+        type: ConversationMessageType.SYSTEM,
+      },
+      undefined,
+    );
   }
 
   async listarMensagens(conversationId: string, limit: number = 100, offset: number = 0) {
@@ -227,6 +240,51 @@ export class ConversationsService {
       .andWhere('m.criadoEm > :lastRead', { lastRead: participant.lastReadAt })
       .andWhere('(m.senderUserId IS NULL OR m.senderUserId != :userId)', { userId })
       .getCount();
+  }
+
+  async marcarComoLidaPorDevice(conversationId: string, deviceId: string) {
+    await this.participantRepo.update(
+      { conversationId, deviceId },
+      { lastReadAt: new Date() },
+    );
+  }
+
+  async contarNaoLidasPorDevice(conversationId: string, deviceId: string): Promise<number> {
+    const participant = await this.participantRepo.findOne({
+      where: { conversationId, deviceId },
+    });
+    if (!participant || !participant.lastReadAt) {
+      return this.messageRepo
+        .createQueryBuilder('m')
+        .where('m.conversationId = :conversationId', { conversationId })
+        .andWhere('(m.senderDeviceId IS NULL OR m.senderDeviceId != :deviceId)', { deviceId })
+        .getCount();
+    }
+
+    return this.messageRepo
+      .createQueryBuilder('m')
+      .where('m.conversationId = :conversationId', { conversationId })
+      .andWhere('m.criadoEm > :lastRead', { lastRead: participant.lastReadAt })
+      .andWhere('(m.senderDeviceId IS NULL OR m.senderDeviceId != :deviceId)', { deviceId })
+      .getCount();
+  }
+
+  /** Mensagens de conversa não lidas pelo dispositivo (outros remetentes), para o agente. */
+  async listarMensagensNaoLidasDispositivo(deviceId: string, tenantId: string): Promise<ConversationMessage[]> {
+    const convs = await this.listarPorDevice(deviceId, tenantId);
+    const out: ConversationMessage[] = [];
+    for (const c of convs) {
+      const n = await this.contarNaoLidasPorDevice(c.id, deviceId);
+      if (n === 0) continue;
+      const recent = await this.messageRepo.find({
+        where: { conversationId: c.id },
+        order: { criadoEm: 'DESC' },
+        take: 5,
+      });
+      const fromOthers = recent.filter((m) => m.senderDeviceId !== deviceId);
+      if (fromOthers.length > 0) out.push(fromOthers[0]);
+    }
+    return out;
   }
 
   // ── Status ──

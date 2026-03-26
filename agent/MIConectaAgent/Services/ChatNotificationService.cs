@@ -56,7 +56,8 @@ public class ChatNotificationService : BackgroundService
         await Task.Run(() => ExibirNotificacao(
             remetente: payload.Remetente,
             conteudo: payload.Conteudo,
-            ticketId: payload.TicketId));
+            ticketId: payload.TicketId,
+            conversationId: null));
     }
 
     // ── Handler HTTP polling ──
@@ -70,19 +71,23 @@ public class ChatNotificationService : BackgroundService
         Task.Run(() => ExibirNotificacao(
             remetente: notif.RemetenteNome,
             conteudo: notif.Conteudo,
-            ticketId: notif.TicketId));
+            ticketId: notif.TicketId,
+            conversationId: string.IsNullOrEmpty(notif.ConversationId) ? null : notif.ConversationId));
     }
 
     // ─────────────────────────────────────────────────────
     // Notificação desktop
     // ─────────────────────────────────────────────────────
 
-    private static void ExibirNotificacao(string remetente, string conteudo, string ticketId)
+    private static void ExibirNotificacao(string remetente, string conteudo, string ticketId, string? conversationId)
     {
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return;
 
         var titulo = $"💬 MIConectaRMM — {remetente}";
-        var mensagem = $"Ticket #{ticketId}\n\n{conteudo}\n\n[Esta é uma notificação do suporte técnico]";
+        var refLinha = !string.IsNullOrEmpty(ticketId)
+            ? $"Ticket #{ticketId}"
+            : (!string.IsNullOrEmpty(conversationId) ? "Conversa com suporte" : "Suporte");
+        var mensagem = $"{refLinha}\n\n{conteudo}\n\n[Esta é uma notificação do suporte técnico]";
 
         // MessageBox em thread separada — não bloqueia o serviço
         // Usa MB_TOPMOST | MB_SYSTEMMODAL para aparecer sobre outras janelas

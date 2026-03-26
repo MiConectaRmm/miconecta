@@ -1,6 +1,6 @@
 import {
   Controller, Post, Get, Put, Body, Req, Param, Delete, Query,
-  UseGuards, Headers, Res,
+  UseGuards, Headers, Res, ForbiddenException,
 } from '@nestjs/common';
 import { Response } from 'express';
 import * as path from 'path';
@@ -472,7 +472,39 @@ export class AgentsController {
   async meConversations(@Req() req: any) {
     const device = req.device;
     const tenantId = req.tenantId;
-    return this.conversationsService.listarPorTenant(tenantId);
+    return this.conversationsService.listarPorDevice(device.id, tenantId);
+  }
+
+  @Get('me/chat/unread')
+  @UseGuards(AgentAuthGuard)
+  @ApiOperation({ summary: 'Mensagens não lidas (tickets + conversas) para o agente' })
+  async meChatUnread(@Req() req: any) {
+    const device = req.device;
+    const tenantId = req.tenantId;
+    const ticketMsgs = await this.chatService.listarMensagensNaoLidasAgente(device.id, tenantId);
+    const convMsgs = await this.conversationsService.listarMensagensNaoLidasDispositivo(device.id, tenantId);
+    const list: Record<string, unknown>[] = [];
+    for (const m of ticketMsgs) {
+      list.push({
+        id: m.id,
+        ticketId: m.ticketId,
+        conversationId: null,
+        remetenteNome: m.remetenteNome,
+        conteudo: m.conteudo,
+        criadoEm: m.criadoEm,
+      });
+    }
+    for (const m of convMsgs) {
+      list.push({
+        id: m.id,
+        ticketId: null,
+        conversationId: m.conversationId,
+        remetenteNome: m.senderName,
+        conteudo: m.content,
+        criadoEm: m.criadoEm,
+      });
+    }
+    return list;
   }
 
   @Post('me/conversations')
@@ -527,13 +559,20 @@ export class AgentsController {
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
+    const device = req.device;
     const tenantId = req.tenantId;
     const conversation = await this.conversationsService.buscar(conversationId, tenantId);
-    return this.conversationsService.listarMensagens(
+    const parts = await this.conversationsService.listarParticipantes(conversation.id);
+    if (!parts.some((p) => p.deviceId === device.id)) {
+      throw new ForbiddenException('Dispositivo não participa desta conversa');
+    }
+    const msgs = await this.conversationsService.listarMensagens(
       conversation.id,
       limit ? parseInt(limit, 10) : 50,
       offset ? parseInt(offset, 10) : 0,
     );
+    await this.conversationsService.marcarComoLidaPorDevice(conversation.id, device.id);
+    return msgs;
   }
 
   @Post('me/conversations/:conversationId/messages')
@@ -548,6 +587,10 @@ export class AgentsController {
     const tenantId = req.tenantId;
 
     const conversation = await this.conversationsService.buscar(conversationId, tenantId);
+    const parts = await this.conversationsService.listarParticipantes(conversation.id);
+    if (!parts.some((p) => p.deviceId === device.id)) {
+      throw new ForbiddenException('Dispositivo não participa desta conversa');
+    }
 
     const message = await this.conversationsService.enviarMensagem({
       conversationId: conversation.id,

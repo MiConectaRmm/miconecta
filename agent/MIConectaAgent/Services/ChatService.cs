@@ -24,7 +24,7 @@ public class ChatService
     }
 
     /// <summary>
-    /// Verifica se há mensagens de chat não lidas para tickets associados ao dispositivo.
+    /// Verifica mensagens não lidas em tickets e em conversations (GET agents/me/chat/unread).
     /// </summary>
     public async Task<List<ChatNotification>> VerificarMensagens()
     {
@@ -35,9 +35,17 @@ public class ChatService
             var mensagens = await _apiClient.ObterMensagensNaoLidas();
             foreach (var msg in mensagens)
             {
+                var ticketId = msg.TryGetProperty("ticketId", out var tid) && tid.ValueKind != JsonValueKind.Null
+                    ? tid.GetString() ?? ""
+                    : "";
+                var conversationId = msg.TryGetProperty("conversationId", out var cid) && cid.ValueKind != JsonValueKind.Null
+                    ? cid.GetString() ?? ""
+                    : "";
+
                 var notif = new ChatNotification
                 {
-                    TicketId = msg.TryGetProperty("ticketId", out var tid) ? tid.GetString() ?? "" : "",
+                    TicketId = ticketId,
+                    ConversationId = conversationId,
                     MensagemId = msg.TryGetProperty("id", out var mid) ? mid.GetString() ?? "" : "",
                     RemetenteNome = msg.TryGetProperty("remetenteNome", out var rn) ? rn.GetString() ?? "" : "Suporte",
                     Conteudo = msg.TryGetProperty("conteudo", out var c) ? c.GetString() ?? "" : "",
@@ -47,8 +55,8 @@ public class ChatService
                 notificacoes.Add(notif);
                 OnNovaMensagem?.Invoke(notif);
 
-                _logger.LogDebug("Nova mensagem de {Remetente} no ticket {TicketId}",
-                    notif.RemetenteNome, notif.TicketId);
+                _logger.LogDebug("Nova mensagem de {Remetente} (ticket={TicketId}, conv={ConversationId})",
+                    notif.RemetenteNome, notif.TicketId, notif.ConversationId);
             }
         }
         catch (Exception ex)
@@ -60,7 +68,7 @@ public class ChatService
     }
 
     /// <summary>
-    /// Envia uma mensagem de resposta do usuário local.
+    /// Envia mensagem em um ticket (chat legado).
     /// </summary>
     public async Task<bool> EnviarMensagem(string ticketId, string conteudo)
     {
@@ -77,11 +85,32 @@ public class ChatService
             return false;
         }
     }
+
+    /// <summary>
+    /// Envia mensagem em uma conversation (sem ticket obrigatório).
+    /// </summary>
+    public async Task<bool> EnviarMensagemConversa(string conversationId, string conteudo)
+    {
+        try
+        {
+            var sucesso = await _apiClient.EnviarMensagemConversa(conversationId, conteudo);
+            if (sucesso)
+                _logger.LogInformation("Mensagem enviada na conversa {ConversationId}", conversationId);
+            return sucesso;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao enviar mensagem na conversa {ConversationId}", conversationId);
+            return false;
+        }
+    }
 }
 
 public class ChatNotification
 {
     public string TicketId { get; set; } = "";
+    /// <summary>Guid da conversation quando a notificação não é de ticket.</summary>
+    public string ConversationId { get; set; } = "";
     public string MensagemId { get; set; } = "";
     public string RemetenteNome { get; set; } = "";
     public string Conteudo { get; set; } = "";

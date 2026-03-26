@@ -260,7 +260,7 @@ public class ApiClient
         try
         {
             AdicionarHeaders();
-            var response = await _http.GetAsync("chat/agent/unread");
+            var response = await _http.GetAsync("agents/me/chat/unread");
             if (!response.IsSuccessStatusCode) return new List<JsonElement>();
             return await response.Content.ReadFromJsonAsync<List<JsonElement>>() ?? new List<JsonElement>();
         }
@@ -268,6 +268,77 @@ public class ApiClient
         {
             _logger.LogError(ex, "Erro ao obter mensagens não lidas");
             return new List<JsonElement>();
+        }
+    }
+
+    public async Task<List<JsonElement>> ListarConversacoesAgente()
+    {
+        try
+        {
+            AdicionarHeaders();
+            var response = await _http.GetAsync("agents/me/conversations");
+            if (!response.IsSuccessStatusCode) return new List<JsonElement>();
+            return await response.Content.ReadFromJsonAsync<List<JsonElement>>() ?? new List<JsonElement>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao listar conversas do agente");
+            return new List<JsonElement>();
+        }
+    }
+
+    public async Task<JsonElement?> CriarConversaAgente(string? titulo = null, string? mensagemInicial = null)
+    {
+        try
+        {
+            AdicionarHeaders();
+            var body = new Dictionary<string, object?>
+            {
+                ["titulo"] = titulo,
+                ["mensagemInicial"] = mensagemInicial,
+            };
+            var response = await _http.PostAsJsonAsync("agents/me/conversations", body);
+            if (!response.IsSuccessStatusCode) return null;
+            return await response.Content.ReadFromJsonAsync<JsonElement>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao criar conversa no servidor");
+            return null;
+        }
+    }
+
+    public async Task<List<JsonElement>> ListarMensagensConversa(string conversationId, int limit = 50)
+    {
+        try
+        {
+            AdicionarHeaders();
+            var response = await _http.GetAsync($"agents/me/conversations/{Uri.EscapeDataString(conversationId)}/messages?limit={limit}");
+            if (!response.IsSuccessStatusCode) return new List<JsonElement>();
+            return await response.Content.ReadFromJsonAsync<List<JsonElement>>() ?? new List<JsonElement>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao listar mensagens da conversa");
+            return new List<JsonElement>();
+        }
+    }
+
+    public async Task<bool> EnviarMensagemConversa(string conversationId, string conteudo)
+    {
+        try
+        {
+            AdicionarHeaders();
+            var payload = new { content = conteudo };
+            var response = await _http.PostAsJsonAsync(
+                $"agents/me/conversations/{Uri.EscapeDataString(conversationId)}/messages",
+                payload);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao enviar mensagem na conversa {ConversationId}", conversationId);
+            return false;
         }
     }
 

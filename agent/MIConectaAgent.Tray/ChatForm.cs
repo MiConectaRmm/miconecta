@@ -43,6 +43,7 @@ public class ChatForm : Form
     private string? _activeTicketId;
     private string? _activeTicketTitle;
     private string? _activeTicketStatus;
+    private bool _activeIsConversation;
     private readonly HashSet<string> _renderedMessageIds = [];
     private bool _isTicketListView = true;
 
@@ -356,7 +357,11 @@ public class ChatForm : Form
         }
 
         loadingLabel.Text = "Carregando chamados...";
+        var conversas = await _api.ListarConversacoesAsync();
         var tickets = await _api.ListarTicketsAsync();
+        var merged = new List<ChatTicket>();
+        merged.AddRange(conversas);
+        merged.AddRange(tickets);
         _ticketListPanel.Controls.Clear();
 
         // Mostrar erro da API se houver
@@ -374,11 +379,13 @@ public class ChatForm : Form
             _ticketListPanel.Controls.Add(apiErrorLabel);
         }
 
-        // New ticket button — always at top
+        // Novo chamado + conversa sem ticket
         var newTicketBtn = CriarBotaoNovoTicket();
         _ticketListPanel.Controls.Add(newTicketBtn);
+        var novaConversaBtn = CriarBotaoNovaConversa();
+        _ticketListPanel.Controls.Add(novaConversaBtn);
 
-        if (tickets.Count == 0)
+        if (merged.Count == 0)
         {
             var emptyLabel = new Label
             {
@@ -395,9 +402,9 @@ public class ChatForm : Form
         else
         {
             // Reverse so newest is at top (controls dock top = first added is lowest)
-            for (int i = tickets.Count - 1; i >= 0; i--)
+            for (int i = merged.Count - 1; i >= 0; i--)
             {
-                var ticket = tickets[i];
+                var ticket = merged[i];
                 var ticketPanel = CriarItemTicket(ticket);
                 _ticketListPanel.Controls.Add(ticketPanel);
             }
@@ -423,6 +430,35 @@ public class ChatForm : Form
         return btn;
     }
 
+    private Button CriarBotaoNovaConversa()
+    {
+        var btn = new Button
+        {
+            Text = "💬  Conversa com suporte (sem chamado)",
+            Dock = DockStyle.Top,
+            Height = 40,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.FromArgb(45, 55, 72),
+            ForeColor = TextWhite,
+            Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+            Cursor = Cursors.Hand,
+            Margin = new Padding(0, 0, 0, 8),
+        };
+        btn.FlatAppearance.BorderSize = 0;
+        btn.Click += async (s, e) => await CriarConversaRapidaAsync();
+        return btn;
+    }
+
+    private async Task CriarConversaRapidaAsync()
+    {
+        var c = await _api.CriarConversaAsync($"Suporte — {_hostname}", null);
+        if (c != null)
+            await AbrirTicketAsync(c);
+        else
+            MessageBox.Show("Não foi possível abrir a conversa.\nVerifique a conexão.",
+                "Erro", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+    }
+
     private Panel CriarItemTicket(ChatTicket ticket)
     {
         var panel = new Panel
@@ -435,12 +471,14 @@ public class ChatForm : Form
             Padding = new Padding(12, 8, 12, 8),
         };
 
-        var statusColor = ticket.Status switch
-        {
-            "aberto" => AccentGreen,
-            "em_atendimento" => Color.FromArgb(251, 191, 36), // amber
-            _ => TextMuted,
-        };
+        var statusColor = ticket.IsConversation
+            ? BrandColor
+            : ticket.Status switch
+            {
+                "aberto" => AccentGreen,
+                "em_atendimento" => Color.FromArgb(251, 191, 36), // amber
+                _ => TextMuted,
+            };
 
         var dot = new Label
         {
@@ -463,7 +501,7 @@ public class ChatForm : Form
 
         var statusLabel = new Label
         {
-            Text = ticket.Status.Replace("_", " "),
+            Text = ticket.IsConversation ? "conversa" : ticket.Status.Replace("_", " "),
             ForeColor = TextMuted,
             Font = new Font("Segoe UI", 8f),
             AutoSize = true,
@@ -503,6 +541,7 @@ public class ChatForm : Form
 
     private async Task AbrirTicketAsync(ChatTicket ticket)
     {
+        _activeIsConversation = ticket.IsConversation;
         _activeTicketId = ticket.Id;
         _activeTicketTitle = ticket.Titulo;
         _activeTicketStatus = ticket.Status;
@@ -519,10 +558,10 @@ public class ChatForm : Form
         _headerSubtitle.Text = ticket.Status.Replace("_", " ");
         _headerSubtitle.Location = new Point(44, 38);
 
-        // Show concluir button only for active tickets
-        var canConcluir = ticket.Status is "aberto" or "em_atendimento" or "aguardando_cliente" or "aguardando_tecnico";
+        // Finalizar só para tickets ativos (não para conversation pura)
+        var canConcluir = !ticket.IsConversation && ticket.Status is "aberto" or "em_atendimento" or "aguardando_cliente" or "aguardando_tecnico";
         _concluirBtn.Visible = canConcluir;
-        _inputPanel.Visible = canConcluir; // hide input for resolved/closed
+        _inputPanel.Visible = ticket.IsConversation || canConcluir;
 
         await LoadMessagesAsync(ticket.Id);
         _pollTimer.Start();
@@ -534,6 +573,7 @@ public class ChatForm : Form
         _pollTimer.Stop();
         _activeTicketId = null;
         _activeTicketStatus = null;
+        _activeIsConversation = false;
         _isTicketListView = true;
 
         _messagesPanel.Visible = false;
@@ -551,7 +591,9 @@ public class ChatForm : Form
 
     private async Task LoadMessagesAsync(string ticketId)
     {
-        var messages = await _api.ListarMensagensAsync(ticketId);
+        var messages = _activeIsConversation
+            ? await _api.ListarMensagensConversaAsync(ticketId)
+            : await _api.ListarMensagensAsync(ticketId);
 
         foreach (var msg in messages)
         {
@@ -732,7 +774,9 @@ public class ChatForm : Form
         _inputBox.Enabled = false;
         _sendBtn.Enabled = false;
 
-        var msg = await _api.EnviarMensagemAsync(_activeTicketId, text);
+        ChatMessage? msg = _activeIsConversation
+            ? await _api.EnviarMensagemConversaAsync(_activeTicketId, text)
+            : await _api.EnviarMensagemAsync(_activeTicketId, text);
         if (msg != null && !_renderedMessageIds.Contains(msg.Id))
         {
             _renderedMessageIds.Add(msg.Id);

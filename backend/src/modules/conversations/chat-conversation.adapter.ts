@@ -1,12 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, Not } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { ChatService } from '../chat/chat.service';
 import { ConversationsService } from './conversations.service';
 import { Ticket } from '../../database/entities/ticket.entity';
 import { Conversation, ConversationType } from '../../database/entities/conversation.entity';
-import { ChatRemetenteTipo, ChatMessageTipo } from '../../database/entities/chat-message.entity';
-import { ConversationMessageType } from '../../database/entities/conversation-message.entity';
+import { ChatMessage, ChatRemetenteTipo, ChatMessageTipo } from '../../database/entities/chat-message.entity';
+import { ConversationMessage, ConversationMessageType } from '../../database/entities/conversation-message.entity';
 import { ParticipantRole } from '../../database/entities/conversation-participant.entity';
 
 /**
@@ -23,7 +23,9 @@ export class ChatConversationAdapter {
   private readonly logger = new Logger(ChatConversationAdapter.name);
 
   constructor(
+    @Inject(forwardRef(() => ChatService))
     private readonly chatService: ChatService,
+    @Inject(forwardRef(() => ConversationsService))
     private readonly conversationsService: ConversationsService,
     @InjectRepository(Ticket)
     private readonly ticketRepo: Repository<Ticket>,
@@ -51,20 +53,66 @@ export class ChatConversationAdapter {
       const ticket = await this.ticketRepo.findOne({ where: { id: ticketId } });
       if (!ticket?.conversationId) return null;
 
-      return await this.conversationsService.enviarMensagem({
-        conversationId: ticket.conversationId,
-        senderUserId: dados.senderUserId,
-        senderDeviceId: dados.senderDeviceId,
-        senderName: dados.senderName,
-        senderType: dados.senderType,
-        content: dados.content,
-        type: ConversationMessageType.TEXT,
-        arquivoUrl: dados.arquivoUrl,
-        arquivoNome: dados.arquivoNome,
-        arquivoTamanho: dados.arquivoTamanho,
-      });
+      const type = dados.arquivoUrl
+        ? ConversationMessageType.FILE
+        : ConversationMessageType.TEXT;
+
+      return await this.conversationsService.enviarMensagem(
+        {
+          conversationId: ticket.conversationId,
+          senderUserId: dados.senderUserId,
+          senderDeviceId: dados.senderDeviceId,
+          senderName: dados.senderName,
+          senderType: dados.senderType,
+          content: dados.content,
+          type,
+          arquivoUrl: dados.arquivoUrl,
+          arquivoNome: dados.arquivoNome,
+          arquivoTamanho: dados.arquivoTamanho,
+        },
+        { skipReplicationToLegacy: true },
+      );
     } catch (err) {
       this.logger.warn(`Falha ao replicar msg legada para conversation (ticket=${ticketId}): ${err}`);
+      return null;
+    }
+  }
+
+  /** Chamado após salvar ChatMessage no fluxo legado (REST/WS ticket). */
+  async replicarMensagemLegadaParaConversation(msg: ChatMessage): Promise<ConversationMessage | null> {
+    try {
+      const ticket = await this.ticketRepo.findOne({ where: { id: msg.ticketId } });
+      if (!ticket?.conversationId) return null;
+
+      const senderType = this.mapRemetenteTipoToSenderType(msg.remetenteTipo);
+      const senderUserId =
+        msg.remetenteTipo === ChatRemetenteTipo.TECHNICIAN || msg.remetenteTipo === ChatRemetenteTipo.CLIENT_USER
+          ? msg.remetenteId
+          : undefined;
+      const senderDeviceId = msg.remetenteTipo === ChatRemetenteTipo.AGENT ? msg.remetenteId : msg.deviceId;
+
+      let type = ConversationMessageType.TEXT;
+      if (msg.tipo === ChatMessageTipo.SISTEMA) type = ConversationMessageType.SYSTEM;
+      else if (msg.tipo === ChatMessageTipo.ARQUIVO || msg.tipo === ChatMessageTipo.IMAGEM || msg.arquivoUrl)
+        type = ConversationMessageType.FILE;
+
+      return await this.conversationsService.enviarMensagem(
+        {
+          conversationId: ticket.conversationId,
+          senderUserId,
+          senderDeviceId,
+          senderName: msg.remetenteNome,
+          senderType,
+          content: msg.conteudo,
+          type,
+          arquivoUrl: msg.arquivoUrl,
+          arquivoNome: msg.arquivoNome,
+          arquivoTamanho: msg.arquivoTamanho,
+        },
+        { skipReplicationToLegacy: true },
+      );
+    } catch (err) {
+      this.logger.warn(`Falha ao replicar ChatMessage ${msg.id} para conversation: ${err}`);
       return null;
     }
   }
@@ -75,6 +123,27 @@ export class ChatConversationAdapter {
    * Após enviar uma ConversationMessage, replicar como ChatMessage no ticket linkado.
    * Chamar quando a conversation tem um ticket vinculado.
    */
+  /** Replica uma ConversationMessage já persistida para o ticket vinculado (se existir). */
+  async replicarMensagemConversationParaLegado(msg: ConversationMessage) {
+    const rt = this.mapSenderTypeToRemetenteTipo(msg.senderType);
+    const remetenteId = rt === ChatRemetenteTipo.AGENT ? msg.senderDeviceId : msg.senderUserId;
+    let tipo: ChatMessageTipo = ChatMessageTipo.TEXTO;
+    if (msg.type === ConversationMessageType.SYSTEM) tipo = ChatMessageTipo.SISTEMA;
+    else if (msg.type === ConversationMessageType.FILE) tipo = ChatMessageTipo.ARQUIVO;
+
+    return this.replicarParaChatLegado(msg.conversationId, {
+      remetenteNome: msg.senderName,
+      remetenteTipo: rt,
+      remetenteId,
+      conteudo: msg.content,
+      deviceId: msg.senderDeviceId,
+      arquivoUrl: msg.arquivoUrl,
+      arquivoNome: msg.arquivoNome,
+      arquivoTamanho: msg.arquivoTamanho,
+      tipo,
+    });
+  }
+
   async replicarParaChatLegado(conversationId: string, dados: {
     remetenteNome: string;
     remetenteTipo: ChatRemetenteTipo;
@@ -84,23 +153,31 @@ export class ChatConversationAdapter {
     arquivoUrl?: string;
     arquivoNome?: string;
     arquivoTamanho?: number;
+    tipo?: ChatMessageTipo;
   }) {
     try {
-      // Buscar ticket vinculado
       const ticket = await this.ticketRepo.findOne({ where: { conversationId } });
       if (!ticket) return null;
 
-      return await this.chatService.enviarMensagem({
-        ticketId: ticket.id,
-        deviceId: dados.deviceId,
-        remetenteTipo: dados.remetenteTipo,
-        remetenteId: dados.remetenteId,
-        remetenteNome: dados.remetenteNome,
-        conteudo: dados.conteudo,
-        arquivoUrl: dados.arquivoUrl,
-        arquivoNome: dados.arquivoNome,
-        arquivoTamanho: dados.arquivoTamanho,
-      });
+      const tipo =
+        dados.tipo ||
+        (dados.remetenteTipo === ChatRemetenteTipo.SYSTEM ? ChatMessageTipo.SISTEMA : ChatMessageTipo.TEXTO);
+
+      return await this.chatService.enviarMensagem(
+        {
+          ticketId: ticket.id,
+          deviceId: dados.deviceId,
+          remetenteTipo: dados.remetenteTipo,
+          remetenteId: dados.remetenteId,
+          remetenteNome: dados.remetenteNome,
+          tipo,
+          conteudo: dados.conteudo,
+          arquivoUrl: dados.arquivoUrl,
+          arquivoNome: dados.arquivoNome,
+          arquivoTamanho: dados.arquivoTamanho,
+        },
+        { skipConversationReplication: true },
+      );
     } catch (err) {
       this.logger.warn(`Falha ao replicar msg conversation para chat legado (conv=${conversationId}): ${err}`);
       return null;
@@ -113,6 +190,7 @@ export class ChatConversationAdapter {
     const map: Record<string, string> = {
       [ChatRemetenteTipo.TECHNICIAN]: 'technician',
       [ChatRemetenteTipo.CLIENT_USER]: 'client',
+      [ChatRemetenteTipo.AGENT]: 'device',
       [ChatRemetenteTipo.SYSTEM]: 'system',
     };
     return map[tipo] || 'unknown';
@@ -122,7 +200,8 @@ export class ChatConversationAdapter {
     const map: Record<string, ChatRemetenteTipo> = {
       technician: ChatRemetenteTipo.TECHNICIAN,
       client: ChatRemetenteTipo.CLIENT_USER,
-      device: ChatRemetenteTipo.CLIENT_USER,
+      client_user: ChatRemetenteTipo.CLIENT_USER,
+      device: ChatRemetenteTipo.AGENT,
       system: ChatRemetenteTipo.SYSTEM,
     };
     return map[senderType] || ChatRemetenteTipo.SYSTEM;
@@ -207,18 +286,8 @@ export class ChatConversationAdapter {
     let copiadas = 0;
     for (const msg of legacyMessages) {
       try {
-        await this.conversationsService.enviarMensagem({
-          conversationId: ticket.conversationId,
-          senderUserId: msg.remetenteId,
-          senderName: msg.remetenteNome,
-          senderType: this.mapRemetenteTipoToSenderType(msg.remetenteTipo),
-          content: msg.conteudo,
-          type: msg.tipo === ChatMessageTipo.SISTEMA ? ConversationMessageType.SYSTEM : ConversationMessageType.TEXT,
-          arquivoUrl: msg.arquivoUrl,
-          arquivoNome: msg.arquivoNome,
-          arquivoTamanho: msg.arquivoTamanho,
-        });
-        copiadas++;
+        const r = await this.replicarMensagemLegadaParaConversation(msg);
+        if (r) copiadas++;
       } catch (err) {
         this.logger.warn(`Falha ao copiar msg ${msg.id}: ${err}`);
       }

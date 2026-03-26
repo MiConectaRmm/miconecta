@@ -162,6 +162,122 @@ public class ChatApiClient : IDisposable
         }
     }
 
+    /// <summary>GET agents/me/conversations</summary>
+    public async Task<List<ChatTicket>> ListarConversacoesAsync()
+    {
+        try
+        {
+            var resp = await _http.GetAsync("agents/me/conversations");
+            if (!resp.IsSuccessStatusCode)
+            {
+                LastError = $"Erro ao listar conversas: {(int)resp.StatusCode}";
+                return [];
+            }
+
+            LastError = null;
+            var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
+            var list = new List<ChatTicket>();
+            if (json.ValueKind != JsonValueKind.Array) return list;
+
+            foreach (var c in json.EnumerateArray())
+            {
+                list.Add(new ChatTicket
+                {
+                    Id = c.TryGetProperty("id", out var id) ? id.GetString() ?? "" : "",
+                    Titulo = c.TryGetProperty("titulo", out var tit) ? tit.GetString() ?? "Conversa" : "Conversa",
+                    Status = c.TryGetProperty("status", out var st) ? st.GetString() ?? "open" : "open",
+                    IsConversation = true,
+                });
+            }
+
+            return list;
+        }
+        catch (Exception ex)
+        {
+            LastError = $"Erro de conexão: {ex.Message}";
+            return [];
+        }
+    }
+
+    public async Task<ChatTicket?> CriarConversaAsync(string? titulo = null, string? mensagemInicial = null)
+    {
+        try
+        {
+            var body = new { titulo, mensagemInicial };
+            var resp = await _http.PostAsJsonAsync("agents/me/conversations", body);
+            if (!resp.IsSuccessStatusCode)
+            {
+                LastError = $"Erro ao criar conversa: {(int)resp.StatusCode}";
+                return null;
+            }
+
+            var c = await resp.Content.ReadFromJsonAsync<JsonElement>();
+            LastError = null;
+            return new ChatTicket
+            {
+                Id = c.TryGetProperty("id", out var id) ? id.GetString() ?? "" : "",
+                Titulo = c.TryGetProperty("titulo", out var tit) ? tit.GetString() ?? "Conversa" : "Conversa",
+                Status = "open",
+                IsConversation = true,
+            };
+        }
+        catch (Exception ex)
+        {
+            LastError = $"Erro de conexão: {ex.Message}";
+            return null;
+        }
+    }
+
+    public async Task<List<ChatMessage>> ListarMensagensConversaAsync(string conversationId)
+    {
+        try
+        {
+            var resp = await _http.GetAsync($"agents/me/conversations/{Uri.EscapeDataString(conversationId)}/messages?limit=80");
+            if (!resp.IsSuccessStatusCode)
+            {
+                LastError = $"Erro ao listar mensagens: {(int)resp.StatusCode}";
+                return [];
+            }
+
+            var arr = await resp.Content.ReadFromJsonAsync<JsonElement>();
+            var msgs = new List<ChatMessage>();
+            if (arr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var m in arr.EnumerateArray())
+                    msgs.Add(ParseMessage(m));
+            }
+
+            return msgs;
+        }
+        catch (Exception ex)
+        {
+            LastError = $"Erro de conexão: {ex.Message}";
+            return [];
+        }
+    }
+
+    public async Task<ChatMessage?> EnviarMensagemConversaAsync(string conversationId, string conteudo)
+    {
+        try
+        {
+            var body = new { content = conteudo };
+            var resp = await _http.PostAsJsonAsync($"agents/me/conversations/{Uri.EscapeDataString(conversationId)}/messages", body);
+            if (!resp.IsSuccessStatusCode)
+            {
+                LastError = $"Erro ao enviar: {(int)resp.StatusCode}";
+                return null;
+            }
+
+            var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
+            return ParseMessage(json);
+        }
+        catch (Exception ex)
+        {
+            LastError = $"Erro de conexão: {ex.Message}";
+            return null;
+        }
+    }
+
     /// <summary>
     /// Cria um ticket rápido de suporte para este dispositivo.
     /// POST /agents/me/tickets
@@ -249,6 +365,8 @@ public class ChatTicket
     public string Id { get; set; } = "";
     public string Titulo { get; set; } = "";
     public string Status { get; set; } = "";
+    /// <summary>True quando o item é uma conversation (não ticket).</summary>
+    public bool IsConversation { get; set; }
 }
 
 public class ChatMessage
@@ -259,5 +377,6 @@ public class ChatMessage
     public string RemetenteTipo { get; set; } = "";
     public string CriadoEm { get; set; } = "";
 
-    public bool IsTechnician => RemetenteTipo.Contains("technician", StringComparison.OrdinalIgnoreCase);
+    public bool IsTechnician =>
+        RemetenteTipo.Contains("technician", StringComparison.OrdinalIgnoreCase);
 }
