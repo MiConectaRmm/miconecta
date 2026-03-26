@@ -1,0 +1,13 @@
+<Project>
+  <!--
+    REGRA MIConecta — publicação do agente e do tray:
+    - Self-contained: runtime .NET incluído na pasta de instalação (sem depender do runtime global).
+    - Multi-arquivo: NÃO usar PublishSingleFile — o MSI deve empacotar coreclr.dll, hostfxr,
+      todas as DLLs gerenciadas e nativas ao lado do .exe (comportamento suportado pelo WiX).
+    - PublishTrimmed desligado: evita remover tipos usados via reflexão (Socket.IO, WMI, etc.).
+  -->
+  <PropertyGroup>
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+  </PropertyGroup>
+</Project>
