@@ -8,6 +8,8 @@ import { ConsentRecord, ConsentTipo } from '../../database/entities/consent-reco
 import { Device } from '../../database/entities/device.entity';
 import { AccessPolicyDto, AccessPolicyType } from './dto/remote-session.dto';
 import { RmmGateway } from '../gateway/rmm.gateway';
+import { ConversationsService } from '../conversations/conversations.service';
+import { Ticket } from '../../database/entities/ticket.entity';
 
 /**
  * Políticas padrão por tipo de dispositivo.
@@ -71,6 +73,7 @@ export class RemoteSessionsService {
     private readonly deviceRepo: Repository<Device>,
     @Inject(forwardRef(() => RmmGateway))
     private readonly gateway: RmmGateway,
+    private readonly conversationsService: ConversationsService,
   ) {}
 
   // ══════════════════════════════════════════════════
@@ -252,6 +255,18 @@ export class RemoteSessionsService {
       });
     }
 
+    // Resolver conversationId do ticket (se existir)
+    if (dados.ticketId && !saved.conversationId) {
+      try {
+        const ticketRepo = this.deviceRepo.manager.getRepository(Ticket);
+        const ticket = await ticketRepo.findOne({ where: { id: dados.ticketId } });
+        if (ticket?.conversationId) {
+          await this.sessionRepo.update(saved.id, { conversationId: ticket.conversationId });
+          await this.notificarConversation(ticket.conversationId, `🖥️ Sessão remota solicitada para ${device.hostname || 'dispositivo'}`);
+        }
+      } catch {}
+    }
+
     return this.buscar(saved.id, dados.tenantId);
   }
 
@@ -368,6 +383,12 @@ export class RemoteSessionsService {
     });
 
     this.logger.log(`Sessão ${sessionId} INICIADA`);
+
+    // Notificar conversation
+    if (session.conversationId) {
+      this.notificarConversation(session.conversationId, '🟢 Sessão remota iniciada').catch(() => {});
+    }
+
     return this.sessionRepo.findOne({ where: { id: sessionId } });
   }
 
@@ -401,6 +422,12 @@ export class RemoteSessionsService {
     });
 
     this.logger.log(`Sessão ${sessionId} FINALIZADA (${duracao}s)`);
+
+    // Notificar conversation
+    if (session.conversationId) {
+      this.notificarConversation(session.conversationId, `🔴 Sessão remota finalizada (${Math.round(duracao / 60)} min)`).catch(() => {});
+    }
+
     return this.sessionRepo.findOne({ where: { id: sessionId } });
   }
 
@@ -415,7 +442,14 @@ export class RemoteSessionsService {
       detalhes: { erro },
     });
     this.logger.warn(`Sessão ${sessionId} ERRO: ${erro}`);
-    return this.sessionRepo.findOne({ where: { id: sessionId } });
+
+    // Notificar conversation
+    const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
+    if (session?.conversationId) {
+      this.notificarConversation(session.conversationId, `⚠️ Erro na sessão remota: ${erro}`).catch(() => {});
+    }
+
+    return session;
   }
 
   async cancelar(sessionId: string, tenantId: string, motivo?: string, autorNome?: string) {
@@ -629,6 +663,18 @@ export class RemoteSessionsService {
   // ══════════════════════════════════════════════════
   // POLICY QUERY (público)
   // ══════════════════════════════════════════════════
+
+  // ══════════════════════════════════════════════════
+  // CONVERSATION HELPER
+  // ══════════════════════════════════════════════════
+
+  private async notificarConversation(conversationId: string, content: string) {
+    try {
+      await this.conversationsService.enviarMensagemSistema(conversationId, content);
+    } catch (err) {
+      this.logger.warn(`Falha ao notificar conversation ${conversationId}: ${err}`);
+    }
+  }
 
   async consultarPoliticaDevice(deviceId: string) {
     const device = await this.deviceRepo.findOne({ where: { id: deviceId } });

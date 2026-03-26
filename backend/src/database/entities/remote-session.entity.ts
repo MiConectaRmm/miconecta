@@ -12,6 +12,7 @@ import { Tenant } from './tenant.entity';
 import { Ticket } from './ticket.entity';
 import { Device } from './device.entity';
 import { Technician } from './technician.entity';
+import { Conversation } from './conversation.entity';
 
 export enum RemoteSessionStatus {
   SOLICITADA = 'solicitada',
@@ -42,6 +43,9 @@ export class RemoteSession {
 
   @Column({ name: 'ticket_id', nullable: true })
   ticketId: string;
+
+  @Column({ name: 'conversation_id', nullable: true })
+  conversationId: string;
 
   @Column({ name: 'device_id' })
   deviceId: string;
@@ -116,6 +120,10 @@ export class RemoteSession {
   @ManyToOne(() => Ticket, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'ticket_id' })
   ticket: Ticket;
+
+  @ManyToOne(() => Conversation, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'conversation_id' })
+  conversation: Conversation;
 
   @ManyToOne(() => Device, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'device_id' })
