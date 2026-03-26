@@ -10,6 +10,7 @@
     <Company>Maginf Tecnologia</Company>
     <Product>MIConectaRMM Agent</Product>
     <Description>Agente RMM para monitoramento e gerenciamento remoto</Description>
+    <ApplicationIcon>..\branding\miconecta.ico</ApplicationIcon>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
   </PropertyGroup>

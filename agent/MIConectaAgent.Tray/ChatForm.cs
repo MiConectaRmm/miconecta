@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.IO;
 using System.Media;
 
 namespace MIConectaAgent.Tray;
@@ -300,6 +301,33 @@ public class ChatForm : Form
             catch { /* silent */ }
         };
         notifyTimer.Start();
+
+        AplicarIconeJanela();
+    }
+
+    private void AplicarIconeJanela()
+    {
+        try
+        {
+            var path = Path.Combine(AppContext.BaseDirectory, "icon.ico");
+            if (File.Exists(path))
+            {
+                Icon = new Icon(path);
+                return;
+            }
+        }
+        catch { /* mantém ícone padrão */ }
+
+        try
+        {
+            var extracted = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            if (extracted != null)
+            {
+                Icon = (Icon)extracted.Clone();
+                extracted.Dispose();
+            }
+        }
+        catch { /* ignore */ }
     }
 
     // ══════════════════════════════════════════════════════
