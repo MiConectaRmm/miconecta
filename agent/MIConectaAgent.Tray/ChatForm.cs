@@ -693,6 +693,7 @@ public class ChatForm : Form
 
     private void ScrollToBottom()
     {
+        if (_messagesFlow.Controls.Count == 0) return;
         _messagesFlow.PerformLayout();
         _messagesFlow.ScrollControlIntoView(_messagesFlow.Controls[^1]);
     }
