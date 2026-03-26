@@ -1,12 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, LessThan, Not } from 'typeorm';
 import { Conversation, ConversationStatus, ConversationType } from '../../database/entities/conversation.entity';
 import { ConversationParticipant, ParticipantRole } from '../../database/entities/conversation-participant.entity';
 import { ConversationMessage, ConversationMessageType } from '../../database/entities/conversation-message.entity';
 
 @Injectable()
 export class ConversationsService {
+  private readonly logger = new Logger(ConversationsService.name);
+
   constructor(
     @InjectRepository(Conversation)
     private readonly conversationRepo: Repository<Conversation>,
@@ -139,6 +142,17 @@ export class ConversationsService {
     arquivoTamanho?: number;
     metadata?: Record<string, any>;
   }): Promise<ConversationMessage> {
+    // Business rule: block messages on closed/archived conversations (except system)
+    if (dados.senderType !== 'system') {
+      const conv = await this.conversationRepo.findOne({ where: { id: dados.conversationId } });
+      if (conv && conv.status === ConversationStatus.CLOSED) {
+        throw new ForbiddenException('Conversa fechada. Reabra para enviar mensagens.');
+      }
+      if (conv && conv.status === ConversationStatus.ARCHIVED) {
+        throw new ForbiddenException('Conversa arquivada. Não é possível enviar mensagens.');
+      }
+    }
+
     const message = this.messageRepo.create({
       conversationId: dados.conversationId,
       senderUserId: dados.senderUserId,
@@ -217,21 +231,52 @@ export class ConversationsService {
 
   // ── Status ──
 
-  async fechar(id: string, tenantId: string) {
+  async fechar(id: string, tenantId: string, autorNome?: string) {
     const conversation = await this.buscar(id, tenantId);
+    if (conversation.status === ConversationStatus.CLOSED) return conversation;
     conversation.status = ConversationStatus.CLOSED;
-    return this.conversationRepo.save(conversation);
+    const saved = await this.conversationRepo.save(conversation);
+    await this.enviarMensagemSistema(id, `Conversa fechada${autorNome ? ' por ' + autorNome : ''}`);
+    return saved;
   }
 
-  async reabrir(id: string, tenantId: string) {
+  async reabrir(id: string, tenantId: string, autorNome?: string) {
     const conversation = await this.buscar(id, tenantId);
+    if (conversation.status === ConversationStatus.OPEN) return conversation;
     conversation.status = ConversationStatus.OPEN;
-    return this.conversationRepo.save(conversation);
+    const saved = await this.conversationRepo.save(conversation);
+    await this.enviarMensagemSistema(id, `Conversa reaberta${autorNome ? ' por ' + autorNome : ''}`);
+    return saved;
   }
 
   async arquivar(id: string, tenantId: string) {
     const conversation = await this.buscar(id, tenantId);
     conversation.status = ConversationStatus.ARCHIVED;
     return this.conversationRepo.save(conversation);
+  }
+
+  // ── Cron: auto-close inactive conversations (no messages for 7 days) ──
+
+  @Cron(CronExpression.EVERY_DAY_AT_3AM)
+  async autoCloseInactive() {
+    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const stale = await this.conversationRepo.find({
+      where: {
+        status: ConversationStatus.OPEN,
+        lastMessageAt: LessThan(cutoff),
+      },
+      take: 100,
+    });
+
+    for (const conv of stale) {
+      conv.status = ConversationStatus.CLOSED;
+      await this.conversationRepo.save(conv);
+      await this.enviarMensagemSistema(conv.id, 'Conversa fechada automaticamente por inatividade (7 dias)');
+      this.logger.log(`Auto-closed conversation ${conv.id} (inactive since ${conv.lastMessageAt})`);
+    }
+
+    if (stale.length > 0) {
+      this.logger.log(`Auto-closed ${stale.length} inactive conversations`);
+    }
   }
 }
