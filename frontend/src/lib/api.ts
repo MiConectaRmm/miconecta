@@ -201,6 +201,24 @@ export const chatApi = {
   naoLidas: (ticketId: string) => api.get(`/chat/tickets/${ticketId}/unread`),
 };
 
+// ── Conversations ──
+export const conversationsApi = {
+  listar: (filtros?: any) => api.get('/conversations', { params: filtros }),
+  minhas: () => api.get('/conversations/me'),
+  buscar: (id: string) => api.get(`/conversations/${id}`),
+  criar: (dados: { type?: string; titulo?: string; deviceId?: string; mensagemInicial?: string }) =>
+    api.post('/conversations', dados),
+  mensagens: (id: string, limit?: number, offset?: number) =>
+    api.get(`/conversations/${id}/messages`, { params: { limit, offset } }),
+  enviarMensagem: (id: string, dados: { content: string; type?: string; arquivoUrl?: string; arquivoNome?: string; arquivoTamanho?: number }) =>
+    api.post(`/conversations/${id}/messages`, dados),
+  marcarLida: (id: string) => api.put(`/conversations/${id}/read`),
+  naoLidas: (id: string) => api.get(`/conversations/${id}/unread`),
+  participantes: (id: string) => api.get(`/conversations/${id}/participants`),
+  fechar: (id: string) => api.put(`/conversations/${id}/close`),
+  reabrir: (id: string) => api.put(`/conversations/${id}/reopen`),
+};
+
 // ── Remote Sessions ──
 export const sessionsApi = {
   listar: (filtros?: any) => api.get('/remote-sessions', { params: filtros }),
