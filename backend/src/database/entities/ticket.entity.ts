@@ -13,6 +13,7 @@ import { Tenant } from './tenant.entity';
 import { Organization } from './organization.entity';
 import { Device } from './device.entity';
 import { Technician } from './technician.entity';
+import { Conversation } from './conversation.entity';
 
 export enum TicketStatus {
   ABERTO = 'aberto',
@@ -150,4 +151,11 @@ export class Ticket {
   @ManyToOne(() => Technician, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'atribuido_a' })
   tecnicoAtribuido: Technician;
+
+  @Column({ name: 'conversation_id', nullable: true })
+  conversationId: string;
+
+  @ManyToOne(() => Conversation, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'conversation_id' })
+  conversation: Conversation;
 }

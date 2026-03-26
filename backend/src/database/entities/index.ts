@@ -25,3 +25,6 @@ export { Notification, NotificationType } from './notification.entity';
 export { FileAttachment } from './file-attachment.entity';
 export { LgpdRequest, LgpdRequestTipo, LgpdRequestStatus } from './lgpd-request.entity';
 export { ReportSchedule, ReportTipo, ReportFrequencia } from './report-schedule.entity';
+export { Conversation, ConversationType, ConversationStatus } from './conversation.entity';
+export { ConversationParticipant, ParticipantRole } from './conversation-participant.entity';
+export { ConversationMessage, ConversationMessageType } from './conversation-message.entity';

@@ -28,6 +28,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { LgpdModule } from './modules/lgpd/lgpd.module';
 import { GatewayModule } from './modules/gateway/gateway.module';
+import { ConversationsModule } from './modules/conversations/conversations.module';
 
 // ── Entidades ──
 import {
@@ -37,6 +38,7 @@ import {
   ClientUser, Ticket, TicketComment, ChatMessage,
   RemoteSession, RemoteSessionLog, ConsentRecord, Notification,
   FileAttachment, LgpdRequest, ReportSchedule, Agent, InstallationToken,
+  Conversation, ConversationParticipant, ConversationMessage,
 } from './database/entities';
 
 // ── Subscriber ──
@@ -49,6 +51,7 @@ const entities = [
   ClientUser, Ticket, TicketComment, ChatMessage,
   RemoteSession, RemoteSessionLog, ConsentRecord, Notification,
   FileAttachment, LgpdRequest, ReportSchedule, Agent, InstallationToken,
+  Conversation, ConversationParticipant, ConversationMessage,
 ];
 
 @Module({
@@ -116,6 +119,7 @@ const entities = [
     AlertsModule,
     TicketsModule,
     ChatModule,
+    ConversationsModule,
     RemoteSessionsModule,
     ScriptsModule,
     SoftwareModule,
