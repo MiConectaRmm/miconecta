@@ -87,6 +87,7 @@ miconecta/
 │
 ├── installer/                     Gerador de .msi
 │   ├── wix/                       WiX toolset config
+│   ├── scripts/                   desinstalar-miconecta.ps1 / .bat (desinstalacao geral MSI)
 │   └── assets/                    Icones e recursos
 │
 ├── docs/                          Documentacao tecnica (14 arquivos)
