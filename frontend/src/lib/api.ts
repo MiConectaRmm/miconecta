@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.maginf.com.br/api/v1';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -87,6 +87,13 @@ export const authApi = {
   refresh: (refreshToken: string) => api.post('/auth/refresh', { refreshToken }),
   logout: () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
+  updateProfile: (dados: {
+    nome?: string;
+    email?: string;
+    senhaAtual?: string;
+    senhaNova?: string;
+    profilePhotoUrl?: string;
+  }) => api.put('/auth/profile', dados),
 };
 
 // ── Tenants / Clients ──
@@ -326,9 +333,8 @@ export const storageApi = {
   upload: (file: File, entidadeTipo: string, entidadeId: string) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post(`/storage/upload?entidadeTipo=${entidadeTipo}&entidadeId=${entidadeId}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    // Não definir Content-Type: o browser define multipart/form-data com boundary correto.
+    return api.post(`/storage/upload?entidadeTipo=${entidadeTipo}&entidadeId=${entidadeId}`, formData);
   },
   getUrl: (id: string) => api.get(`/storage/${id}/url`),
   listarPorEntidade: (tipo: string, id: string) => api.get(`/storage/entidade/${tipo}/${id}`),

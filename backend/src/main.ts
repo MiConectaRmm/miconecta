@@ -43,12 +43,15 @@ async function bootstrap() {
     // Global interceptors
     app.useGlobalInterceptors(new AuditInterceptor());
 
-    // CORS
-    const corsOrigin = process.env.CORS_ORIGIN || (isProd ? 'https://miconecta-frontend.fly.dev' : '*');
+    // CORS — incluir app oficial e fly.dev; CORS_ORIGIN pode ser lista separada por vírgula no Fly
+    const defaultProdOrigins =
+      'https://app.maginf.com.br,https://www.app.maginf.com.br,https://miconecta-frontend.fly.dev';
+    const corsOrigin = process.env.CORS_ORIGIN || (isProd ? defaultProdOrigins : '*');
     app.enableCors({
-      origin: corsOrigin === '*' ? true : corsOrigin.split(',').map(o => o.trim()),
+      origin: corsOrigin === '*' ? true : corsOrigin.split(',').map((o) => o.trim()),
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
       credentials: true,
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id', 'X-Requested-With'],
     });
 
     // Health checks (fora do prefix /api/v1)

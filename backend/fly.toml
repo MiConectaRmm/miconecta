@@ -1,3 +1,4 @@
+# Produção (domínio público): https://api.maginf.com.br — painel: https://app.maginf.com.br
 app = "miconecta-backend"
 primary_region = "gru"
 
@@ -7,7 +8,8 @@ primary_region = "gru"
 [env]
   PORT = "3000"
   NODE_ENV = "production"
-  CORS_ORIGIN = "https://app.maginf.com.br"
+  CORS_ORIGIN = "https://app.maginf.com.br,https://www.app.maginf.com.br,https://miconecta-frontend.fly.dev"
+  PUBLIC_API_URL = "https://api.maginf.com.br"
   DB_SSL = "false"
 
 [http_service]
