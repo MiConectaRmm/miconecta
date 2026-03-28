@@ -15,8 +15,8 @@ import { Device, DeviceStatus } from '../../database/entities/device.entity';
 import { RemoteSessionsService } from '../remote-sessions/remote-sessions.service';
 
 @WebSocketGateway({
-  cors: { origin: '*' },
   namespace: '/rmm',
+  cors: { origin: true, credentials: true },
 })
 export class RmmGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()

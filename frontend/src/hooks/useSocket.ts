@@ -13,12 +13,18 @@ function getSocket(namespace: string) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('miconecta_token') : null
   if (!token) return null
 
+  // Polling primeiro: muitos proxies (CDN/Fly) falham no upgrade WS imediato.
   const socket = io(`${WS_URL}${namespace}`, {
+    path: '/socket.io',
     auth: { token },
-    transports: ['websocket', 'polling'],
+    transports: ['polling', 'websocket'],
+    upgrade: true,
+    rememberUpgrade: true,
+    timeout: 25_000,
     reconnection: true,
-    reconnectionAttempts: 10,
-    reconnectionDelayMax: 5000,
+    reconnectionAttempts: 25,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 15_000,
   })
 
   sockets.set(namespace, socket)

@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
+import { AppSocketIoAdapter } from './socket-io.adapter';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -50,10 +51,12 @@ async function bootstrap() {
     const corsOrigin = process.env.CORS_ORIGIN || (isProd ? defaultProdOrigins : '*');
     app.enableCors({
       origin: corsOrigin === '*' ? true : corsOrigin.split(',').map((o) => o.trim()),
-      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
       credentials: true,
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id', 'X-Requested-With'],
     });
+
+    app.useWebSocketAdapter(new AppSocketIoAdapter(app));
 
     // Health checks (fora do prefix /api/v1)
     const httpAdapter = app.getHttpAdapter();
