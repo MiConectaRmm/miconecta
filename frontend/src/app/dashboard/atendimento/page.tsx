@@ -243,6 +243,16 @@ export default function CentralAtendimentoPage() {
               : item
           )
         )
+      } else if (type === 'conversation_message') {
+        addToast('Nova mensagem em conversa (agente/cliente)', 'ticket')
+        playNotificationSound()
+        if (timeSinceLoad > 3000) carregarDados(true)
+        else setPendingUpdates((p) => p + 1)
+      } else if (type === 'conversation_created') {
+        addToast(`Nova conversa: ${data.conversation?.titulo || 'Chat'}`, 'ticket')
+        playNotificationSound()
+        if (timeSinceLoad > 3000) carregarDados(true)
+        else setPendingUpdates((p) => p + 1)
       } else if (type === 'alert_created') {
         addToast(`Novo alerta: ${data.titulo || data.severidade || 'Alerta'}`, 'alerta')
         playNotificationSound()

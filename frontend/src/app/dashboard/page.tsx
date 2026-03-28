@@ -4,122 +4,112 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  Monitor, MonitorOff, AlertTriangle, CheckCircle2,
-  Ticket, MessageSquare, Building2, Activity, Shield, Users, Eye,
-  Inbox, ChevronRight, Clock, RefreshCw, Star,
+  Building2, Monitor, MonitorOff, AlertTriangle, CheckCircle2,
+  ArrowRight, Activity, TrendingUp, Clock, RefreshCw,
 } from 'lucide-react'
-import { devicesApi, alertsApi, ticketsApi, tenantsApi, techniciansApi } from '@/lib/api'
-import StatCard from '@/components/ui/StatCard'
-import StatusBadge from '@/components/ui/StatusBadge'
-import { useSocket } from '@/hooks/useSocket'
+import { devicesApi, alertsApi, ticketsApi, tenantsApi } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth.store'
+
+interface ClientCard {
+  id: string
+  nome: string
+  dispositivos: number
+  online: number
+  offline: number
+  alertas: number
+  ticketsAbertos: number
+  status: 'ok' | 'atencao' | 'critico'
+  ultimaAtividade?: string
+}
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user)
   const router = useRouter()
 
-  const [empresas, setEmpresas] = useState(0)
-  const [tecnicos, setTecnicos] = useState(0)
-  const [resumo, setResumo] = useState({ total: 0, online: 0, offline: 0, alerta: 0 })
-  const [alertas, setAlertas] = useState({ ativos: 0, total: 0 })
-  const [tickets, setTickets] = useState({ abertos: 0, emAtendimento: 0, total: 0 })
-  const [clientesResumo, setClientesResumo] = useState<any[]>([])
-  const [ticketsRecentes, setTicketsRecentes] = useState<any[]>([])
-  const [satisfacao, setSatisfacao] = useState<{ media: number; total: number; distribuicao: Record<string, number> } | null>(null)
+  const [clientes, setClientes] = useState<ClientCard[]>([])
+  const [resumoGeral, setResumoGeral] = useState({ dispositivos: 0, online: 0, offline: 0, alertas: 0 })
   const [carregando, setCarregando] = useState(true)
-  const { on } = useSocket('/chat')
-
-  const isSuperAdmin = ['super_admin', 'admin', 'admin_maginf'].includes(user?.role || '')
 
   useEffect(() => {
     carregar()
-    const interval = setInterval(carregar, 30000)
+    const interval = setInterval(carregar, 45000)
     return () => clearInterval(interval)
   }, [])
 
-  useEffect(() => {
-    const unsubNotification = on('notification:new', () => carregar())
-    const unsubTicketUpdated = on('ticket:updated', () => carregar())
-    const unsubMessage = on('message:new', () => carregar())
-    return () => {
-      unsubNotification()
-      unsubTicketUpdated()
-      unsubMessage()
-    }
-  }, [on])
-
   const carregar = async () => {
     try {
-      const [tenantsRes, techRes, resumoRes, alertasRes, ticketsRes, ticketsListRes, satisfacaoRes] = await Promise.allSettled([
+      const [tenantsRes, resumoRes, alertasRes] = await Promise.allSettled([
         tenantsApi.listar(),
-        isSuperAdmin ? techniciansApi.contagem() : Promise.resolve({ data: { total: 0 } }),
         devicesApi.resumo(),
         alertsApi.contagem(),
-        ticketsApi.contagem(),
-        ticketsApi.listar({ limit: 8 }),
-        ticketsApi.satisfacao(),
       ])
 
+      if (resumoRes.status === 'fulfilled') {
+        const r = resumoRes.value.data
+        setResumoGeral({
+          dispositivos: r.total || 0,
+          online: r.online || 0,
+          offline: r.offline || 0,
+          alertas: 0,
+        })
+      }
+      
+      if (alertasRes.status === 'fulfilled') {
+        setResumoGeral(prev => ({ ...prev, alertas: alertasRes.value.data.ativos || 0 }))
+      }
+
       if (tenantsRes.status === 'fulfilled') {
-        const d = tenantsRes.value.data
-        const tenants = Array.isArray(d) ? d : d?.items || []
-        setEmpresas(tenants.length)
+        const tenants = Array.isArray(tenantsRes.value.data) 
+          ? tenantsRes.value.data 
+          : tenantsRes.value.data?.items || []
 
-        // Build resumo por cliente
-        try {
-          const clienteStats = await Promise.all(
-            tenants.slice(0, 20).map(async (t: any) => {
-              const [devRes, alertRes, tickRes] = await Promise.allSettled([
-                devicesApi.listar({ tenantId: t.id }),
-                alertsApi.listar({ tenantId: t.id, status: 'ativo' }),
-                ticketsApi.listar({ tenantId: t.id, status: 'aberto', limit: 100 }),
-              ])
-              const devs = devRes.status === 'fulfilled' ? (Array.isArray(devRes.value.data) ? devRes.value.data : devRes.value.data?.items || []) : []
-              const alts = alertRes.status === 'fulfilled' ? (Array.isArray(alertRes.value.data) ? alertRes.value.data : alertRes.value.data?.items || []) : []
-              const tks = tickRes.status === 'fulfilled' ? (Array.isArray(tickRes.value.data) ? tickRes.value.data : tickRes.value.data?.items || []) : []
+        const clienteStats = await Promise.all(
+          tenants.slice(0, 50).map(async (t: any) => {
+            const [devRes, alertRes, tickRes] = await Promise.allSettled([
+              devicesApi.listar({ tenantId: t.id }),
+              alertsApi.listar({ tenantId: t.id, status: 'ativo' }),
+              ticketsApi.listar({ tenantId: t.id, status: 'aberto', limit: 100 }),
+            ])
 
-              const online = devs.filter((d: any) => d.status === 'online' || d.online).length
-              const offline = devs.length - online
-              const alertasAtivos = alts.length
-              const ticketsAbertos = tks.length
+            const devs = devRes.status === 'fulfilled' 
+              ? (Array.isArray(devRes.value.data) ? devRes.value.data : devRes.value.data?.items || [])
+              : []
+            const alts = alertRes.status === 'fulfilled'
+              ? (Array.isArray(alertRes.value.data) ? alertRes.value.data : alertRes.value.data?.items || [])
+              : []
+            const tks = tickRes.status === 'fulfilled'
+              ? (Array.isArray(tickRes.value.data) ? tickRes.value.data : tickRes.value.data?.items || [])
+              : []
 
-              let status: 'ok' | 'atencao' | 'critico' = 'ok'
-              if (offline > 0 || alertasAtivos > 0 || ticketsAbertos > 0) status = 'atencao'
-              if (offline > devs.length * 0.3 || alertasAtivos > 2) status = 'critico'
+            const online = devs.filter((d: any) => d.status === 'online' || d.online).length
+            const offline = devs.length - online
+            const alertasAtivos = alts.length
+            const ticketsAbertos = tks.length
 
-              return {
-                id: t.id,
-                nome: t.nomeFantasia || t.razaoSocial || t.nome || 'N/A',
-                dispositivos: devs.length,
-                online,
-                offline,
-                alertas: alertasAtivos,
-                ticketsAbertos,
-                status,
-              }
-            })
-          )
+            let status: 'ok' | 'atencao' | 'critico' = 'ok'
+            if (offline > 0 || alertasAtivos > 0 || ticketsAbertos > 0) status = 'atencao'
+            if (offline > devs.length * 0.3 || alertasAtivos > 2 || ticketsAbertos > 3) status = 'critico'
 
-          // Ordenar: críticos primeiro
-          const statusOrdem: Record<string, number> = { critico: 0, atencao: 1, ok: 2 }
-          clienteStats.sort((a, b) => (statusOrdem[a.status] ?? 2) - (statusOrdem[b.status] ?? 2))
-          setClientesResumo(clienteStats)
-        } catch {}
-      }
+            return {
+              id: t.id,
+              nome: t.nomeFantasia || t.razaoSocial || t.nome || 'Cliente',
+              dispositivos: devs.length,
+              online,
+              offline,
+              alertas: alertasAtivos,
+              ticketsAbertos,
+              status,
+              ultimaAtividade: devs[0]?.ultimaConexao,
+            }
+          })
+        )
 
-      if (techRes.status === 'fulfilled') {
-        const c = techRes.value.data
-        setTecnicos(typeof c?.total === 'number' ? c.total : typeof c?.ativos === 'number' ? c.ativos : 0)
-      }
-      if (resumoRes.status === 'fulfilled') setResumo(resumoRes.value.data)
-      if (alertasRes.status === 'fulfilled') setAlertas(alertasRes.value.data)
-      if (ticketsRes.status === 'fulfilled') setTickets(ticketsRes.value.data)
-      if (ticketsListRes.status === 'fulfilled') {
-        const tl = ticketsListRes.value.data
-        setTicketsRecentes(Array.isArray(tl) ? tl.slice(0, 8) : (tl?.items || []).slice(0, 8))
-      }
-      if (satisfacaoRes.status === 'fulfilled') {
-        setSatisfacao(satisfacaoRes.value.data)
+        clienteStats.sort((a, b) => {
+          const ordem: Record<'critico' | 'atencao' | 'ok', number> = { critico: 0, atencao: 1, ok: 2 }
+          return (ordem[a.status as keyof typeof ordem] ?? 2) - (ordem[b.status as keyof typeof ordem] ?? 2)
+        })
+
+        setClientes(clienteStats)
       }
     } catch (err) {
       console.error('Erro ao carregar dashboard:', err)
@@ -128,275 +118,173 @@ export default function DashboardPage() {
     }
   }
 
-  function tempoRelativo(data: string): string {
-    if (!data) return ''
-    const agora = new Date()
-    const criado = new Date(data)
-    const diffMs = agora.getTime() - criado.getTime()
-    const diffMin = Math.floor(diffMs / 60000)
-    const diffHoras = Math.floor(diffMin / 60)
-    const diffDias = Math.floor(diffHoras / 24)
-    if (diffMin < 1) return 'agora'
-    if (diffMin < 60) return `${diffMin}min`
-    if (diffHoras < 24) return `${diffHoras}h`
-    return `${diffDias}d`
-  }
-
-  const statusCores: Record<string, { dot: string; bg: string; text: string; label: string }> = {
-    ok: { dot: 'bg-green-400', bg: 'bg-green-500/10', text: 'text-green-400', label: 'OK' },
-    atencao: { dot: 'bg-yellow-400', bg: 'bg-yellow-500/10', text: 'text-yellow-400', label: 'Atenção' },
-    critico: { dot: 'bg-red-400', bg: 'bg-red-500/10', text: 'text-red-400', label: 'Crítico' },
+  const statusStyles = {
+    ok: { dot: 'bg-green-500', bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' },
+    atencao: { dot: 'bg-amber-500', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+    critico: { dot: 'bg-red-500', bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' },
   }
 
   return (
     <div>
       {/* Header */}
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="mb-8 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">
-            Olá, {user?.nome?.split(' ')[0] || 'Admin'} 👋
+          <h1 className="text-3xl font-bold text-gray-800">
+            Olá, {user?.nome?.split(' ')[0] || 'Admin'}
           </h1>
-          <p className="text-dark-400 text-sm mt-1">
-            Visão geral da plataforma MIConecta
+          <p className="text-gray-600 mt-1">
+            Visão geral dos seus clientes
           </p>
         </div>
         <button
           onClick={() => { setCarregando(true); carregar() }}
-          className="flex items-center gap-2 px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg hover:bg-dark-700 text-sm font-medium text-dark-300 transition-colors"
+          disabled={carregando}
+          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 text-sm font-medium text-gray-700 transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${carregando ? 'animate-spin' : ''}`} />
           Atualizar
         </button>
       </div>
 
-      {/* Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        <StatCard title="Clientes" value={empresas} icon={Building2} color="emerald" subtitle="empresas" />
-        {isSuperAdmin && <StatCard title="Técnicos" value={tecnicos} icon={Users} color="purple" subtitle="Maginf" />}
-        <StatCard title="Dispositivos" value={resumo.total} icon={Monitor} color="brand" subtitle={`${resumo.online} online`} />
-        <StatCard title="Offline" value={resumo.offline} icon={MonitorOff} color="red" />
-        <StatCard title="Alertas" value={alertas.ativos} icon={AlertTriangle} color="amber" subtitle="ativos" />
-        <StatCard title="Tickets" value={tickets.abertos} icon={Ticket} color="blue" subtitle="abertos" />
+      {/* KPIs rápidos */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="card">
+          <div className="flex items-center justify-between mb-2">
+            <Monitor className="w-5 h-5 text-brand-500" />
+            <TrendingUp className="w-4 h-4 text-green-500" />
+          </div>
+          <p className="text-2xl font-bold text-gray-800">{resumoGeral.dispositivos}</p>
+          <p className="text-xs text-gray-500 uppercase tracking-wide">Dispositivos</p>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between mb-2">
+            <CheckCircle2 className="w-5 h-5 text-green-500" />
+          </div>
+          <p className="text-2xl font-bold text-gray-800">{resumoGeral.online}</p>
+          <p className="text-xs text-gray-500 uppercase tracking-wide">Online</p>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between mb-2">
+            <MonitorOff className="w-5 h-5 text-red-500" />
+          </div>
+          <p className="text-2xl font-bold text-gray-800">{resumoGeral.offline}</p>
+          <p className="text-xs text-gray-500 uppercase tracking-wide">Offline</p>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between mb-2">
+            <AlertTriangle className="w-5 h-5 text-amber-500" />
+          </div>
+          <p className="text-2xl font-bold text-gray-800">{resumoGeral.alertas}</p>
+          <p className="text-xs text-gray-500 uppercase tracking-wide">Alertas ativos</p>
+        </div>
       </div>
 
-      {/* Satisfação do Cliente */}
-      {satisfacao && satisfacao.total > 0 && (
-        <div className="card mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-              <Star className="w-5 h-5 text-yellow-400" />
-              Satisfação do Cliente
-            </h2>
-            <span className="text-xs text-dark-400">{satisfacao.total} avaliações</span>
-          </div>
-          <div className="flex items-center gap-8">
-            {/* Média grande */}
-            <div className="text-center">
-              <div className="text-4xl font-bold text-white">{satisfacao.media.toFixed(1)}</div>
-              <div className="flex items-center gap-0.5 mt-1 justify-center">
-                {[1, 2, 3, 4, 5].map(i => (
-                  <Star key={i} className={`w-4 h-4 ${i <= Math.round(satisfacao.media) ? 'text-yellow-400 fill-yellow-400' : 'text-dark-600'}`} />
-                ))}
-              </div>
-              <p className="text-xs text-dark-400 mt-1">de 5.0</p>
-            </div>
-            {/* Distribuição com carinhas */}
-            <div className="flex-1 space-y-1.5">
-              {[
-                { key: 'excelente', label: 'Excelente', emoji: '😄', color: 'bg-green-500' },
-                { key: 'bom', label: 'Bom', emoji: '😊', color: 'bg-lime-500' },
-                { key: 'mediano', label: 'Mediano', emoji: '😐', color: 'bg-yellow-500' },
-                { key: 'ruim', label: 'Ruim', emoji: '😟', color: 'bg-orange-500' },
-                { key: 'pessimo', label: 'Péssimo', emoji: '😠', color: 'bg-red-500' },
-              ].map(item => {
-                const count = satisfacao.distribuicao?.[item.key] || 0
-                const pct = satisfacao.total > 0 ? (count / satisfacao.total) * 100 : 0
-                return (
-                  <div key={item.key} className="flex items-center gap-2">
-                    <span className="text-sm w-5 text-center">{item.emoji}</span>
-                    <span className="text-xs text-dark-400 w-16">{item.label}</span>
-                    <div className="flex-1 h-2 bg-dark-800 rounded-full overflow-hidden">
-                      <div className={`h-full ${item.color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
-                    </div>
-                    <span className="text-xs text-dark-500 w-8 text-right">{count}</span>
+      {/* Título da seção */}
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold text-gray-800">Seus Clientes</h2>
+        <p className="text-sm text-gray-500 mt-1">
+          {clientes.length} {clientes.length === 1 ? 'cliente cadastrado' : 'clientes cadastrados'}
+        </p>
+      </div>
+
+      {/* Grid de clientes */}
+      {carregando ? (
+        <div className="flex items-center justify-center py-20">
+          <RefreshCw className="w-8 h-8 text-brand-500 animate-spin" />
+        </div>
+      ) : clientes.length === 0 ? (
+        <div className="card text-center py-12">
+          <Building2 className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+          <p className="text-gray-600">Nenhum cliente cadastrado</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {clientes.map((cliente) => {
+            const style = statusStyles[cliente.status]
+            return (
+              <Link
+                key={cliente.id}
+                href={`/dashboard/clients/${cliente.id}`}
+                className="card hover:shadow-md hover:border-brand-200 transition-all group cursor-pointer"
+              >
+                {/* Header do card */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base font-semibold text-gray-800 truncate group-hover:text-brand-600 transition-colors">
+                      {cliente.nome}
+                    </h3>
                   </div>
-                )
-              })}
-            </div>
-          </div>
+                  <div className={`w-2 h-2 rounded-full ${style.dot} flex-shrink-0 mt-1.5`} />
+                </div>
+
+                {/* Indicadores */}
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600 flex items-center gap-1.5">
+                      <Monitor className="w-4 h-4" />
+                      Dispositivos
+                    </span>
+                    <span className="font-semibold text-gray-800">{cliente.dispositivos}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      Online
+                    </span>
+                    <span className="font-semibold text-green-600">{cliente.online}</span>
+                  </div>
+
+                  {cliente.offline > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600 flex items-center gap-1.5">
+                        <MonitorOff className="w-4 h-4 text-red-500" />
+                        Offline
+                      </span>
+                      <span className="font-semibold text-red-600">{cliente.offline}</span>
+                    </div>
+                  )}
+
+                  {cliente.alertas > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600 flex items-center gap-1.5">
+                        <AlertTriangle className="w-4 h-4 text-amber-500" />
+                        Alertas
+                      </span>
+                      <span className="font-semibold text-amber-600">{cliente.alertas}</span>
+                    </div>
+                  )}
+
+                  {cliente.ticketsAbertos > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600 flex items-center gap-1.5">
+                        <Activity className="w-4 h-4 text-blue-500" />
+                        Tickets
+                      </span>
+                      <span className="font-semibold text-blue-600">{cliente.ticketsAbertos}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer com status */}
+                <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                  <span className={`text-xs font-medium px-2 py-1 rounded-full ${style.bg} ${style.text}`}>
+                    {cliente.status === 'ok' ? 'OK' : cliente.status === 'atencao' ? 'Atenção' : 'Crítico'}
+                  </span>
+                  <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-brand-500 group-hover:translate-x-1 transition-all" />
+                </div>
+              </Link>
+            )
+          })}
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Saúde por cliente */}
-        <div className="lg:col-span-2 card p-0">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-dark-700">
-            <h2 className="text-lg font-semibold text-white">Saúde por Cliente</h2>
-            <Link href="/dashboard/clients" className="text-sm text-brand-400 hover:text-brand-300 flex items-center gap-1">
-              Ver todos <ChevronRight className="w-3 h-3" />
-            </Link>
-          </div>
-          {carregando ? (
-            <div className="text-center py-12 text-dark-400">
-              <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
-              Carregando...
-            </div>
-          ) : clientesResumo.length === 0 ? (
-            <div className="text-center py-12">
-              <Building2 className="w-12 h-12 text-dark-600 mx-auto mb-3" />
-              <p className="text-dark-400">Nenhum cliente cadastrado</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-dark-800">
-              {clientesResumo.slice(0, 10).map((cliente) => {
-                const sc = statusCores[cliente.status] || statusCores.ok
-                return (
-                  <Link
-                    key={cliente.id}
-                    href={`/dashboard/clients/${cliente.id}`}
-                    className="flex items-center gap-4 px-6 py-3 hover:bg-dark-800/50 transition-colors"
-                  >
-                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${sc.dot}`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{cliente.nome}</p>
-                    </div>
-                    <div className="flex items-center gap-4 text-xs text-dark-400">
-                      <span className="flex items-center gap-1">
-                        <Monitor className="w-3 h-3" />
-                        {cliente.online}/{cliente.dispositivos}
-                      </span>
-                      {cliente.ticketsAbertos > 0 && (
-                        <span className="flex items-center gap-1 text-blue-400">
-                          <Ticket className="w-3 h-3" />
-                          {cliente.ticketsAbertos}
-                        </span>
-                      )}
-                      {cliente.offline > 0 && (
-                        <span className="flex items-center gap-1 text-red-400">
-                          <MonitorOff className="w-3 h-3" />
-                          {cliente.offline}
-                        </span>
-                      )}
-                      {cliente.alertas > 0 && (
-                        <span className="flex items-center gap-1 text-amber-400">
-                          <AlertTriangle className="w-3 h-3" />
-                          {cliente.alertas}
-                        </span>
-                      )}
-                    </div>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${sc.bg} ${sc.text}`}>
-                      {sc.label}
-                    </span>
-                    <ChevronRight className="w-4 h-4 text-dark-600" />
-                  </Link>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Coluna direita */}
-        <div className="space-y-6">
-          {/* Atividade recente */}
-          <div className="card p-0">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-dark-700">
-              <h2 className="text-lg font-semibold text-white">Atividade Recente</h2>
-              <Link href="/dashboard/atendimento" className="text-sm text-brand-400 hover:text-brand-300 flex items-center gap-1">
-                Ver tudo <ChevronRight className="w-3 h-3" />
-              </Link>
-            </div>
-            {ticketsRecentes.length === 0 ? (
-              <div className="px-6 py-12 text-center text-dark-500">
-                <Clock className="w-10 h-10 mx-auto mb-3" />
-                <p className="text-sm">Nenhuma atividade recente</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-dark-800">
-                {ticketsRecentes.map((t: any) => (
-                  <Link
-                    key={t.id}
-                    href={`/dashboard/tickets/${t.id}`}
-                    className="flex items-start gap-3 px-6 py-3 hover:bg-dark-800/50 transition-colors"
-                  >
-                    <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center mt-0.5 flex-shrink-0">
-                      <Ticket className="w-3 h-3 text-blue-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white truncate">{t.titulo || t.assunto || 'Ticket'}</p>
-                      <p className="text-xs text-dark-400 mt-0.5">
-                        {t.tenant?.nomeFantasia || t.tenant?.nome || 'N/A'} · {tempoRelativo(t.criadoEm || t.createdAt)}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Ações rápidas */}
-          <div className="card">
-            <h2 className="text-lg font-semibold text-white mb-4">Ações Rápidas</h2>
-            <div className="space-y-2">
-              <Link
-                href="/dashboard/atendimento"
-                className="flex items-center gap-3 p-3 rounded-lg bg-dark-900 hover:bg-dark-700 transition-colors group"
-              >
-                <div className="w-9 h-9 rounded-lg bg-brand-500/20 flex items-center justify-center">
-                  <Inbox className="w-4 h-4 text-brand-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-dark-200 group-hover:text-white">Central de Atendimento</p>
-                  <p className="text-xs text-dark-500">Fila de tickets e alertas</p>
-                </div>
-              </Link>
-              <Link
-                href="/dashboard/clients"
-                className="flex items-center gap-3 p-3 rounded-lg bg-dark-900 hover:bg-dark-700 transition-colors group"
-              >
-                <div className="w-9 h-9 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                  <Building2 className="w-4 h-4 text-emerald-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-dark-200 group-hover:text-white">Clientes</p>
-                  <p className="text-xs text-dark-500">Gerenciar empresas</p>
-                </div>
-              </Link>
-              {isSuperAdmin && (
-                <>
-                  <Link
-                    href="/dashboard/technicians"
-                    className="flex items-center gap-3 p-3 rounded-lg bg-dark-900 hover:bg-dark-700 transition-colors group"
-                  >
-                    <div className="w-9 h-9 rounded-lg bg-purple-500/20 flex items-center justify-center">
-                      <Users className="w-4 h-4 text-purple-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-dark-200 group-hover:text-white">Técnicos</p>
-                      <p className="text-xs text-dark-500">Equipe Maginf</p>
-                    </div>
-                  </Link>
-                  <Link
-                    href="/dashboard/settings"
-                    className="flex items-center gap-3 p-3 rounded-lg bg-dark-900 hover:bg-dark-700 transition-colors group"
-                  >
-                    <div className="w-9 h-9 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                      <Shield className="w-4 h-4 text-amber-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-dark-200 group-hover:text-white">Configurações</p>
-                      <p className="text-xs text-dark-500">Plataforma e segurança</p>
-                    </div>
-                  </Link>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Auto-refresh */}
-      <p className="text-center text-xs text-dark-600 mt-6">
-        Atualização automática a cada 30 segundos
+      {/* Footer com auto-refresh */}
+      <p className="text-center text-xs text-gray-400 mt-8">
+        Atualização automática a cada 45 segundos
       </p>
     </div>
   )

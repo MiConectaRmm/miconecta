@@ -4,52 +4,52 @@
 
 @layer base {
   :root {
-    --color-primary: #3B82F6;
-    --color-primary-dark: #1D4ED8;
-    --color-secondary: #8B5CF6;
-    --color-secondary-dark: #6D28D9;
-    --color-bg: #0F172A;
-    --color-surface: #1E293B;
-    --color-card: #111827;
-    --color-text: #F8FAFC;
-    --color-text-secondary: #94A3B8;
-    --color-border: #334155;
+    --color-primary: #2EA3E6;
+    --color-primary-dark: #1890ff;
+    --color-secondary: #7D3C98;
+    --color-secondary-dark: #6b2d85;
+    --color-bg: #F7F8FA;
+    --color-surface: #FFFFFF;
+    --color-card: #FFFFFF;
+    --color-text: #1F2937;
+    --color-text-secondary: #6B7280;
+    --color-border: #E5E7EB;
     --color-success: #22C55E;
     --color-error: #EF4444;
     --color-warning: #F59E0B;
-    --color-info: #3B82F6;
-    --gradient-primary: linear-gradient(135deg, #3B82F6, #8B5CF6);
+    --color-info: #2EA3E6;
+    --gradient-primary: linear-gradient(135deg, #2EA3E6, #7D3C98);
   }
 
   body {
-    @apply bg-dark-900 text-dark-50 antialiased;
+    @apply bg-gray-50 text-gray-800 antialiased;
   }
 }
 
 @layer components {
   .card {
-    @apply bg-dark-800 border border-dark-700 rounded-xl p-6;
+    @apply bg-white border border-gray-200 rounded-xl p-6 shadow-sm;
   }
   .btn-primary {
-    @apply bg-brand-500 hover:bg-brand-700 text-white px-4 py-2 rounded-lg font-medium transition-colors;
+    @apply bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm;
   }
   .btn-secondary {
-    @apply bg-dark-700 hover:bg-dark-600 text-dark-100 px-4 py-2 rounded-lg font-medium transition-colors;
+    @apply bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors;
   }
   .btn-danger {
-    @apply bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors;
+    @apply bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm;
   }
   .input {
-    @apply bg-dark-900 border border-dark-600 text-dark-100 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent;
+    @apply bg-white border border-gray-200 text-gray-800 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent;
   }
   .badge-online {
-    @apply bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full text-xs font-medium;
+    @apply bg-green-50 text-green-600 px-2 py-0.5 rounded-full text-xs font-medium;
   }
   .badge-offline {
-    @apply bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full text-xs font-medium;
+    @apply bg-red-50 text-red-600 px-2 py-0.5 rounded-full text-xs font-medium;
   }
   .badge-alerta {
-    @apply bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full text-xs font-medium;
+    @apply bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full text-xs font-medium;
   }
 }
 
@@ -58,12 +58,12 @@
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: #F7F8FA;
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #D1D5DB;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #9CA3AF;
 }

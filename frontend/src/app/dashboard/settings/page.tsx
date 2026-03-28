@@ -7,6 +7,7 @@ import {
   AlertTriangle, Database, RefreshCw, Eye, Download, Loader2
 } from 'lucide-react'
 import { scriptsApi, patchesApi, lgpdApi, auditApi } from '@/lib/api'
+import { PUBLIC_APP_ORIGIN, PUBLIC_API_BASE_URL, PUBLIC_WS_ORIGIN } from '@/lib/public-config'
 
 /* ────────────────────────────── types ────────────────────────────── */
 interface Script {
@@ -106,8 +107,9 @@ function TabGeral() {
             <h2 className="text-lg font-semibold text-white">API Backend</h2>
           </div>
           <div className="space-y-3 text-sm">
-            <InfoRow label="URL Base" value={process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'} mono />
-            <InfoRow label="WebSocket" value={process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3000'} mono />
+            <InfoRow label="Painel (app)" value={PUBLIC_APP_ORIGIN} mono />
+            <InfoRow label="URL Base (API)" value={PUBLIC_API_BASE_URL} mono />
+            <InfoRow label="WebSocket" value={PUBLIC_WS_ORIGIN} mono />
             <InfoRow label="Versão" value="v2.0.0" />
           </div>
         </div>

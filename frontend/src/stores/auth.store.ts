@@ -12,6 +12,7 @@ export interface AuthUser {
   tenant?: { id: string; nome: string; slug?: string }
   permissions: string[]
   tenantsAtribuidos?: string[]
+  profilePhotoUrl?: string | null
 }
 
 interface AuthState {

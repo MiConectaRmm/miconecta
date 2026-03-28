@@ -1,14 +1,18 @@
+# Produção (domínio público): https://app.maginf.com.br — API: https://api.maginf.com.br
+# O flyctl pode mostrar *.fly.dev; o utilizador acede sempre por app.maginf.com.br.
 app = "miconecta-frontend"
 primary_region = "gru"
 
 [build]
   [build.args]
+  NEXT_PUBLIC_APP_URL = "https://app.maginf.com.br"
   NEXT_PUBLIC_API_URL = "https://api.maginf.com.br/api/v1"
   NEXT_PUBLIC_WS_URL = "wss://api.maginf.com.br"
 
 [env]
   PORT = "3000"
   NODE_ENV = "production"
+  NEXT_PUBLIC_APP_URL = "https://app.maginf.com.br"
 
 [http_service]
   internal_port = 3000

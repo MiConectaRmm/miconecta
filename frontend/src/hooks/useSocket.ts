@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useCallback } from 'react'
 import { io, Socket } from 'socket.io-client'
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:3000'
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'wss://api.maginf.com.br'
 const sockets = new Map<string, Socket>()
 
 function getSocket(namespace: string) {

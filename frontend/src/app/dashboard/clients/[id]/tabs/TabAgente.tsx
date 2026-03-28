@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Download, FileCode2, Terminal, Key, Copy, Check, RefreshCw, Loader2, Info, AlertCircle } from 'lucide-react'
 import { agentsApi } from '@/lib/api'
+import { AGENT_MSI_DOWNLOAD_URL, PUBLIC_API_BASE_URL, PUBLIC_APP_ORIGIN } from '@/lib/public-config'
 
 interface TabAgenteProps {
   tenantId: string
@@ -46,8 +47,6 @@ export default function TabAgente({ tenantId, tenantNome }: TabAgenteProps) {
     setTimeout(() => setCopied(null), 2000)
   }
 
-  const msiUrl = 'https://miconecta-backend.fly.dev/agents/download'
-
   return (
     <div className="space-y-6">
       {/* Cabeçalho */}
@@ -56,6 +55,14 @@ export default function TabAgente({ tenantId, tenantNome }: TabAgenteProps) {
         <p className="text-sm text-dark-400 mt-1">
           Baixe o script de instalação personalizado para <span className="text-white font-medium">{tenantNome}</span>.
           O script já contém o token de provisionamento e a URL do servidor configurados.
+          {' '}Painel:{' '}
+          <span className="text-brand-400 font-mono text-xs">{PUBLIC_APP_ORIGIN}</span>
+        </p>
+        <p className="text-xs text-dark-500 mt-2">
+          MSI oficial:{' '}
+          <a href={AGENT_MSI_DOWNLOAD_URL} className="text-brand-400 hover:underline" target="_blank" rel="noopener noreferrer">
+            {AGENT_MSI_DOWNLOAD_URL}
+          </a>
         </p>
       </div>
 
@@ -162,7 +169,7 @@ export default function TabAgente({ tenantId, tenantNome }: TabAgenteProps) {
           <span className="text-green-400">msiexec</span>
           {' '}<span className="text-white">/i MIConectaRMMSetup.msi /qn</span>
           {' '}<span className="text-yellow-400">SERVER_URL=</span>
-          <span className="text-blue-300">https://miconecta-backend.fly.dev/api/v1</span>
+          <span className="text-blue-300">{PUBLIC_API_BASE_URL}</span>
           {' '}<span className="text-yellow-400">TENANT_ID=</span>
           <span className="text-blue-300">{tenantId}</span>
           {' '}<span className="text-yellow-400">PROVISION_TOKEN=</span>
