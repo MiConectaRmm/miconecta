@@ -19,10 +19,11 @@ async function bootstrap() {
       logger: isProd ? ['error', 'warn', 'log'] : ['error', 'warn', 'log', 'debug'],
     });
 
-    // Security headers
+    // Security headers — CORP cross-origin: o painel (app.*) embute imagens da API (avatars, etc.)
     app.use(helmet({
       contentSecurityPolicy: isProd ? undefined : false,
       crossOriginEmbedderPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
     }));
 
     app.setGlobalPrefix('api/v1');

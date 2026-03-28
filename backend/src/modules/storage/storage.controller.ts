@@ -67,6 +67,8 @@ export class StorageController {
     const { file, absolutePath } = await this.storageService.resolveStreamFromToken(token);
     res.setHeader('Content-Type', file.mimeType);
     res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Access-Control-Allow-Origin', '*');
     const stream = this.storageService.createReadStreamForPath(absolutePath);
     stream.pipe(res);
   }
