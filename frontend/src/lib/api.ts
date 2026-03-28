@@ -15,6 +15,12 @@ api.interceptors.request.use((config) => {
       config.headers.Authorization = `Bearer ${token}`;
     }
   }
+  // Instância axios tem Content-Type: application/json por defeito — isso quebra multipart.
+  // Com FormData o browser deve enviar multipart/form-data;boundary=...
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+    delete config.headers['content-type'];
+  }
   return config;
 });
 
