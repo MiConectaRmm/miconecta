@@ -1,20 +1,25 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, Fragment } from 'react'
 import {
   MessageSquare, Send, Search, User, Paperclip,
   Volume2, VolumeX, RefreshCw, CheckCircle2, MonitorPlay,
-  Plus, Ticket, Terminal, X, MessagesSquare, Star, Wifi, WifiOff,
+  Plus, MessagesSquare, Wifi, WifiOff, Pencil, Palette,
 } from 'lucide-react'
 import { ticketsApi, chatApi, conversationsApi, devicesApi } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth.store'
 import { useSocket } from '@/hooks/useSocket'
 import { useChatNotificationsStore } from '@/stores/chat-notifications.store'
 import {
-  colorForClientKey,
-  empresaUpper,
+  INBOX_PALETTE,
+  empresaLabel,
+  getContactDisplayName,
   getInboxAlias,
   setInboxAlias,
+  resolveInboxColor,
+  setInboxColorAuto,
+  setInboxColorPalette,
+  setInboxColorHex,
   type ClientColor,
 } from '@/lib/inbox-utils'
 
@@ -87,11 +92,41 @@ function colorKeyForItem(item: InboxItem): string {
 }
 
 function pickClientColor(item: InboxItem): ClientColor {
-  return colorForClientKey(colorKeyForItem(item))
+  return resolveInboxColor(item.id, colorKeyForItem(item))
 }
 
 function resolveEmpresaNome(item: InboxItem, tenantNome?: string | null): string {
-  return item.empresaNome || item.cliente || tenantNome || 'Cliente'
+  return item.empresaNome || item.cliente || tenantNome || ''
+}
+
+type MessageGroup =
+  | { kind: 'system'; items: ChatMessage[] }
+  | { kind: 'user'; items: ChatMessage[]; isMine: boolean; senderLabel: string }
+
+function senderGroupKey(msg: ChatMessage, userId?: string): string {
+  if (msg.senderType === 'system' || msg.type === 'sistema') return '__system__'
+  const mine = msg.senderType === 'technician' || msg.senderId === userId
+  return `${mine ? 'M' : 'C'}|${msg.senderId || msg.senderName}|${msg.senderType}`
+}
+
+function buildMessageGroups(messages: ChatMessage[], userId?: string): MessageGroup[] {
+  const groups: MessageGroup[] = []
+  for (const msg of messages) {
+    if (msg.senderType === 'system' || msg.type === 'sistema') {
+      groups.push({ kind: 'system', items: [msg] })
+      continue
+    }
+    const key = senderGroupKey(msg, userId)
+    const isMine = msg.senderType === 'technician' || msg.senderId === userId
+    const label = msg.senderName || (isMine ? 'Você' : 'Cliente')
+    const last = groups[groups.length - 1]
+    if (last?.kind === 'user' && senderGroupKey(last.items[0], userId) === key) {
+      last.items.push(msg)
+    } else {
+      groups.push({ kind: 'user', items: [msg], isMine, senderLabel: label })
+    }
+  }
+  return groups
 }
 
 export default function InboxPage() {
@@ -105,10 +140,12 @@ export default function InboxPage() {
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [wsConnected, setWsConnected] = useState(false)
   const [somAtivo, setSomAtivo] = useState(true)
-  const [showActions, setShowActions] = useState(false)
   const [tab, setTab] = useState<'all' | 'conversations' | 'tickets'>('all')
   const [aliasBump, setAliasBump] = useState(0)
   const [aliasDraft, setAliasDraft] = useState('')
+  const [nomeEditando, setNomeEditando] = useState(false)
+  const [coresAbertas, setCoresAbertas] = useState(false)
+  const [hexCustom, setHexCustom] = useState('#2EA3E6')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const joinedRoomsRef = useRef<Set<string>>(new Set())
 
@@ -150,6 +187,7 @@ export default function InboxPage() {
               .map((p: any) => p.participantName)
               .filter(Boolean) || []
           const contatoLabel = contatoNames.length ? contatoNames.join(' · ') : '—'
+          const tenantNome = c.tenant?.nomeFantasia || c.tenant?.nome
           inboxItems.push({
             id: `conv-${c.id}`,
             kind: 'conversation',
@@ -158,6 +196,7 @@ export default function InboxPage() {
             status: c.status,
             cliente: contatoLabel !== '—' ? contatoLabel : 'N/A',
             contatoLabel,
+            empresaNome: tenantNome,
             tenantId: c.tenantId,
             deviceId: c.deviceId,
             criadoEm: c.criadoEm,
@@ -238,9 +277,13 @@ export default function InboxPage() {
   useEffect(() => {
     if (!activeItem) {
       setAliasDraft('')
+      setNomeEditando(false)
+      setCoresAbertas(false)
       return
     }
     setAliasDraft(getInboxAlias(activeItem.id))
+    setNomeEditando(false)
+    setCoresAbertas(false)
   }, [activeItem?.id])
 
   useEffect(() => {
@@ -326,6 +369,31 @@ export default function InboxPage() {
         await chatApi.marcarTodasLidas(item.ticketId).catch(() => {})
       }
       setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, unread: 0 } : i))
+
+      if (item.deviceId && !item.rustdeskId) {
+        try {
+          const dres = await devicesApi.buscar(item.deviceId)
+          const d = dres.data
+          const rd = d?.rustdeskId
+          const hn = d?.hostname
+          if (rd || hn) {
+            setActiveItem((cur) =>
+              cur && cur.id === item.id
+                ? { ...cur, rustdeskId: rd || cur.rustdeskId, deviceHostname: hn || cur.deviceHostname }
+                : cur,
+            )
+            setItems((prev) =>
+              prev.map((i) =>
+                i.id === item.id
+                  ? { ...i, rustdeskId: rd || i.rustdeskId, deviceHostname: hn || i.deviceHostname }
+                  : i,
+              ),
+            )
+          }
+        } catch {
+          /* ignore */
+        }
+      }
     } catch (err) {
       console.error('Erro ao carregar mensagens:', err)
     } finally {
@@ -377,6 +445,34 @@ export default function InboxPage() {
       window.open(`rustdesk://connection/new/${activeItem.rustdeskId}`, '_blank')
     }
   }
+
+  const salvarNomeContato = () => {
+    if (!activeItem) return
+    setInboxAlias(activeItem.id, aliasDraft)
+    setAliasBump((n) => n + 1)
+    setNomeEditando(false)
+  }
+
+  const encerrarAtendimento = async () => {
+    if (!activeItem) return
+    if (!window.confirm('Encerrar atendimento? O ticket será resolvido e a conversa fechada, se existirem.')) return
+    try {
+      if (activeItem.ticketId && !['resolvido', 'fechado', 'cancelado'].includes(activeItem.status)) {
+        await ticketsApi.resolver(activeItem.ticketId)
+      }
+      if (activeItem.conversationId) {
+        await conversationsApi.fechar(activeItem.conversationId).catch(() => {})
+      }
+      await carregarInbox(true)
+      setActiveItem(null)
+    } catch {
+      alert('Não foi possível encerrar. Tente novamente.')
+    }
+  }
+
+  const mostrarEncerrar =
+    !!activeItem && Boolean(activeItem.ticketId || activeItem.conversationId)
+  const mostrarConectar = !!activeItem?.rustdeskId
 
   useEffect(() => {
     const interval = setInterval(() => carregarInbox(true), 60000)
@@ -443,14 +539,16 @@ export default function InboxPage() {
             <div className="text-center py-12 text-gray-500 text-sm">Nenhuma conversa</div>
           ) : (
             filteredItems.map((item) => {
-              const listTitle = (getInboxAlias(item.id) || item.titulo).trim()
+              const cor = pickClientColor(item)
+              const nomeLista = getContactDisplayName(item)
               return (
                 <button
                   key={`${item.id}-${aliasBump}`}
                   onClick={() => selecionarItem(item)}
-                  className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                    activeItem?.id === item.id ? 'bg-brand-50' : ''
-                  } ${item.unread > 0 ? 'bg-blue-50/30' : ''}`}
+                  className={`w-full text-left py-3 pr-4 pl-3 border-b border-gray-100 hover:bg-gray-50 transition-colors border-l-4 ${
+                    activeItem?.id === item.id ? 'bg-brand-50/80' : ''
+                  } ${item.unread > 0 ? 'bg-blue-50/40' : ''}`}
+                  style={{ borderLeftColor: cor.border }}
                 >
                   <div className="flex items-start gap-3">
                     <div className="mt-0.5">
@@ -462,8 +560,8 @@ export default function InboxPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <p className={`text-sm truncate ${item.unread > 0 ? 'font-bold text-gray-900' : 'font-medium text-gray-700'}`}>
-                          {item.ticketNumero ? `#${item.ticketNumero} ` : ''}{listTitle}
+                        <p className={`text-sm truncate ${item.unread > 0 ? 'font-bold text-gray-900' : 'font-semibold text-gray-800'}`}>
+                          {item.ticketNumero ? `#${item.ticketNumero} · ` : ''}{nomeLista}
                         </p>
                         {item.unread > 0 && (
                           <span className="flex-shrink-0 w-5 h-5 rounded-full bg-brand-500 text-white text-[10px] font-bold flex items-center justify-center">
@@ -471,8 +569,8 @@ export default function InboxPage() {
                           </span>
                         )}
                       </div>
-                      <p className="text-[10px] font-semibold text-gray-600 truncate mt-0.5">
-                        {empresaUpper(resolveEmpresaNome(item, user?.tenant?.nome))}
+                      <p className="text-xs text-gray-500 truncate mt-0.5">
+                        {empresaLabel(resolveEmpresaNome(item, user?.tenant?.nome))}
                       </p>
                       {item.lastMessage && (
                         <p className={`text-xs mt-1 truncate ${item.unread > 0 ? 'text-gray-700' : 'text-gray-500'}`}>
@@ -501,54 +599,146 @@ export default function InboxPage() {
           </div>
         ) : (
           <>
-            {/* Header da conversa */}
-            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-              <div className="flex items-center justify-between">
+            {/* Header estilo WhatsApp: nome + empresa + ações iguais em chat e ticket */}
+            <div
+              className="px-4 py-3 border-b border-gray-200"
+              style={{ backgroundColor: pickClientColor(activeItem).soft }}
+            >
+              <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    {empresaUpper(resolveEmpresaNome(activeItem, user?.tenant?.nome))}
+                  {nomeEditando ? (
+                    <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                      <input
+                        type="text"
+                        value={aliasDraft}
+                        onChange={(e) => setAliasDraft(e.target.value)}
+                        placeholder="Nome para exibir"
+                        className="flex-1 min-w-[140px] bg-white border border-gray-200 rounded-lg py-1.5 px-2 text-sm text-gray-800"
+                      />
+                      <button
+                        type="button"
+                        onClick={salvarNomeContato}
+                        className="text-xs font-semibold px-2 py-1.5 rounded-lg bg-brand-500 text-white hover:bg-brand-600"
+                      >
+                        Salvar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAliasDraft(getInboxAlias(activeItem.id))
+                          setNomeEditando(false)
+                        }}
+                        className="text-xs text-gray-600 hover:underline"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 min-w-0">
+                      <p className="text-base font-semibold text-gray-900 truncate">
+                        {getContactDisplayName(activeItem)}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setNomeEditando(true)}
+                        className="p-1 rounded-lg hover:bg-white/60 text-gray-500 shrink-0"
+                        title="Nomear contato"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                  <p className="text-sm text-gray-500 truncate mt-0.5">
+                    {empresaLabel(resolveEmpresaNome(activeItem, user?.tenant?.nome))}
                   </p>
-                  <p className="text-sm font-bold text-gray-800 truncate">
-                    {activeItem.ticketNumero ? `#${activeItem.ticketNumero} ` : ''}
-                    {aliasDraft.trim() || activeItem.titulo}
-                  </p>
-                  {activeItem.deviceHostname && (
-                    <p className="text-xs text-gray-600 mt-0.5">
-                      Dispositivo: {activeItem.deviceHostname}
+                  {(activeItem.ticketNumero || activeItem.deviceHostname) && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {activeItem.ticketNumero ? `Ticket #${activeItem.ticketNumero}` : ''}
+                      {activeItem.ticketNumero && activeItem.deviceHostname ? ' · ' : ''}
+                      {activeItem.deviceHostname ? `PC ${activeItem.deviceHostname}` : ''}
                     </p>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  {activeItem.rustdeskId && (
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                  <div className="flex flex-wrap justify-end gap-2">
                     <button
-                      onClick={conectarRemoto}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-xs font-semibold transition-colors"
+                      type="button"
+                      onClick={() => setCoresAbertas((v) => !v)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 text-xs font-medium hover:bg-gray-50"
+                      title="Cor deste cliente"
                     >
-                      <MonitorPlay className="w-3.5 h-3.5" /> Conectar
+                      <Palette className="w-3.5 h-3.5" /> Cor
                     </button>
-                  )}
-                  {activeItem.ticketId && !['resolvido', 'fechado'].includes(activeItem.status) && (
-                    <button
-                      onClick={async () => {
-                        try {
-                          await ticketsApi.resolver(activeItem.ticketId!)
-                          await carregarInbox(true)
-                          setActiveItem(null)
-                        } catch (err) {
-                          alert('Erro ao finalizar ticket')
-                        }
-                      }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-semibold transition-colors"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Finalizar
-                    </button>
+                    {mostrarConectar && (
+                      <button
+                        type="button"
+                        onClick={conectarRemoto}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-xs font-semibold transition-colors"
+                      >
+                        <MonitorPlay className="w-3.5 h-3.5" /> Conectar
+                      </button>
+                    )}
+                    {mostrarEncerrar && (
+                      <button
+                        type="button"
+                        onClick={encerrarAtendimento}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold transition-colors"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Encerrar
+                      </button>
+                    )}
+                  </div>
+                  {coresAbertas && (
+                    <div className="flex flex-wrap items-center justify-end gap-1.5 p-2 bg-white rounded-lg border border-gray-200 shadow-sm max-w-[min(100%,280px)]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInboxColorAuto(activeItem.id)
+                          setAliasBump((n) => n + 1)
+                        }}
+                        className="text-[10px] px-2 py-1 rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50"
+                      >
+                        Auto
+                      </button>
+                      {INBOX_PALETTE.map((c, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          title={`Cor ${i + 1}`}
+                          className="w-7 h-7 rounded-full border-2 border-white shadow shrink-0"
+                          style={{ backgroundColor: c.border }}
+                          onClick={() => {
+                            setInboxColorPalette(activeItem.id, i)
+                            setAliasBump((n) => n + 1)
+                          }}
+                        />
+                      ))}
+                      <span className="w-full sm:w-auto flex items-center gap-1 mt-1 sm:mt-0">
+                        <input
+                          type="color"
+                          value={hexCustom}
+                          onChange={(e) => setHexCustom(e.target.value)}
+                          className="h-7 w-10 rounded cursor-pointer border border-gray-200 p-0 bg-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setInboxColorHex(activeItem.id, hexCustom)
+                            setAliasBump((n) => n + 1)
+                          }}
+                          className="text-[10px] px-2 py-1 rounded-md bg-gray-800 text-white"
+                        >
+                          Hex
+                        </button>
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-gray-50">
+            {/* Mensagens agrupadas por remetente */}
+            <div className="flex-1 overflow-y-auto px-4 py-4 bg-gray-50">
               {loadingMessages ? (
                 <div className="flex items-center justify-center py-20">
                   <RefreshCw className="w-6 h-6 text-brand-500 animate-spin" />
@@ -556,45 +746,94 @@ export default function InboxPage() {
               ) : messages.length === 0 ? (
                 <div className="text-center py-12 text-gray-500 text-sm">Nenhuma mensagem ainda</div>
               ) : (
-                messages.map((msg) => {
-                  const isMine = msg.senderType === 'technician' || msg.senderId === user?.id
-                  const isSystem = msg.senderType === 'system' || msg.type === 'sistema'
-                  if (isSystem) {
+                <div className="space-y-4">
+                  {buildMessageGroups(messages, user?.id).map((group, gi) => {
+                    if (group.kind === 'system') {
+                      return (
+                        <Fragment key={`sys-${group.items[0]?.id ?? gi}`}>
+                          {group.items.map((msg) => (
+                            <div key={msg.id} className="flex justify-center">
+                              <span className="text-[11px] text-gray-500 bg-white px-3 py-1 rounded-full border border-gray-200">
+                                {msg.content}
+                              </span>
+                            </div>
+                          ))}
+                        </Fragment>
+                      )
+                    }
+                    const { isMine, items, senderLabel } = group
                     return (
-                      <div key={msg.id} className="flex justify-center">
-                        <span className="text-[11px] text-gray-500 bg-white px-3 py-1 rounded-full border border-gray-200">
-                          {msg.content}
-                        </span>
+                      <div
+                        key={`g-${gi}-${items[0].id}`}
+                        className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <div className={`flex flex-col max-w-[72%] ${isMine ? 'items-end' : 'items-start'}`}>
+                          {!isMine && (
+                            <p className="text-xs font-medium text-gray-600 mb-1 pl-1 flex items-center gap-1">
+                              <User className="w-3 h-3 opacity-70" /> {senderLabel}
+                            </p>
+                          )}
+                          <div className="flex flex-col gap-0.5 w-full">
+                            {items.map((msg, mi) => {
+                              const isFirst = mi === 0
+                              const isLast = mi === items.length - 1
+                              const roundMine =
+                                items.length === 1
+                                  ? 'rounded-2xl rounded-br-md'
+                                  : isFirst
+                                    ? 'rounded-2xl rounded-br-sm rounded-bl-2xl'
+                                    : isLast
+                                      ? 'rounded-2xl rounded-tr-sm rounded-br-md'
+                                      : 'rounded-lg'
+                              const roundThem =
+                                items.length === 1
+                                  ? 'rounded-2xl rounded-bl-md'
+                                  : isFirst
+                                    ? 'rounded-2xl rounded-bl-sm rounded-br-2xl'
+                                    : isLast
+                                      ? 'rounded-2xl rounded-tl-sm rounded-bl-md'
+                                      : 'rounded-lg'
+                              return (
+                                <div
+                                  key={msg.id}
+                                  className={`px-3.5 py-2 ${
+                                    isMine
+                                      ? `bg-brand-500 text-white ${roundMine}`
+                                      : `bg-white text-gray-800 shadow-sm border border-gray-100 ${roundThem}`
+                                  }`}
+                                >
+                                  {msg.arquivoUrl && (
+                                    <a
+                                      href={msg.arquivoUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className={`flex items-center gap-1.5 text-xs hover:underline mb-1 ${
+                                        isMine ? 'text-brand-100' : 'text-brand-600'
+                                      }`}
+                                    >
+                                      <Paperclip className="w-3 h-3" /> {msg.arquivoNome || 'Arquivo'}
+                                    </a>
+                                  )}
+                                  <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                                  {isLast && (
+                                    <p
+                                      className={`text-[10px] mt-1 ${isMine ? 'text-brand-100' : 'text-gray-400'}`}
+                                    >
+                                      {new Date(msg.criadoEm).toLocaleTimeString('pt-BR', {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })}
+                                    </p>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
                       </div>
                     )
-                  }
-                  return (
-                    <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${
-                        isMine 
-                          ? 'bg-brand-500 text-white rounded-br-md' 
-                          : 'bg-white text-gray-800 rounded-bl-md shadow-sm border border-gray-100'
-                      }`}>
-                        {!isMine && (
-                          <p className="text-[10px] font-semibold text-gray-500 mb-0.5 flex items-center gap-1">
-                            <User className="w-3 h-3" /> {msg.senderName}
-                          </p>
-                        )}
-                        {msg.arquivoUrl && (
-                          <a href={msg.arquivoUrl} target="_blank" rel="noopener noreferrer" 
-                            className={`flex items-center gap-1.5 text-xs hover:underline mb-1 ${isMine ? 'text-brand-100' : 'text-brand-600'}`}
-                          >
-                            <Paperclip className="w-3 h-3" /> {msg.arquivoNome || 'Arquivo'}
-                          </a>
-                        )}
-                        <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
-                        <p className={`text-[10px] mt-1 ${isMine ? 'text-brand-100' : 'text-gray-400'}`}>
-                          {new Date(msg.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      </div>
-                    </div>
-                  )
-                })
+                  })}
+                </div>
               )}
               <div ref={messagesEndRef} />
             </div>

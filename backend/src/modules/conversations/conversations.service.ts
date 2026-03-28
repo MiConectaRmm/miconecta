@@ -51,6 +51,7 @@ export class ConversationsService {
   async listar(tenantId: string, filtros?: { status?: ConversationStatus; type?: ConversationType; userId?: string }) {
     const query = this.conversationRepo.createQueryBuilder('c')
       .leftJoinAndSelect('c.participants', 'p')
+      .leftJoinAndSelect('c.tenant', 'tenant')
       .where('c.tenantId = :tenantId', { tenantId });
 
     if (filtros?.status) {
@@ -78,6 +79,7 @@ export class ConversationsService {
   async listarPorParticipante(userId: string, tenantId: string) {
     return this.conversationRepo.createQueryBuilder('c')
       .leftJoinAndSelect('c.participants', 'p')
+      .leftJoinAndSelect('c.tenant', 'tenant')
       .innerJoin('conversation_participants', 'me', 'me.conversation_id = c.id AND me.user_id = :userId', { userId })
       .where('c.tenantId = :tenantId', { tenantId })
       .andWhere('c.status != :archived', { archived: ConversationStatus.ARCHIVED })
