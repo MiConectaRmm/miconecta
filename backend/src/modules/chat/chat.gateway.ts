@@ -140,7 +140,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const normalized = this.normalizeMessage(message);
     this.server.to(`ticket:${ticket.id}`).emit('message:new', normalized);
-    this.server.to(`tenant:${ticket.tenantId}`).emit('notification:new', {
+    this.emitNotification(ticket.tenantId, {
       type: 'ticket_message',
       ticketId: ticket.id,
       tenantId: ticket.tenantId,
@@ -196,7 +196,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
     const normalized = this.normalizeMessage(message);
     this.server.to(`ticket:${ticket.id}`).emit('message:new', normalized);
-    this.server.to(`tenant:${ticket.tenantId}`).emit('notification:new', {
+    this.emitNotification(ticket.tenantId, {
       type: 'ticket_message',
       ticketId: ticket.id,
       tenantId: ticket.tenantId,
@@ -325,15 +325,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
 
     this.server.to(`conversation:${conversation.id}`).emit('conversation:message:new', message);
-    this.server.to(`tenant:${conversation.tenantId}`).emit('notification:new', {
-      type: 'conversation_message',
-      conversationId: conversation.id,
-      tenantId: conversation.tenantId,
-      message,
-      timestamp: new Date(),
-    });
-    // Broadcast para Central de Atendimento
-    this.server.to('atendimento').emit('atendimento:update', {
+    this.emitNotification(conversation.tenantId, {
       type: 'conversation_message',
       conversationId: conversation.id,
       tenantId: conversation.tenantId,

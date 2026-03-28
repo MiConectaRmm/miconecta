@@ -14,6 +14,8 @@ import { InstallationToken, InstallationTokenStatus } from '../../database/entit
 import { AlertEngine } from '../alerts/alert-engine.service';
 import { AgentRegisterDto, AgentHeartbeatDto, AgentInventoryDto, InstallationTokenCreateDto } from './dto/agent.dto';
 import * as crypto from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class AgentsService {
@@ -36,7 +38,106 @@ export class AgentsService {
     private readonly installationTokenRepo: Repository<InstallationToken>,
     private readonly jwtService: JwtService,
     private readonly alertEngine: AlertEngine,
+    private readonly configService: ConfigService,
   ) {}
+
+  /** Base pública da API (scripts, MSI, agent.config) — alinhada a API_URL ou produção Maginf. */
+  getPublicApiBaseUrl(configService: ConfigService): string {
+    const explicit = configService.get<string>('API_URL')?.trim();
+    if (explicit) return explicit.replace(/\/$/, '');
+    const railway = configService.get<string>('RAILWAY_PUBLIC_DOMAIN')?.trim();
+    if (railway) return `https://${railway}/api/v1`;
+    if (configService.get<string>('NODE_ENV') !== 'production') {
+      return 'http://localhost:3000/api/v1';
+    }
+    return 'https://api.maginf.com.br/api/v1';
+  }
+
+  /** Mesma versão do MSI/agente (AGENT_VERSION, senão assets/agent-version.txt gerado pelo build-agent.ps1). */
+  resolveAgentVersion(configService: ConfigService): string {
+    const env = configService.get<string>('AGENT_VERSION')?.trim();
+    if (env) return env;
+    try {
+      const p = path.join(process.cwd(), 'assets', 'agent-version.txt');
+      if (fs.existsSync(p)) return fs.readFileSync(p, 'utf8').trim();
+    } catch {
+      /* ignore */
+    }
+    return '2.0.0';
+  }
+
+  private escapeHtml(s: string): string {
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  /** Página HTML única por tenant (abra a resposta no navegador a partir do painel, com JWT). */
+  async buildInstallerLandingHtml(tenantId: string, configService: ConfigService): Promise<string> {
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    if (!tenant) throw new NotFoundException('Tenant não encontrado');
+
+    const base = this.getPublicApiBaseUrl(configService);
+    const v = this.resolveAgentVersion(configService);
+    const msiUrl = `${base}/agents/download/msi`;
+    const nome = this.escapeHtml(tenant.nome);
+    const year = new Date().getFullYear();
+
+    return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Instalar MIConecta — ${nome}</title>
+  <style>
+    :root { --bg:#0f1419; --card:#1a2332; --text:#e8eef7; --muted:#8b9bb4; --accent:#3b82f6; --accent2:#22c55e; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, Segoe UI, Roboto, sans-serif; background: linear-gradient(160deg, var(--bg) 0%, #162030 100%); color: var(--text); min-height: 100vh; }
+    .wrap { max-width: 640px; margin: 0 auto; padding: 2.5rem 1.25rem; }
+    .badge { display:inline-block; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent2); background: rgba(34,197,94,0.12); padding: 0.35rem 0.65rem; border-radius: 6px; margin-bottom: 1rem; }
+    h1 { font-size: 1.5rem; font-weight: 700; margin: 0 0 0.5rem; line-height: 1.3; }
+    .sub { color: var(--muted); font-size: 0.95rem; margin-bottom: 1.75rem; }
+    .card { background: var(--card); border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; border: 1px solid rgba(255,255,255,0.06); }
+    .row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+    a.btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem 1.25rem; border-radius: 8px; font-weight: 600; text-decoration: none; color: #fff; background: var(--accent); border: none; cursor: pointer; font-size: 0.95rem; }
+    a.btn:hover { filter: brightness(1.08); }
+    a.btn-secondary { background: #334155; color: var(--text); }
+    .meta { font-size: 0.8rem; color: var(--muted); word-break: break-all; margin-top: 0.75rem; }
+    .ver { font-family: ui-monospace, monospace; font-size: 0.85rem; color: var(--accent2); }
+    footer { margin-top: 2rem; font-size: 0.75rem; color: var(--muted); text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="badge">Instalador oficial</div>
+    <h1>MIConecta Agent</h1>
+    <p class="sub">Cliente: <strong>${nome}</strong> · Versão do pacote <span class="ver">${this.escapeHtml(v)}</span></p>
+    <div class="card">
+      <p style="margin:0 0 1rem; font-size:0.95rem;">Baixe o instalador assinado pela Maginf (MSI). Os scripts .ps1 / .bat do painel usam a mesma versão e o mesmo servidor.</p>
+      <div class="row">
+        <a class="btn" href="${this.escapeHtml(msiUrl)}">Baixar MIConectaSetup.msi</a>
+      </div>
+      <p class="meta">Endpoint: ${this.escapeHtml(msiUrl)}</p>
+    </div>
+    <div class="card">
+      <p style="margin:0; font-size:0.9rem; color:var(--muted);">Scripts automatizados com token de provisionamento ficam em <strong>Dispositivos / Instalar agente</strong> no painel (mesma versão <span class="ver">${this.escapeHtml(v)}</span> nos nomes dos ficheiros).</p>
+    </div>
+    <footer>Maginf Tecnologia · MIConecta · ${year}</footer>
+  </div>
+</body>
+</html>`;
+  }
+
+  /** Chamado após criar tenant: não compila MSI no servidor (o build é único por release); centraliza log e URL da página de instalador. */
+  async onTenantCreated(tenantId: string, configService: ConfigService): Promise<void> {
+    const base = this.getPublicApiBaseUrl(configService);
+    const v = this.resolveAgentVersion(configService);
+    this.logger.log(
+      `Tenant ${tenantId}: pacote agente v${v}; página de instalador: ${base}/agents/installer-page/${tenantId} (requer JWT)`,
+    );
+  }
 
   async criarInstallationToken(tenantId: string, dto: InstallationTokenCreateDto) {
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
@@ -87,7 +188,7 @@ export class AgentsService {
 
     const apiUrl = configService.get('API_URL') || configService.get('CORS_ORIGIN')?.replace(/\/$/, '');
     const downloadUrl = configService.get('AGENT_DOWNLOAD_URL') || null;
-    const agentVersion = configService.get('AGENT_VERSION') || '1.0.0';
+    const agentVersion = this.resolveAgentVersion(configService);
 
     let provisionToken = tenant.provisionToken;
     let provisionExpires = tenant.provisionTokenExpires;
@@ -101,7 +202,7 @@ export class AgentsService {
     return {
       downloadUrl,
       agentVersion,
-      serverUrl: configService.get('API_URL') || `${configService.get('RAILWAY_PUBLIC_DOMAIN') ? 'https://' + configService.get('RAILWAY_PUBLIC_DOMAIN') : 'http://localhost:3000'}/api/v1`,
+      serverUrl: this.getPublicApiBaseUrl(configService),
       tenantId,
       tenantNome: tenant.nome,
       provisionToken,
@@ -125,18 +226,16 @@ export class AgentsService {
       provisionToken = result.provisionToken;
     }
 
-    const serverUrl = configService.get('API_URL')
-      || (configService.get('RAILWAY_PUBLIC_DOMAIN')
-        ? `https://${configService.get('RAILWAY_PUBLIC_DOMAIN')}/api/v1`
-        : 'https://miconecta-backend.fly.dev/api/v1');
+    const serverUrl = this.getPublicApiBaseUrl(configService);
 
     const msiDownloadUrl = `${serverUrl}/agents/download/msi`;
     const clientName = tenant.nome.replace(/[^a-zA-Z0-9 ]/g, '').trim();
 
-    const agentVersion = configService.get('AGENT_VERSION') || '1.0.0';
+    const agentVersion = this.resolveAgentVersion(configService);
     if (format === 'ps1') {
       const script = [
         `# MIConectaRMM - Instalacao Automatica`,
+        `# Agente MSI / scripts: v${agentVersion} (alinhado ao deploy do servidor)`,
         `# Cliente: ${tenant.nome}`,
         `# Gerado em: ${new Date().toISOString()}`,
         ``,
@@ -309,6 +408,7 @@ export class AgentsService {
       `@echo off`,
       `chcp 65001 > nul`,
       `REM MIConectaRMM - Instalacao Automatica`,
+      `REM Agente MSI / scripts: v${agentVersion} (alinhado ao deploy do servidor)`,
       `REM Cliente: ${tenant.nome}`,
       `REM Gerado em: ${new Date().toISOString()}`,
       `REM Execute como Administrador`,
@@ -616,7 +716,7 @@ export class AgentsService {
   async verificarAtualizacao() {
     // Retorna informações da versão mais recente do agente disponível
     // Configurável via env AGENT_VERSION e AGENT_DOWNLOAD_URL
-    const versaoDisponivel = process.env.AGENT_VERSION || '2.0.0';
+    const versaoDisponivel = this.resolveAgentVersion(this.configService);
     const downloadUrl = process.env.AGENT_DOWNLOAD_URL || null;
     const checksum = process.env.AGENT_CHECKSUM || null;
 

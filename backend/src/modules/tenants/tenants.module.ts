@@ -6,11 +6,13 @@ import { Organization } from '../../database/entities/organization.entity';
 import { Technician } from '../../database/entities/technician.entity';
 import { TenantsController } from './tenants.controller';
 import { TenantsService } from './tenants.service';
+import { AgentsModule } from '../agents/agents.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Tenant, Organization, Technician]),
     HttpModule,
+    AgentsModule,
   ],
   controllers: [TenantsController],
   providers: [TenantsService],

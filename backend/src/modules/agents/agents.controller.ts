@@ -139,6 +139,21 @@ export class AgentsController {
     return this.agentsService.generateInstallScript(tenantId, this.configService, format);
   }
 
+  @Get('installer-page/:tenantId')
+  @UseGuards(JwtAuthGuard, TenantAccessGuard, RolesGuard, PermissionsGuard)
+  @Roles('super_admin', 'admin_maginf', 'admin', 'tecnico')
+  @RequirePermissions('devices:read')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Página HTML de instalador (download MSI) para o tenant' })
+  async installerPage(
+    @Param('tenantId') tenantId: string,
+    @Res() res: Response,
+  ) {
+    const html = await this.agentsService.buildInstallerLandingHtml(tenantId, this.configService);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(html);
+  }
+
   @Post('register')
   @ApiOperation({ summary: 'Registrar agente (usa provision token, sem auth JWT)' })
   async register(
@@ -241,16 +256,19 @@ export class AgentsController {
       `Ticket criado pelo dispositivo ${device.hostname || device.id}`,
     );
 
-    // Emitir via WebSocket para técnicos receberem em tempo real
-    this.chatGateway.emitAtendimento('ticket:new', {
-      id: saved.id,
-      numero: saved.numero,
-      titulo: saved.titulo,
-      status: saved.status,
+    // Mesmo canal que tickets criados pela API: tenant + atendimento:update
+    this.chatGateway.emitNotification(tenantId, {
+      type: 'ticket_created',
+      ticketId: saved.id,
       tenantId,
-      deviceId: device.id,
-      origem: 'agente',
-      criadoEm: saved.criadoEm,
+      titulo: saved.titulo,
+      timestamp: new Date(),
+    });
+    this.chatGateway.emitTicketUpdated(saved.id, {
+      ticketId: saved.id,
+      status: saved.status,
+      prioridade: saved.prioridade,
+      hasUnreadFromClient: false,
     });
 
     return {
@@ -355,7 +373,7 @@ export class AgentsController {
       criadoEm: message.criadoEm,
     };
     this.chatGateway.emitMessage(ticketId, normalized);
-    this.chatGateway.emitAtendimento('notification:new', {
+    this.chatGateway.emitNotification(tenantId, {
       type: 'ticket_message',
       ticketId,
       tenantId,
@@ -601,9 +619,9 @@ export class AgentsController {
       type: ConversationMessageType.TEXT,
     });
 
-    // Emitir via WebSocket
+    // Igual ao WebSocket conversation:message: conversa + notification:new (tenant) + atendimento:update
     this.chatGateway.emitConversationMessage(conversation.id, message);
-    this.chatGateway.emitAtendimento('notification:new', {
+    this.chatGateway.emitNotification(tenantId, {
       type: 'conversation_message',
       conversationId: conversation.id,
       tenantId,

@@ -243,6 +243,7 @@ export class AuthService {
         tenantId: user.tenantId, tenant: user.tenant,
         organization: user.organization,
         permissions: this.getPermissions(user.funcao),
+        profilePhotoUrl: user.avatarUrl || null,
       };
     }
 
@@ -254,7 +255,58 @@ export class AuthService {
       tenantId: tecnico.tenantId, tenant: tecnico.tenant,
       tenantsAtribuidos: tecnico.tenantsAtribuidos,
       permissions: this.getPermissions(tecnico.funcao),
+      profilePhotoUrl: tecnico.avatarUrl || null,
     };
+  }
+
+  async updateProfile(userId: string, userType: string, dto: {
+    nome?: string;
+    email?: string;
+    senhaAtual?: string;
+    senhaNova?: string;
+    profilePhotoUrl?: string;
+  }) {
+    if (userType === 'client_user') {
+      const user = await this.clientUserRepo.findOne({ where: { id: userId } });
+      if (!user) throw new UnauthorizedException('Usuário não encontrado');
+
+      if (dto.senhaNova && dto.senhaAtual) {
+        const senhaValida = await bcrypt.compare(dto.senhaAtual, user.senha);
+        if (!senhaValida) throw new UnauthorizedException('Senha atual incorreta');
+        user.senha = await bcrypt.hash(dto.senhaNova, 12);
+      }
+
+      if (dto.nome) user.nome = dto.nome;
+      if (dto.email) {
+        const existe = await this.clientUserRepo.findOne({ where: { email: dto.email } });
+        if (existe && existe.id !== userId) throw new ConflictException('E-mail já em uso');
+        user.email = dto.email;
+      }
+      if (dto.profilePhotoUrl !== undefined) user.avatarUrl = dto.profilePhotoUrl;
+
+      await this.clientUserRepo.save(user);
+      return { message: 'Perfil atualizado com sucesso' };
+    }
+
+    const tecnico = await this.technicianRepo.findOne({ where: { id: userId } });
+    if (!tecnico) throw new UnauthorizedException('Usuário não encontrado');
+
+    if (dto.senhaNova && dto.senhaAtual) {
+      const senhaValida = await bcrypt.compare(dto.senhaAtual, tecnico.senha);
+      if (!senhaValida) throw new UnauthorizedException('Senha atual incorreta');
+      tecnico.senha = await bcrypt.hash(dto.senhaNova, 12);
+    }
+
+    if (dto.nome) tecnico.nome = dto.nome;
+    if (dto.email) {
+      const existe = await this.technicianRepo.findOne({ where: { email: dto.email } });
+      if (existe && existe.id !== userId) throw new ConflictException('E-mail já em uso');
+      tecnico.email = dto.email;
+    }
+    if (dto.profilePhotoUrl !== undefined) tecnico.avatarUrl = dto.profilePhotoUrl;
+
+    await this.technicianRepo.save(tecnico);
+    return { message: 'Perfil atualizado com sucesso' };
   }
 
   private async registrarAuditLogin(tenantId: string, userId: string, nome: string, tipo: string, ip?: string) {

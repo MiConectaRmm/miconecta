@@ -27,7 +27,15 @@ export class ConversationsController {
     @Query('status') status?: ConversationStatus,
     @Query('type') type?: ConversationType,
   ) {
-    return this.conversationsService.listar(req.user.tenantId, { status, type, userId: req.user.sub });
+    const tenantId = req.user.tenantId;
+    // Portal (cliente): só conversas em que o usuário participa.
+    // Técnicos: todas as conversas do tenant (inclui DEVICE só com agente — inbox / suporte).
+    const isClient = req.user.userType === 'client_user';
+    return this.conversationsService.listar(tenantId, {
+      status,
+      type,
+      ...(isClient ? { userId: req.user.sub } : {}),
+    });
   }
 
   @Get('me')

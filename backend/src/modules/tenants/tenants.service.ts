@@ -8,6 +8,8 @@ import { Organization } from '../../database/entities/organization.entity';
 import { Technician } from '../../database/entities/technician.entity';
 import { CreateTenantDto, UpdateTenantDto } from './dto/create-tenant.dto';
 import { JwtPayload } from '../../common/interfaces';
+import { ConfigService } from '@nestjs/config';
+import { AgentsService } from '../agents/agents.service';
 
 @Injectable()
 export class TenantsService {
@@ -21,6 +23,8 @@ export class TenantsService {
     @InjectRepository(Technician)
     private readonly technicianRepo: Repository<Technician>,
     private readonly httpService: HttpService,
+    private readonly agentsService: AgentsService,
+    private readonly configService: ConfigService,
   ) {}
 
   async criarTenant(dados: CreateTenantDto) {
@@ -30,7 +34,11 @@ export class TenantsService {
       plano: dados.plano as TenantPlano | undefined,
     };
     const tenant = this.tenantRepo.create(toSave);
-    return this.tenantRepo.save(tenant);
+    const saved = await this.tenantRepo.save(tenant);
+    await this.agentsService.onTenantCreated(saved.id, this.configService).catch((err) => {
+      this.logger.warn(`Pós-cadastro instalador: ${err?.message ?? err}`);
+    });
+    return saved;
   }
 
   private readonly rolesListaTenantsGlobal = ['super_admin', 'admin_maginf', 'admin'];
