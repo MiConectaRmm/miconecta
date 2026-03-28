@@ -8,6 +8,14 @@ namespace MIConectaAgent.Tray;
 /// Cliente REST leve para o chat. Usa o device-token do agente para
 /// autenticação (header x-agent-token) e consulta tickets + mensagens.
 /// </summary>
+public sealed class SupportPanelContext
+{
+    public string CompanyName { get; set; } = "";
+    public string? LogoUrl { get; set; }
+    public string TechnicianName { get; set; } = "";
+    public string? TechnicianAvatarUrl { get; set; }
+}
+
 public class ChatApiClient : IDisposable
 {
     private readonly HttpClient _http;
@@ -23,7 +31,7 @@ public class ChatApiClient : IDisposable
         _http = new HttpClient
         {
             BaseAddress = new Uri(serverUrl.TrimEnd('/') + "/"),
-            Timeout = TimeSpan.FromSeconds(15),
+            Timeout = TimeSpan.FromSeconds(45),
         };
         _http.DefaultRequestHeaders.Add("x-device-id", deviceId);
         _http.DefaultRequestHeaders.Add("x-agent-token", deviceToken);
@@ -51,6 +59,57 @@ public class ChatApiClient : IDisposable
             Connected = false;
             LastError = $"Sem conexão: {ex.Message}";
             return false;
+        }
+    }
+
+    /// <summary>GET agents/me/support-context — logo, técnico.</summary>
+    public async Task<SupportPanelContext?> ObterContextoSuporteAsync()
+    {
+        try
+        {
+            var resp = await _http.GetAsync("agents/me/support-context");
+            if (!resp.IsSuccessStatusCode) return null;
+            var j = await resp.Content.ReadFromJsonAsync<JsonElement>();
+            if (j.ValueKind != JsonValueKind.Object) return null;
+            return new SupportPanelContext
+            {
+                CompanyName = j.TryGetProperty("companyName", out var cn) ? cn.GetString() ?? "" : "",
+                LogoUrl = j.TryGetProperty("logoUrl", out var lu) && lu.ValueKind == JsonValueKind.String ? lu.GetString() : null,
+                TechnicianName = j.TryGetProperty("technicianName", out var tn) ? tn.GetString() ?? "" : "",
+                TechnicianAvatarUrl = j.TryGetProperty("technicianAvatarUrl", out var au) && au.ValueKind == JsonValueKind.String ? au.GetString() : null,
+            };
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>GET agents/me/tickets/history</summary>
+    public async Task<List<ChatTicket>> ListarTicketsHistoricoAsync()
+    {
+        try
+        {
+            var resp = await _http.GetAsync("agents/me/tickets/history");
+            if (!resp.IsSuccessStatusCode) return [];
+            var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
+            var list = new List<ChatTicket>();
+            if (json.ValueKind != JsonValueKind.Array) return list;
+            foreach (var t in json.EnumerateArray())
+            {
+                list.Add(new ChatTicket
+                {
+                    Id = t.TryGetProperty("id", out var id) ? id.GetString() ?? "" : "",
+                    Numero = t.TryGetProperty("numero", out var num) && num.TryGetInt32(out var n) ? n : 0,
+                    Titulo = t.TryGetProperty("titulo", out var tit) ? tit.GetString() ?? "" : "",
+                    Status = t.TryGetProperty("status", out var st) ? st.GetString() ?? "" : "",
+                });
+            }
+            return list;
+        }
+        catch
+        {
+            return [];
         }
     }
 
@@ -86,6 +145,7 @@ public class ChatApiClient : IDisposable
                     tickets.Add(new ChatTicket
                     {
                         Id = t.GetProperty("id").GetString() ?? "",
+                        Numero = t.TryGetProperty("numero", out var num) && num.TryGetInt32(out var n) ? n : 0,
                         Titulo = t.TryGetProperty("titulo", out var tit) ? tit.GetString() ?? "" : "",
                         Status = t.TryGetProperty("status", out var st) ? st.GetString() ?? "" : "",
                     });
@@ -299,6 +359,7 @@ public class ChatApiClient : IDisposable
             return new ChatTicket
             {
                 Id = json.GetProperty("id").GetString() ?? "",
+                Numero = json.TryGetProperty("numero", out var num) && num.TryGetInt32(out var n) ? n : 0,
                 Titulo = json.TryGetProperty("titulo", out var t) ? t.GetString() ?? "" : titulo,
                 Status = "aberto",
             };
@@ -360,15 +421,6 @@ public class ChatApiClient : IDisposable
     public void Dispose() => _http.Dispose();
 }
 
-public class ChatTicket
-{
-    public string Id { get; set; } = "";
-    public string Titulo { get; set; } = "";
-    public string Status { get; set; } = "";
-    /// <summary>True quando o item é uma conversation (não ticket).</summary>
-    public bool IsConversation { get; set; }
-}
-
 public class ChatMessage
 {
     public string Id { get; set; } = "";
@@ -378,5 +430,26 @@ public class ChatMessage
     public string CriadoEm { get; set; } = "";
 
     public bool IsTechnician =>
-        RemetenteTipo.Contains("technician", StringComparison.OrdinalIgnoreCase);
+        RemetenteTipo.Contains("technician", StringComparison.OrdinalIgnoreCase)
+        || RemetenteTipo.Contains("tecnico", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Mensagens do dispositivo / portal cliente (bolha do usuário).</summary>
+    public bool IsClientSide =>
+        RemetenteTipo.Equals("client_user", StringComparison.OrdinalIgnoreCase)
+        || RemetenteTipo.Equals("device", StringComparison.OrdinalIgnoreCase)
+        || RemetenteTipo.Equals("agent", StringComparison.OrdinalIgnoreCase);
+
+    public bool IsSystem =>
+        RemetenteTipo.Equals("system", StringComparison.OrdinalIgnoreCase)
+        || RemetenteTipo.Equals("SYSTEM", StringComparison.OrdinalIgnoreCase);
+}
+
+public class ChatTicket
+{
+    public string Id { get; set; } = "";
+    public int Numero { get; set; }
+    public string Titulo { get; set; } = "";
+    public string Status { get; set; } = "";
+    /// <summary>True quando o item é uma conversation (não ticket).</summary>
+    public bool IsConversation { get; set; }
 }

@@ -13,39 +13,23 @@ static class Program
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
 
-        // --chat: abre direto a janela de chat nativa
-        if (args.Length > 0 && args[0] == "--chat")
-        {
-            var config = LerConfig();
-            var serverUrl = config.GetValueOrDefault("ServerUrl", "");
-            var deviceId = config.GetValueOrDefault("DeviceId", "");
-            var deviceToken = config.GetValueOrDefault("DeviceToken", "");
+        var openChatOnStart = args.Length > 0 && args[0] == "--chat";
 
-            if (string.IsNullOrEmpty(serverUrl) || string.IsNullOrEmpty(deviceToken))
-            {
-                MessageBox.Show(
-                    "O agente ainda não está registrado.\nAguarde alguns minutos e tente novamente.",
-                    "MIConecta Chat", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            using var api = new ChatApiClient(serverUrl, deviceId, deviceToken);
-            var chatForm = new ChatForm(api, Environment.MachineName);
-            chatForm.ShowChat();
-            Application.Run(chatForm);
-            return;
-        }
-
-        // Garantir instância única
+        // Uma instância: sempre com ícone na bandeja; --chat só abre a janela ao iniciar
         using var mutex = new Mutex(true, "MIConectaRMM_Tray", out bool isNew);
         if (!isNew)
         {
-            MessageBox.Show("MIConecta Tray já está em execução.", "MIConecta",
-                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(
+                openChatOnStart
+                    ? "O MIConecta já está em execução.\n\nProcure o ícone na bandeja do sistema (seta ^ ao lado do relógio no Windows 11).\nDuplo clique no ícone para abrir o chat."
+                    : "MIConecta Tray já está em execução.",
+                "MIConecta",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
             return;
         }
 
-        Application.Run(new TrayApplicationContext());
+        Application.Run(new TrayApplicationContext(openChatOnStart));
     }
 
     private static Dictionary<string, string> LerConfig()

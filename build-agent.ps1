@@ -13,12 +13,28 @@
 # ============================================================
 
 param(
-    [string]$Version = "2.0.0",
+    [string]$Version = "",
     [switch]$SkipClean
 )
 
 $ErrorActionPreference = "Stop"
 $Root = $PSScriptRoot
+
+# Versão padrão: agent/Version.props (mesma regra do backend AGENT_VERSION e do MSI via bind.FileVersion)
+$VersionPropsPath = Join-Path $Root "agent\Version.props"
+if (-not (Test-Path $VersionPropsPath)) {
+    Write-Host "ERRO: Nao encontrado $VersionPropsPath" -ForegroundColor Red
+    exit 1
+}
+[xml]$vp = Get-Content $VersionPropsPath -Raw
+$versionFromProps = ($vp.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ } | Select-Object -First 1)
+if ([string]::IsNullOrWhiteSpace($versionFromProps)) {
+    Write-Host "ERRO: Version ausente em Version.props" -ForegroundColor Red
+    exit 1
+}
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    $Version = $versionFromProps.Trim()
+}
 $AgentProj = "$Root\agent\MIConectaAgent\MIConectaAgent.csproj"
 $TrayProj = "$Root\agent\MIConectaAgent.Tray\MIConectaAgent.Tray.csproj"
 $WixProj = "$Root\installer\wix\MIConectaInstaller.wixproj"
@@ -131,4 +147,10 @@ Write-Host "    msiexec /i MIConectaSetup-v$Version.msi /qn SERVER_URL=https://a
 Write-Host ""
 Write-Host "  Via GPO:" -ForegroundColor Cyan
 Write-Host "    Adicione o .msi em Software Installation da GPO" -ForegroundColor White
+Write-Host ""
+
+# Sincroniza versão exibida pelo backend quando AGENT_VERSION não estiver definido no deploy
+$AgentVersionFile = Join-Path $Root "backend\assets\agent-version.txt"
+[System.IO.File]::WriteAllText($AgentVersionFile, $Version, [System.Text.UTF8Encoding]::new($false))
+Write-Host "  agent-version.txt atualizado: $AgentVersionFile" -ForegroundColor DarkGray
 Write-Host ""

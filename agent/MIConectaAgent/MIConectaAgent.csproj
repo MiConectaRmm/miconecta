@@ -6,7 +6,6 @@
     <AssemblyName>MIConectaAgent</AssemblyName>
     <RootNamespace>MIConectaAgent</RootNamespace>
     <OutputType>Exe</OutputType>
-    <Version>2.0.0</Version>
     <Company>Maginf Tecnologia</Company>
     <Product>MIConectaRMM Agent</Product>
     <Description>Agente RMM para monitoramento e gerenciamento remoto</Description>

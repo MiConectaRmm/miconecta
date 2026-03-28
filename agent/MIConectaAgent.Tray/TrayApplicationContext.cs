@@ -18,6 +18,7 @@ public class TrayApplicationContext : ApplicationContext
 {
     private readonly NotifyIcon _trayIcon;
     private readonly System.Windows.Forms.Timer _statusTimer;
+    private readonly bool _openChatOnStart;
     private bool _serviceRunning = false;
 
     // Chat
@@ -31,8 +32,9 @@ public class TrayApplicationContext : ApplicationContext
     private const string CONFIG_PATH = @"C:\Program Files\MIConecta\agent.config";
     private static readonly string ICON_PATH = Path.Combine(AppContext.BaseDirectory, "icon.ico");
 
-    public TrayApplicationContext()
+    public TrayApplicationContext(bool openChatOnStart = false)
     {
+        _openChatOnStart = openChatOnStart;
         CarregarConfig();
         InicializarChatApi();
 
@@ -52,7 +54,17 @@ public class TrayApplicationContext : ApplicationContext
         _statusTimer.Start();
 
         AtualizarStatus();
-        MostrarNotificacao("MIConecta", "Agente ativo na bandeja do sistema. Clique duplo para abrir o chat.");
+        if (!_openChatOnStart)
+            MostrarNotificacao("MIConecta", "Ícone na bandeja (seta ^ junto ao relógio se não aparecer). Duplo clique para o chat.");
+
+        if (_openChatOnStart)
+            Application.Idle += AbrirChatNoPrimeiroIdle;
+    }
+
+    private void AbrirChatNoPrimeiroIdle(object? sender, EventArgs e)
+    {
+        Application.Idle -= AbrirChatNoPrimeiroIdle;
+        try { AbrirChat(); } catch { /* UI já mostra erros */ }
     }
 
     private static Icon CarregarIcone()
@@ -94,7 +106,8 @@ public class TrayApplicationContext : ApplicationContext
 
     private void InicializarChatApi()
     {
-        var serverUrl = _agentConfig.GetValueOrDefault("ServerUrl", "");
+        var rawUrl = _agentConfig.GetValueOrDefault("ServerUrl", "");
+        var serverUrl = ServerUrlNormalizer.Normalize(rawUrl);
         var deviceId = _agentConfig.GetValueOrDefault("DeviceId", "");
         var deviceToken = _agentConfig.GetValueOrDefault("DeviceToken", "");
 

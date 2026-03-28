@@ -20,6 +20,23 @@ async function bootstrap() {
       logger: isProd ? ['error', 'warn', 'log'] : ['error', 'warn', 'log', 'debug'],
     });
 
+    const httpAdapter = app.getHttpAdapter();
+    const startTime = Date.now();
+    // Health o mais cedo possível (antes de helmet/CORS/Socket.IO) para o probe da Fly não falhar sob carga de polling WS.
+    httpAdapter.get('/health', (_req: any, res: any) => {
+      res.status(200).json({
+        status: 'ok',
+        uptime: Math.round((Date.now() - startTime) / 1000),
+        env: process.env.NODE_ENV || 'development',
+      });
+    });
+    httpAdapter.get('/health/live', (_req: any, res: any) => {
+      res.status(200).json({ status: 'ok', check: 'liveness' });
+    });
+    httpAdapter.get('/health/ready', (_req: any, res: any) => {
+      res.status(200).json({ status: 'ok', check: 'readiness' });
+    });
+
     // Security headers — CORP cross-origin: o painel (app.*) embute imagens da API (avatars, etc.)
     app.use(helmet({
       contentSecurityPolicy: isProd ? undefined : false,
@@ -57,28 +74,6 @@ async function bootstrap() {
     });
 
     app.useWebSocketAdapter(new AppSocketIoAdapter(app));
-
-    // Health checks (fora do prefix /api/v1)
-    const httpAdapter = app.getHttpAdapter();
-    const startTime = Date.now();
-
-    httpAdapter.get('/health', (req: any, res: any) => {
-      res.json({
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        version: '2.0.0',
-        uptime: Math.round((Date.now() - startTime) / 1000),
-        environment: process.env.NODE_ENV || 'development',
-      });
-    });
-
-    httpAdapter.get('/health/live', (req: any, res: any) => {
-      res.json({ status: 'ok', check: 'liveness' });
-    });
-
-    httpAdapter.get('/health/ready', (req: any, res: any) => {
-      res.json({ status: 'ok', check: 'readiness', uptime: Math.round((Date.now() - startTime) / 1000) });
-    });
 
     // Swagger — apenas em dev/staging
     if (!isProd) {

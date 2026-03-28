@@ -1,4 +1,5 @@
 <Project>
+  <Import Project="$(MSBuildThisFileDirectory)Version.props" Condition="Exists('$(MSBuildThisFileDirectory)Version.props')" />
   <!--
     REGRA MIConecta — publicação do agente e do tray:
     - Self-contained: runtime .NET incluído na pasta de instalação (sem depender do runtime global).

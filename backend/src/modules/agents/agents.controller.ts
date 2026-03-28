@@ -24,8 +24,9 @@ import { ConversationType } from '../../database/entities/conversation.entity';
 import { ParticipantRole } from '../../database/entities/conversation-participant.entity';
 import { ConversationMessageType } from '../../database/entities/conversation-message.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, Not } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Ticket, TicketStatus, TicketOrigem, TicketPrioridade } from '../../database/entities/ticket.entity';
+import { Tenant } from '../../database/entities/tenant.entity';
 import { AgentRegisterDto, AgentHeartbeatDto, AgentInventoryDto, InstallationTokenCreateDto } from './dto/agent.dto';
 
 @ApiTags('Agents')
@@ -40,6 +41,8 @@ export class AgentsController {
     private readonly conversationsService: ConversationsService,
     @InjectRepository(Ticket)
     private readonly ticketRepo: Repository<Ticket>,
+    @InjectRepository(Tenant)
+    private readonly tenantRepo: Repository<Tenant>,
   ) {}
 
   @Get('download-info')
@@ -192,22 +195,96 @@ export class AgentsController {
 
   // ─── Agent Chat Endpoints ─────────────────────────────────────
 
+  @Get('me/support-context')
+  @UseGuards(AgentAuthGuard)
+  @ApiOperation({ summary: 'Logo do tenant, nome e avatar do técnico (painel do agente)' })
+  async meSupportContext(@Req() req: any) {
+    const device = req.device;
+    const tenantId = req.tenantId;
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    const publicBase = (this.configService.get<string>('PUBLIC_API_URL') || '').replace(/\/$/, '');
+
+    const openOnly = [
+      TicketStatus.ABERTO,
+      TicketStatus.EM_ATENDIMENTO,
+      TicketStatus.AGUARDANDO_CLIENTE,
+      TicketStatus.AGUARDANDO_TECNICO,
+    ];
+
+    const tickets = await this.ticketRepo.find({
+      where: { deviceId: device.id, tenantId, status: In(openOnly) },
+      relations: ['tecnicoAtribuido'],
+      order: { atualizadoEm: 'DESC' },
+      take: 15,
+    });
+
+    let technicianName = 'Equipe de suporte';
+    let technicianAvatarUrl: string | null = null;
+    for (const t of tickets) {
+      if (t.tecnicoAtribuido?.nome) {
+        technicianName = t.tecnicoAtribuido.nome;
+        technicianAvatarUrl = t.tecnicoAtribuido.avatarUrl || null;
+        break;
+      }
+    }
+
+    const absolutize = (u: string | null | undefined): string | null => {
+      if (!u) return null;
+      const s = u.trim();
+      if (/^https?:\/\//i.test(s)) return s;
+      if (!publicBase) return s.startsWith('/') ? s : `/${s}`;
+      return `${publicBase}${s.startsWith('/') ? '' : '/'}${s}`;
+    };
+
+    return {
+      companyName: tenant?.nome || 'MIConecta',
+      logoUrl: absolutize(tenant?.logoUrl),
+      technicianName,
+      technicianAvatarUrl: absolutize(technicianAvatarUrl),
+    };
+  }
+
+  @Get('me/tickets/history')
+  @UseGuards(AgentAuthGuard)
+  @ApiOperation({ summary: 'Histórico de tickets finalizados do dispositivo (agent chat)' })
+  async meTicketsHistory(@Req() req: any) {
+    const device = req.device;
+    const tenantId = req.tenantId;
+    const tickets = await this.ticketRepo.find({
+      where: {
+        deviceId: device.id,
+        tenantId,
+        status: In([TicketStatus.RESOLVIDO, TicketStatus.FECHADO, TicketStatus.CANCELADO]),
+      },
+      order: { atualizadoEm: 'DESC' },
+      take: 40,
+    });
+
+    return tickets.map(t => ({
+      id: t.id,
+      numero: t.numero,
+      titulo: t.titulo,
+      status: t.status,
+      atualizadoEm: t.atualizadoEm,
+    }));
+  }
+
   @Get('me/tickets')
   @UseGuards(AgentAuthGuard)
-  @ApiOperation({ summary: 'Listar tickets do dispositivo autenticado (agent chat)' })
+  @ApiOperation({ summary: 'Listar tickets em aberto do dispositivo (agent chat)' })
   async meTickets(@Req() req: any) {
     const device = req.device;
     const tenantId = req.tenantId;
 
-    // Buscar tickets deste device OU do mesmo tenant sem device (criados pelo portal)
+    const openOnly = [
+      TicketStatus.ABERTO,
+      TicketStatus.EM_ATENDIMENTO,
+      TicketStatus.AGUARDANDO_CLIENTE,
+      TicketStatus.AGUARDANDO_TECNICO,
+    ];
+
     const tickets = await this.ticketRepo.find({
-      where: [
-        {
-          deviceId: device.id,
-          tenantId,
-          status: Not(In([TicketStatus.FECHADO, TicketStatus.CANCELADO])),
-        },
-      ],
+      where: { deviceId: device.id, tenantId, status: In(openOnly) },
       order: { criadoEm: 'DESC' },
       take: 50,
     });

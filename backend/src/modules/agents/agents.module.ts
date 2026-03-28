@@ -10,6 +10,7 @@ import { InstallationToken } from '../../database/entities/installation-token.en
 import { DeviceMetric } from '../../database/entities/device-metric.entity';
 import { DeviceInventory } from '../../database/entities/device-inventory.entity';
 import { Ticket } from '../../database/entities/ticket.entity';
+import { Technician } from '../../database/entities/technician.entity';
 import { AlertsModule } from '../alerts/alerts.module';
 import { ChatModule } from '../chat/chat.module';
 import { TicketsModule } from '../tickets/tickets.module';
@@ -20,7 +21,7 @@ import { AgentAuthGuard } from '../auth/guards/agent-auth.guard';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Device, Organization, Tenant, Agent, InstallationToken, DeviceMetric, DeviceInventory, Ticket]),
+    TypeOrmModule.forFeature([Device, Organization, Tenant, Agent, InstallationToken, DeviceMetric, DeviceInventory, Ticket, Technician]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

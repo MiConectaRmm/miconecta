@@ -4,7 +4,7 @@
 
   <Package Name="MIConecta Agent"
            Manufacturer="Maginf Tecnologia"
-           Version="2.0.0.0"
+           Version="!(bind.FileVersion.AgentExe)"
            UpgradeCode="E7A3B1C2-4D5F-6A7B-8C9D-0E1F2A3B4C5D"
            Scope="perMachine"
            Language="1046"

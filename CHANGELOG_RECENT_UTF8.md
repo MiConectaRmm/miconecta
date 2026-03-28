@@ -1,0 +1,125 @@
+﻿- 2026-03-25: feat: incluir vers├úo do agente no cabe├ºalho dos scripts .bat e .ps1 gerados para instala├º├úo
+- 2026-03-25: fix: tray icon, concluir button visibility (client+technician)
+- 2026-03-24: feat: conclusao ticket + pesquisa satisfacao 5 carinhas + media dashboard + notificacao tecnico responde
+- 2026-03-24: feat: central de chat multi-atendimento para tecnicos (WhatsApp-style)
+- 2026-03-24: fix: emitir WebSocket ao criar ticket/enviar msg via agent REST + dialog TopMost
+- 2026-03-24: fix: chat - botao fechar visivel, recarregar config ao abrir chat, recriar api client
+- 2026-03-24: fix: upsert agent no registrar para evitar duplicate key
+- 2026-03-24: fix: registrar aceita provision token do tenant como fallback
+- 2026-03-23: fix: MSI x64 com ServiceInstall no componente do exe + recovery via script + log verbose
+- 2026-03-23: fix: scripts instalacao criam agent.config e iniciam servico apos MSI
+- 2026-03-23: feat: chat nativo (widget Zendesk-style) - endpoints backend agents/me/tickets, ChatForm WinForms, MSI com tray em subpasta
+- 2026-03-23: fix: .bat download powershell em linha unica (sem ^ de continuacao)
+- 2026-03-23: feat: MSI v2.0 em assets/ + Dockerfile copia assets + endpoint busca assets e uploads
+- 2026-03-23: feat: agente auto-download MSI via .bat/.ps1 + endpoint GET /agents/download/msi + MSI v2.0.0 gerado
+- 2026-03-23: feat: tab Instalar Agente por cliente com download .bat e .ps1
+- 2026-03-23: fix: fluxo completo de consentimento de sessao remota
+- 2026-03-23: config: RustDesk Oracle Cloud - IP 136.248.114.218
+- 2026-03-23: fix: usar npm install no Dockerfile (sem package-lock.json no contexto)
+- 2026-03-23: feat: acesso remoto auditado - fluxo consentimento + RustDesk Oracle Cloud placeholders
+- 2026-03-23: fix: liberar acesso tecnico - sistema uso interno Maginf, todos de confianca
+- 2026-03-23: fix: JWT 8h+30d, mutex refresh, tecnico pode ver agentes/scripts
+- 2026-03-22: fix: desabilitar SSL e usar conexao direta PG (.internal:5433) para resolver Connection terminated unexpectedly
+- 2026-03-22: fix: pool PostgreSQL + keepAlive para evitar Connection terminated unexpectedly no Fly.io
+- 2026-03-22: feat: logo MIConecta no login, sidebar, portal e favicon
+- 2026-03-22: fix: dashboard nao chama technicians.contagem para tecnico + desabilita auto_stop_machines
+- 2026-03-22: fix: RBAC/tenant - tecnico v├¬ dados do pr├│prio tenant, superadmin continua global
+- 2026-03-22: feat: nova identidade visual MIConecta - paleta azul/roxa, dark mode, CSS variables, branding assets
+- 2026-03-21: chore: switch production domains to maginf
+- 2026-03-21: fix: use production backend url for agent defaults
+- 2026-03-21: fix: preserve actual rustdesk id on device heartbeat
+- 2026-03-21: feat: dispatch scripts to online agents via websocket
+- 2026-03-21: fix: use JWT agent auth for heartbeat and align agent heartbeat payload
+- 2026-03-21: fix: allow agent registration by ensuring default organization
+- 2026-03-21: fix: destravar registro do agente e criar organizacao padrao
+- 2026-03-21: fix: HeartbeatService duplicated code, SocketIO namespace conflict, int? conversion
+- 2026-03-21: fix: AgentAuthGuard JWT verify, DevicesModule JwtModule, LocalStateStore AppDir, users.module cleanup
+- 2026-03-21: feat: Fases 1-7 completas - WebSocket, RustDesk, Telemetria, ScriptWS, Chat, Patches, AutoUpdate
+- 2026-03-21: fase1: LocalStateStore, AgentIdentityService, loggedUser, check-update endpoint, devices com metricas inline
+- 2026-03-21: fix: corrigir status tickets, mapeamento prioridade e tratamento defensivo de arrays
+- 2026-03-21: fix: corrigir arquivos de redirect corrompidos em clientes/
+- 2026-03-21: fix: auditoria completa - redirect login, mapping technicians, CORS prod, rotas duplicadas, hook duplicado
+- 2026-03-21: Etapa 5: Configura├º├Áes reorganizadas com 5 abas (Geral, Scripts, Patches, LGPD, Integra├º├Áes)
+- 2026-03-21: feat: WebSocket real-time na Central de Atendimento (Etapa 3)
+- 2026-03-21: feat: hub do cliente com 9 abas (Etapa 2) - Cadastro, Usuarios, Dispositivos, Alertas, Tickets, Scripts, Software, Patches, Sessoes - cada aba como componente separado em tabs/ - lazy loading por aba, sidebar resumo + navegacao vertical
+- 2026-03-21: refactor: sidebar 5 itens + dashboard executivo + central de atendimento
+- 2026-03-21: refactor: portal users integrados na p├ígina da empresa - removido sidebar/dashboard links separados
+- 2026-03-21: feat: portal users management - CRUD com limite din├ómico por tenant, tab Usu├írios do Portal, documenta├º├úo AI
+- 2026-03-21: feat: fix client users page - add senha/funcao/tenantId fields, enforce max 5 users per tenant
+- 2026-03-21: fix: add tenantId to filter DTOs (devices, tickets, sessions, alerts) - fix 400 Bad Request
+- 2026-03-21: chore: add .dockerignore for faster deploys, update create-admin.js seed script
+- 2026-03-21: chore: remove Railway/Render configs, update README for Fly.io stack
+- 2026-03-21: fix: UTF-8 encoding in auth errors, add notifications dropdown, user menu, Settings in sidebar, remove dead agent.controller.ts, update version to v2.0.0
+- 2026-03-20: feat: Fly.io deploy, tenants RBAC for technicians, JWT permissions refresh, dashboard/favicon/login
+- 2026-03-20: feat: implement unified technician workflow with 15 features
+- 2026-03-20: fix: correct JSX syntax error in clientes page
+- 2026-03-20: fix: make client user management read-only for technicians
+- 2026-03-20: fix: allow technicians to view all client users across tenants
+- 2026-03-19: fix: sync auth service permissions with roles service
+- 2026-03-19: fix: update dashboard home link to clientes
+- 2026-03-19: feat: add users management permissions to technician roles
+- 2026-03-19: fix: correct Sidebar client menu link to prevent 403 errors
+- 2026-03-19: feat: add client users management page in dashboard
+- 2026-03-19: fix: remove duplicate WebSocket event emissions in chat gateway
+- 2026-03-19: fix: resolve subquery syntax error in tickets count endpoint
+- 2026-03-19: fix: add Agent entity to RemoteSessionsModule TypeORM imports
+- 2026-03-19: fix: export TypeOrmModule from AuthModule for AgentAuthGuard dependencies
+- 2026-03-19: fix: import AuthModule in remote sessions module
+- 2026-03-19: fix: define explicit postgres types for Agent nullable columns
+- 2026-03-19: fix: stabilize ticket chat realtime and access control
+- 2026-03-19: fix: postgres column type for installation token description
+- 2026-03-19: fix: register Agent repository in AuthModule
+- 2026-03-18: fix: ticket filters and chat/note actions
+- 2026-03-18: fix: backend build for installation tokens and ticket events
+- 2026-03-18: fix: avoid null user when creating technician
+- 2026-03-18: fix: remove chat menu and include tenantId on technician create
+- 2026-03-17: fix: make frontend Dockerfile copy explicit
+- 2026-03-17: feat: add secure agent onboarding and provisioning
+- 2026-03-17: feat: add technicians management UI to dashboard
+- 2026-03-17: feat: make client install scripts version-agnostic for MSI
+- 2026-03-17: feat: add MSI download button on client agent install section
+- 2026-03-17: chore: publish MSI agent under frontend/public/download
+- 2026-03-17: fix: client creation feedback and plan mapping
+- 2026-03-17: fix: use HttpService for CNPJ lookup and stabilize install scripts
+- 2026-03-17: fix: move CNPJ route before :id wildcard to prevent 404
+- 2026-03-17: feat: client detail page, CNPJ auto-fill, per-client install scripts
+- 2026-03-17: feat: add WiX MSI installer, agent download page, and build pipeline
+- 2026-03-17: fix: corrigir JwtStrategy, PermissionsGuard e adicionar seed script
+- 2026-03-16: fix: remove invalid npm nixpkg from nixpacks.toml
+- 2026-03-16: chore: add railway.json + nixpacks.toml for Railway deploy
+- 2026-03-16: feat(fase6): reports executivo+tecnico, exports CSV/JSON (5 tipos), data retention cron (5 politicas), LGPD RBAC+retention endpoints, health live/ready, dashboard reports page, portal exports
+- 2026-03-16: feat(fase5): portal do cliente - dashboard expandido, device detail, ticket detail com chat, sessions page, users CRUD (admin_cliente), RBAC permissions update, reativar endpoint, role-based menu
+- 2026-03-16: feat(fase4): remote sessions - RBAC on all endpoints, typed DTOs, cancel flow, cron consent timeout, audit logging on lifecycle, policy query method, frontend cancel+log endpoints
+- 2026-03-16: feat(fase3): tickets, chat, timeline - RBAC on all controllers, typed DTOs, ChatGateway JWT auth, unread count, text search, chat file support
+- 2026-03-16: feat(fase2): devices, agents, monitoring - RBAC on all controllers, typed DTOs, AlertEngine integration, heartbeat auto-resolve offline, inventory HW/SW, fix QueryBuilder bug, tsconfig.build.json
+- 2026-03-16: feat(fase1): foundation - Helmet, ThrottlerModule, health check, RBAC on all controllers, TechniciansController CRUD, typed DTOs, README v2
+- 2026-03-16: feat: remote sessions v2 - policy engine (servidor vs estacao), evidence management, recording, consent timeout, agent endpoints, statistics
+- 2026-03-16: feat: unified chat/tickets/timeline module - UnifiedTimelineService, auto-summary, enhanced ChatGateway, frontend timeline v2
+- 2026-03-16: feat: agent v2 architecture - LocalQueue, ConsentManager, ChatService, AutoUpdater, Tray Icon, Serilog
+- 2026-03-16: feat: frontend v2 architecture - 22 pages, dual-context (Maginf + Portal), zustand, websocket, tickets+chat, device detail
+- 2026-03-16: feat: backend v2 complete - 20 modules, 25 entities, S3 storage, LGPD, reports, roles/permissions, global filters, tenant subscriber
+- 2026-03-16: feat: backend v2 - 6 new modules, 8 new entities, RBAC, dual-user auth, tickets, chat, remote sessions, agents, notifications
+- 2026-03-16: docs: complete technical architecture v2 (10 parts - macro, multitenant, modules, agent, realtime, audit, remote-sessions, chat-ticket, monorepo, decisions)
+- 2026-03-16: docs: add MIConectaRMM v2 architecture document
+- 2026-03-16: docs: update README to reflect Render + Vercel production stack
+- 2026-03-16: feat: support multiple CORS origins separated by comma
+- 2026-03-16: security: remove bootstrap endpoint, update CORS for production
+- 2026-03-16: fix: use TypeORM property names in QueryBuilder instead of column names (fixes 500 errors)
+- 2026-03-16: feat: add bootstrap endpoint to create initial tenant + admin user
+- 2026-03-16: fix: render build command to include dev dependencies
+- 2026-03-16: clean: prepare for Render.com deploy - remove Dockerfile, bull/redis, vercel serverless, add render.yaml
+- 2026-03-16: simplify: use DATABASE_URL directly with ssl:false, remove all complex parsing
+- 2026-03-16: fix: disable SSL for Railway internal PostgreSQL, only use SSL for external DBs
+- 2026-03-16: fix: add Device entity to AuthModule for AgentAuthGuard dependency
+- 2026-03-16: fix: add DB_HOST individual params support, fix types
+- 2026-03-16: fix: parse DATABASE_URL manually to handle special chars in password
+- 2026-03-16: fix: error handling, bind 0.0.0.0, TypeORM retry, detailed logging
+- 2026-03-16: fix: remove Bull/Redis dependency, simplify app.module for stable startup
+- 2026-03-16: fix: remove vercel.json config from frontend - let Vercel auto-detect Next.js
+- 2026-03-16: feat: frontend env apontando para backend Railway
+- 2026-03-16: trigger railway deploy
+- 2026-03-15: fix: explicit buildCommand, lazy handler loading
+- 2026-03-15: fix: vercel.json modern format - functions + rewrites instead of builds
+- 2026-03-15: fix: backend serverless - explicit entities, compiled entry point, catch-all route
+- 2026-03-15: feat: Redis opcional, synchronize true para criar tabelas no Supabase
+- 2026-03-15: MIConectaRMM Enterprise v1.0.0 - Backend NestJS + Frontend Next.js + Agent C# + Deploy Vercel/Supabase

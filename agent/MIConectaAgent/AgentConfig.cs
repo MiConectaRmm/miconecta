@@ -89,6 +89,26 @@ public class AgentConfig
                     if (bool.TryParse(valor, out var co)) ConsentEnabled = co; break;
             }
         }
+
+        var antes = ServerUrl;
+        ServerUrl = NormalizeLegacyServerUrl(ServerUrl);
+        if (antes != ServerUrl && File.Exists(_configPath))
+        {
+            try { Salvar(); } catch { /* sem permissão em alguns PCs; serviço pode corrigir depois */ }
+        }
+    }
+
+    /// <summary>Substitui host antigo Fly.io pelo API de produção.</summary>
+    public static string NormalizeLegacyServerUrl(string? serverUrl)
+    {
+        if (string.IsNullOrWhiteSpace(serverUrl)) return serverUrl ?? "";
+        var u = serverUrl.Trim();
+        if (u.Contains("miconecta-backend.fly.dev", StringComparison.OrdinalIgnoreCase))
+        {
+            u = u.Replace("https://miconecta-backend.fly.dev", "https://api.maginf.com.br", StringComparison.OrdinalIgnoreCase)
+                 .Replace("http://miconecta-backend.fly.dev", "https://api.maginf.com.br", StringComparison.OrdinalIgnoreCase);
+        }
+        return u.TrimEnd('/');
     }
 
     public void Salvar()
