@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Send, Clock, MessageSquare, FileText, Paperclip, CheckCircle2 } from 'lucide-react'
-import { ticketsApi, chatApi } from '@/lib/api'
+import { ticketsApi, chatApi, parseTicketMessagesPage } from '@/lib/api'
 import StatusBadge from '@/components/ui/StatusBadge'
 import { useAuthStore } from '@/stores/auth.store'
 import { useChatSocket } from '@/hooks/useSocket'
@@ -64,7 +64,9 @@ export default function PortalTicketDetailPage() {
         ticketsApi.timeline(id, 200),
       ])
       if (tRes.status === 'fulfilled') setTicket(tRes.value.data)
-      if (mRes.status === 'fulfilled') setMensagens(mRes.value.data || [])
+      if (mRes.status === 'fulfilled') {
+        setMensagens(parseTicketMessagesPage(mRes.value.data).items as any[])
+      }
       if (tlRes.status === 'fulfilled') setTimeline(tlRes.value.data || [])
     } catch {}
     setCarregando(false)
@@ -81,8 +83,8 @@ export default function PortalTicketDetailPage() {
       }
       setNovaMsg('')
       if (!socket?.connected) {
-        const { data } = await chatApi.mensagens(id, 200)
-        setMensagens(data || [])
+        const { data } = await chatApi.mensagens(id, 80)
+        setMensagens(parseTicketMessagesPage(data).items as any[])
       }
     } catch {}
     setEnviando(false)

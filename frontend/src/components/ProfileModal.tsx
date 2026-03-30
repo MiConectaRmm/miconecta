@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Upload, Loader2, Eye, EyeOff } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth.store'
 import { storageApi, authApi } from '@/lib/api'
+import ProfilePhotoCropDialog from '@/components/ProfilePhotoCropDialog'
 
 interface ProfileModalProps {
   isOpen: boolean
@@ -25,11 +26,32 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const [showSenhaAtual, setShowSenhaAtual] = useState(false)
   const [showSenhaNova, setShowSenhaNova] = useState(false)
   const [photoPreview, setPhotoPreview] = useState(user?.profilePhotoUrl || '')
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (isOpen && user) {
+      setNome(user.nome || '')
+      setEmail(user.email || '')
+      setPhotoPreview(user.profilePhotoUrl || '')
+    }
+  }, [isOpen, user])
+
+  useEffect(() => {
+    return () => {
+      if (cropImageSrc) URL.revokeObjectURL(cropImageSrc)
+    }
+  }, [cropImageSrc])
 
   if (!isOpen) return null
 
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const closeCrop = () => {
+    if (cropImageSrc) URL.revokeObjectURL(cropImageSrc)
+    setCropImageSrc(null)
+  }
+
+  const handlePhotoFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
+    e.target.value = ''
     if (!file) return
 
     if (!file.type.startsWith('image/')) {
@@ -37,16 +59,22 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       return
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Imagem deve ter no máximo 5MB')
+    if (file.size > 8 * 1024 * 1024) {
+      setError('Imagem deve ter no máximo 8MB (será comprimida ao ajustar)')
       return
     }
 
+    setError('')
+    setCropImageSrc(URL.createObjectURL(file))
+  }
+
+  const handleCroppedBlob = async (blob: Blob) => {
+    if (!user?.id) return
     setUploadingPhoto(true)
     setError('')
-    
     try {
-      const { data } = await storageApi.upload(file, 'user_profile', user!.id)
+      const file = new File([blob], 'perfil.jpg', { type: 'image/jpeg' })
+      const { data } = await storageApi.upload(file, 'user_profile', user.id)
       const url = data?.url as string | undefined
       if (url) {
         await authApi.updateProfile({ profilePhotoUrl: url })
@@ -56,6 +84,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       }
       setSuccess('Foto atualizada com sucesso!')
       setTimeout(() => setSuccess(''), 3000)
+      closeCrop()
     } catch (err: any) {
       setError(err.response?.data?.message || 'Erro ao fazer upload da foto')
     } finally {
@@ -114,6 +143,13 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+      {cropImageSrc && (
+        <ProfilePhotoCropDialog
+          imageSrc={cropImageSrc}
+          onCancel={closeCrop}
+          onConfirm={handleCroppedBlob}
+        />
+      )}
       <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
@@ -159,16 +195,18 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
               <input
                 type="file"
                 accept="image/*"
-                onChange={handlePhotoUpload}
+                onChange={handlePhotoFileChosen}
                 className="hidden"
-                disabled={uploadingPhoto}
+                disabled={uploadingPhoto || !!cropImageSrc}
               />
               <div className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">
                 <Upload className="w-4 h-4" />
                 Alterar foto
               </div>
             </label>
-            <p className="text-xs text-gray-500">PNG, JPG até 5MB</p>
+            <p className="text-xs text-gray-500 text-center max-w-xs">
+              Escolha uma imagem; depois ajuste o enquadramento e o zoom antes de enviar. JPG/PNG até 8MB.
+            </p>
           </div>
 
           {/* Informações pessoais */}

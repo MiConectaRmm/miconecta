@@ -22,12 +22,35 @@ async function bootstrap() {
 
     const httpAdapter = app.getHttpAdapter();
     const startTime = Date.now();
+
+    const s3EnvStatus = () => {
+      const ep = String(process.env.S3_ENDPOINT ?? '').trim();
+      const ak = String(process.env.S3_ACCESS_KEY_ID ?? '').trim();
+      const sk = String(process.env.S3_SECRET_ACCESS_KEY ?? '').trim();
+      return {
+        hasEndpoint: Boolean(ep),
+        hasAccessKeyId: Boolean(ak),
+        hasSecretAccessKey: Boolean(sk),
+        mode: ep && ak && sk ? ('r2' as const) : ('disk' as const),
+        bucket: String(process.env.S3_BUCKET ?? '').trim() || 'miconecta',
+      };
+    };
+
     // Health o mais cedo possível (antes de helmet/CORS/Socket.IO) para o probe da Fly não falhar sob carga de polling WS.
     httpAdapter.get('/health', (_req: any, res: any) => {
+      const s3 = s3EnvStatus();
       res.status(200).json({
         status: 'ok',
         uptime: Math.round((Date.now() - startTime) / 1000),
         env: process.env.NODE_ENV || 'development',
+        storage: s3.mode,
+        s3Bucket: s3.mode === 'r2' ? s3.bucket : undefined,
+        // Sem expor valores — só para ver na Fly o que está vazio (secret com nome certo mas valor vazio aparece false)
+        s3Env: {
+          S3_ENDPOINT: s3.hasEndpoint,
+          S3_ACCESS_KEY_ID: s3.hasAccessKeyId,
+          S3_SECRET_ACCESS_KEY: s3.hasSecretAccessKey,
+        },
       });
     });
     httpAdapter.get('/health/live', (_req: any, res: any) => {
@@ -35,6 +58,44 @@ async function bootstrap() {
     });
     httpAdapter.get('/health/ready', (_req: any, res: any) => {
       res.status(200).json({ status: 'ok', check: 'readiness' });
+    });
+
+    // CORS antes do Helmet e do resto — evita preflight sem Access-Control-Allow-Origin.
+    // Em produção: sempre incluir domínios oficiais + o que vier em CORS_ORIGIN (Fly secrets não devem poder “apagar” o painel).
+    const defaultProdOriginsList = [
+      'https://app.maginf.com.br',
+      'https://www.app.maginf.com.br',
+      'https://miconecta-frontend.fly.dev',
+    ];
+    const envOrigins = (process.env.CORS_ORIGIN || '')
+      .split(',')
+      .map((o) => o.trim().replace(/\/$/, ''))
+      .filter(Boolean);
+    const allowedOrigins = isProd
+      ? [...new Set([...defaultProdOriginsList, ...envOrigins])]
+      : envOrigins.length
+        ? [...new Set([...defaultProdOriginsList, ...envOrigins, 'http://localhost:3000'])]
+        : true;
+
+    app.enableCors({
+      origin: allowedOrigins === true ? true : allowedOrigins,
+      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+      credentials: true,
+      allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'X-Tenant-Id',
+        'X-Requested-With',
+        'Accept',
+        'Accept-Language',
+        'Origin',
+        'Cache-Control',
+        'Pragma',
+        'If-None-Match',
+        'If-Modified-Since',
+      ],
+      exposedHeaders: ['Content-Disposition'],
+      maxAge: 86400,
     });
 
     // Security headers — CORP cross-origin: o painel (app.*) embute imagens da API (avatars, etc.)
@@ -61,17 +122,6 @@ async function bootstrap() {
 
     // Global interceptors
     app.useGlobalInterceptors(new AuditInterceptor());
-
-    // CORS — incluir app oficial e fly.dev; CORS_ORIGIN pode ser lista separada por vírgula no Fly
-    const defaultProdOrigins =
-      'https://app.maginf.com.br,https://www.app.maginf.com.br,https://miconecta-frontend.fly.dev';
-    const corsOrigin = process.env.CORS_ORIGIN || (isProd ? defaultProdOrigins : '*');
-    app.enableCors({
-      origin: corsOrigin === '*' ? true : corsOrigin.split(',').map((o) => o.trim()),
-      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-      credentials: true,
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id', 'X-Requested-With'],
-    });
 
     app.useWebSocketAdapter(new AppSocketIoAdapter(app));
 

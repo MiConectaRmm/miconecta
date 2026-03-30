@@ -11,6 +11,8 @@ import { RequirePermissions } from '../../common/decorators/require-permissions.
 import { Roles } from '../../common/decorators/roles.decorator';
 import { TicketsService } from './tickets.service';
 import { UnifiedTimelineService } from './unified-timeline.service';
+import { ChatService } from '../chat/chat.service';
+import { RemoteSessionsService } from '../remote-sessions/remote-sessions.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { AtribuirTicketDto, ComentarioDto, NotaInternaDto, AvaliarTicketDto, TicketFilterDto } from './dto/ticket-actions.dto';
 import { TicketStatus, TicketPrioridade } from '../../database/entities/ticket.entity';
@@ -23,6 +25,8 @@ export class TicketsController {
   constructor(
     private readonly ticketsService: TicketsService,
     private readonly timelineService: UnifiedTimelineService,
+    private readonly chatService: ChatService,
+    private readonly remoteSessionsService: RemoteSessionsService,
   ) {}
 
   @Post()
@@ -79,6 +83,44 @@ export class TicketsController {
   }
 
   // ── Timeline Unificada ──
+
+  @Get(':id/messages')
+  @RequirePermissions('tickets:read')
+  @ApiOperation({ summary: 'Histórico do chat do ticket (cursor ou offset legado)' })
+  async mensagensChat(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+    @Query('beforeCreatedAt') beforeCreatedAt?: string,
+    @Query('beforeId') beforeId?: string,
+  ) {
+    const tenantId = req.tenantId || req.user.tenantId;
+    await this.ticketsService.buscar(id, tenantId);
+    if (beforeCreatedAt && beforeId) {
+      return this.chatService.listarHistoricoCursor(id, limit || 40, { createdAt: beforeCreatedAt, id: beforeId });
+    }
+    if (offset !== undefined && Number(offset) > 0) {
+      const items = await this.chatService.listarHistoricoFormatado(id, limit || 100, Number(offset));
+      return { items, nextOlderCursor: null, hasMoreOlder: false };
+    }
+    return this.chatService.listarHistoricoCursor(id, limit || 40, null);
+  }
+
+  @Post(':id/remote-session')
+  @Roles('super_admin', 'admin_maginf', 'admin', 'tecnico_senior', 'tecnico')
+  @RequirePermissions('sessions:write')
+  @ApiOperation({ summary: 'Solicitar conexão remota (RustDesk) a partir do ticket' })
+  async solicitarSessaoRemotaChat(@Req() req: any, @Param('id') id: string) {
+    const tenantId = req.tenantId || req.user.tenantId;
+    await this.ticketsService.buscar(id, tenantId);
+    return this.remoteSessionsService.solicitarConexaoRemotaChatTicket({
+      ticketId: id,
+      tenantId,
+      technicianId: req.user.sub,
+      technicianNome: req.user.nome,
+    });
+  }
 
   @Get(':id/timeline')
   @RequirePermissions('tickets:read')

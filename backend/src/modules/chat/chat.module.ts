@@ -9,6 +9,7 @@ import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { ChatGateway } from './chat.gateway';
 import { ConversationsModule } from '../conversations/conversations.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { ConversationsModule } from '../conversations/conversations.module';
         secret: config.get('JWT_SECRET'),
       }),
     }),
+    AuthModule,
     forwardRef(() => ConversationsModule),
   ],
   controllers: [ChatController],

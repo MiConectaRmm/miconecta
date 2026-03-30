@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import { Settings, LogOut, User, ChevronDown } from 'lucide-react'
+import { Settings, LogOut, ChevronDown } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth.store'
 import { cn } from '@/lib/utils'
 import ProfileModal from './ProfileModal'
@@ -51,32 +52,38 @@ export default function Header() {
   const profilePhoto = user?.profilePhotoUrl
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-50">
-      <div className="h-full px-6 flex items-center justify-between">
-        {/* Logo + Menu */}
-        <div className="flex items-center gap-8">
-          {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-2 flex-shrink-0">
-            <div className="w-8 h-8 bg-gradient-to-br from-brand-500 to-purple-500 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">M</span>
-            </div>
-            <span className="text-xl font-bold text-gray-800">Miconecta</span>
-          </Link>
+    <header className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-50">
+      <div className="px-4 sm:px-6 py-2.5 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 min-h-[4.5rem]">
+        <div className="min-w-0" aria-hidden />
 
-          {/* Menu horizontal */}
-          <nav className="hidden md:flex items-center gap-1">
+        <div className="flex flex-col items-center justify-center gap-1 text-center max-w-[min(100%,28rem)] mx-auto">
+          <Link href="/dashboard" className="flex flex-col items-center gap-0.5 shrink-0">
+            <Image
+              src="/branding/logo-mark.png"
+              alt="MIConecta"
+              width={44}
+              height={44}
+              className="rounded-xl"
+              priority
+            />
+            <span className="text-lg font-bold text-gray-800 leading-tight">MIConecta</span>
+          </Link>
+          <p className="text-xs sm:text-sm text-gray-500 italic px-1 leading-snug">
+            {currentPhrase}
+          </p>
+          <nav className="flex flex-wrap items-center justify-center gap-0.5 sm:gap-1">
             {menuItems.map((item) => {
-              const isActive = pathname === item.href || 
+              const isActive = pathname === item.href ||
                 (item.href !== '/dashboard' && pathname?.startsWith(item.href))
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                    'px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors',
                     isActive
-                      ? 'bg-brand-50 text-brand-600 border-b-2 border-brand-500'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                      ? 'bg-brand-50 text-brand-600 ring-1 ring-brand-200'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50',
                   )}
                 >
                   {item.label}
@@ -86,14 +93,7 @@ export default function Header() {
           </nav>
         </div>
 
-        {/* Frase motivacional + Perfil */}
-        <div className="flex items-center gap-6">
-          {/* Frase motivacional */}
-          <p className="hidden lg:block text-sm text-gray-500 italic max-w-xs">
-            {currentPhrase}
-          </p>
-
-          {/* User dropdown */}
+        <div className="flex justify-end min-w-0">
           <div className="relative" ref={userMenuRef}>
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}

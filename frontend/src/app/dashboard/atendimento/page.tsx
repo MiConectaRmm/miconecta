@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { ticketsApi, alertsApi } from '@/lib/api'
 import { useSocket } from '@/hooks/useSocket'
+import { handleRemoteConnectRequestNotification } from '@/lib/remote-connect-ws'
 
 interface AtendimentoItem {
   id: string
@@ -223,6 +224,24 @@ export default function CentralAtendimentoPage() {
 
     // Novo ticket ou mensagem → recarregar lista
     const offUpdate = on('atendimento:update', (data: any) => {
+      if (
+        handleRemoteConnectRequestNotification(data, {
+          addToast,
+          playSound: playNotificationSound,
+          onAfterToast: (p) => {
+            const ticketId = p.ticketId
+            if (!ticketId) return
+            setItems((prev) =>
+              prev.map((item) =>
+                item.tipo === 'ticket' && item.id === ticketId ? { ...item, isNew: true } : item,
+              ),
+            )
+          },
+        })
+      ) {
+        return
+      }
+
       const type = data?.type
       const now = Date.now()
       const timeSinceLoad = now - lastLoadRef.current

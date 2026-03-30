@@ -8,7 +8,7 @@ import {
   CheckCircle, XCircle, Play, Square, BarChart3, StickyNote
 } from 'lucide-react'
 import Link from 'next/link'
-import { ticketsApi, chatApi, storageApi } from '@/lib/api'
+import { ticketsApi, chatApi, storageApi, parseTicketMessagesPage } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth.store'
 import { useChatSocket } from '@/hooks/useSocket'
 import StatusBadge from '@/components/ui/StatusBadge'
@@ -132,11 +132,11 @@ export default function TicketDetailPage() {
       const [ticketRes, timelineRes, chatRes] = await Promise.all([
         ticketsApi.buscar(id),
         ticketsApi.timeline(id),
-        chatApi.mensagens(id),
+        chatApi.mensagens(id, 80),
       ])
       setTicket(ticketRes.data)
       setTimeline(timelineRes.data)
-      setMessages(chatRes.data)
+      setMessages(parseTicketMessagesPage(chatRes.data).items as any[])
       await chatApi.marcarTodasLidas(id)
     } catch (err) {
       console.error('Erro:', err)

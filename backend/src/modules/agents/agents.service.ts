@@ -12,7 +12,7 @@ import { DeviceInventory } from '../../database/entities/device-inventory.entity
 import { Agent, AgentStatus } from '../../database/entities/agent.entity';
 import { InstallationToken, InstallationTokenStatus } from '../../database/entities/installation-token.entity';
 import { AlertEngine } from '../alerts/alert-engine.service';
-import { AgentRegisterDto, AgentHeartbeatDto, AgentInventoryDto, InstallationTokenCreateDto } from './dto/agent.dto';
+import { AgentRegisterDto, AgentHeartbeatDto, AgentInventoryDto, InstallationTokenCreateDto, GenerateClientInstallerDto } from './dto/agent.dto';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -64,6 +64,19 @@ export class AgentsService {
       /* ignore */
     }
     return '2.0.0';
+  }
+
+  /** Relay RustDesk a partir do .env (fallback legado só se vazio — evitar quebrar dev). */
+  getRustDeskConfig(configService: ConfigService): { server: string; key: string } {
+    const server = configService.get<string>('RUSTDESK_SERVER')?.trim() || '';
+    const key = configService.get<string>('RUSTDESK_KEY')?.trim() || '';
+    return { server, key };
+  }
+
+  /** Base HTTP(S) para Socket.IO: mesma regra do agente (URL da API sem sufixo /api/v1). */
+  resolveWsBaseUrl(configService: ConfigService): string {
+    const api = this.getPublicApiBaseUrl(configService).replace(/\/$/, '');
+    return api.replace(/\/api\/v1$/i, '') || api;
   }
 
   private escapeHtml(s: string): string {
@@ -216,15 +229,32 @@ export class AgentsService {
     };
   }
 
-  async generateInstallScript(tenantId: string, configService: ConfigService, format: string) {
+  async generateInstallScript(
+    tenantId: string,
+    configService: ConfigService,
+    format: string,
+    options?: { installationTokenPlain?: string; organizationId?: string },
+  ) {
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
     if (!tenant) throw new NotFoundException('Tenant não encontrado');
 
-    let provisionToken = tenant.provisionToken;
-    if (!provisionToken || !tenant.provisionTokenExpires || tenant.provisionTokenExpires < new Date()) {
-      const result = await this.gerarProvisionToken(tenantId);
-      provisionToken = result.provisionToken;
+    let provisionToken = options?.installationTokenPlain;
+    if (!provisionToken) {
+      provisionToken = tenant.provisionToken;
+      if (!provisionToken || !tenant.provisionTokenExpires || tenant.provisionTokenExpires < new Date()) {
+        const result = await this.gerarProvisionToken(tenantId);
+        provisionToken = result.provisionToken;
+      }
     }
+
+    const organizationId = (options?.organizationId || '').replace(/[\r\n"']/g, '').trim();
+    const rd = this.getRustDeskConfig(configService);
+    const rdServer = rd.server || '136.248.114.218';
+    const rdKey = rd.key || '';
+    const rdKeyPs = rdKey.replace(/`/g, '``').replace(/\$/g, '`$');
+    const rdServerPs = rdServer.replace(/`/g, '``').replace(/\$/g, '`$');
+    const rdKeyBat = rdKey.replace(/%/g, '%%');
+    const rdServerBat = rdServer.replace(/%/g, '%%');
 
     const serverUrl = this.getPublicApiBaseUrl(configService);
 
@@ -327,12 +357,12 @@ export class AgentsService {
         `$configContent = @"`,
         `ServerUrl=$ServerUrl`,
         `TenantId=$TenantId`,
-        `OrganizationId=`,
+        `OrganizationId=${organizationId}`,
         `DeviceId=$existingDeviceId`,
         `DeviceToken=$existingDeviceToken`,
         `ProvisionToken=$ProvisionToken`,
-        `RustDeskServer=136.248.114.218`,
-        `RustDeskKey=ev3ic04E+VsgunfupaellTSWgSzmHiQL2H5ywzBE+yI=`,
+        `RustDeskServer=${rdServerPs}`,
+        `RustDeskKey=${rdKeyPs}`,
         `HeartbeatIntervalSeconds=60`,
         `CommandPollIntervalSeconds=30`,
         `ChatPollIntervalSeconds=15`,
@@ -425,7 +455,10 @@ export class AgentsService {
       ``,
       `set "SERVER_URL=${serverUrl}"`,
       `set "TENANT_ID=${tenantId}"`,
+      `set "ORG_ID=${organizationId}"`,
       `set "PROVISION_TOKEN=${provisionToken}"`,
+      `set "RD_SERVER=${rdServerBat}"`,
+      `set "RD_KEY=${rdKeyBat}"`,
       `set "MSI_URL=${msiDownloadUrl}"`,
       `set "MSI_FILE=%TEMP%\\MIConectaSetup.msi"`,
       `set "INSTALL_DIR=%ProgramFiles%\\MIConecta"`,
@@ -469,10 +502,20 @@ export class AgentsService {
       `(`,
       `echo ServerUrl=%SERVER_URL%`,
       `echo TenantId=%TENANT_ID%`,
+      `echo OrganizationId=%ORG_ID%`,
+      `echo DeviceId=`,
+      `echo DeviceToken=`,
       `echo ProvisionToken=%PROVISION_TOKEN%`,
+      `echo RustDeskServer=%RD_SERVER%`,
+      `echo RustDeskKey=%RD_KEY%`,
       `echo HeartbeatIntervalSeconds=60`,
-      `echo RustDeskServer=136.248.114.218`,
-      `echo RustDeskKey=ev3ic04E+VsgunfupaellTSWgSzmHiQL2H5ywzBE+yI=`,
+      `echo CommandPollIntervalSeconds=30`,
+      `echo ChatPollIntervalSeconds=15`,
+      `echo UpdateCheckIntervalHours=6`,
+      `echo QueueEnabled=True`,
+      `echo AutoUpdateEnabled=True`,
+      `echo ChatEnabled=True`,
+      `echo ConsentEnabled=True`,
       `) > "%CONFIG_FILE%"`,
       `echo [OK] Configuracao criada`,
       ``,
@@ -752,6 +795,59 @@ export class AgentsService {
     const saved = await this.inventoryRepo.save(itens);
     this.logger.log(`Inventário atualizado: device=${deviceId}, itens=${saved.length}`);
     return { count: saved.length };
+  }
+
+  /**
+   * White-label por cliente (tenant): cria installation_token único + scripts PS1/BAT
+   * com o mesmo fluxo do agente (MSI + agent.config). Revogação: DELETE /agents/installation-tokens/:id
+   */
+  async gerarPacoteInstaladorCliente(
+    clientTenantId: string,
+    configService: ConfigService,
+    dto: GenerateClientInstallerDto,
+  ) {
+    const tenant = await this.tenantRepo.findOne({ where: { id: clientTenantId } });
+    if (!tenant) throw new NotFoundException('Cliente (tenant) não encontrado');
+
+    const created = await this.criarInstallationToken(clientTenantId, {
+      descricao: dto.descricao?.trim() || `Instalador white-label ${new Date().toISOString().slice(0, 10)}`,
+      expiresAt: dto.expiresAt,
+    });
+    const rawToken = (created as { token: string }).token;
+    if (!rawToken) throw new BadRequestException('Falha ao gerar token de instalação');
+
+    const ps1 = await this.generateInstallScript(clientTenantId, configService, 'ps1', {
+      installationTokenPlain: rawToken,
+      organizationId: dto.organizationId,
+    });
+    const bat = await this.generateInstallScript(clientTenantId, configService, 'bat', {
+      installationTokenPlain: rawToken,
+      organizationId: dto.organizationId,
+    });
+
+    const backendUrl = this.getPublicApiBaseUrl(configService);
+    const wsUrl = this.resolveWsBaseUrl(configService);
+
+    return {
+      clientId: clientTenantId,
+      tenantId: clientTenantId,
+      clientNome: tenant.nome,
+      backendUrl,
+      wsUrl,
+      agentVersion: this.resolveAgentVersion(configService),
+      installationTokenId: created.id,
+      tokenPreview: created.tokenPreview,
+      expiresAt: created.expiresAt,
+      installationToken: rawToken,
+      scripts: {
+        ps1: { filename: ps1.filename, content: ps1.content },
+        bat: { filename: bat.filename, content: bat.content },
+      },
+      revocation: {
+        method: 'DELETE' as const,
+        path: `/api/v1/agents/installation-tokens/${created.id}`,
+      },
+    };
   }
 
   private async getDefaultOrganizationId(tenantId: string): Promise<string> {

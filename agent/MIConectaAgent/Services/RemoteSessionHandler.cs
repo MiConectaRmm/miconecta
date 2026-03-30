@@ -9,26 +9,28 @@ namespace MIConectaAgent.Services;
 /// — Exibe popup de consentimento (NativeMessageBox)
 /// — Envia resposta via WS (remote.consent)
 /// — Se aceito, garante RustDesk em execução
+/// — Recebe remote_connect_request (chat/ticket): valida JWT na API e inicia RustDesk sem popup
 /// </summary>
 public class RemoteSessionHandler : BackgroundService
 {
     private readonly ILogger<RemoteSessionHandler> _logger;
     private readonly RealtimeClient _realtimeClient;
     private readonly RustDeskIntegrationService _rustDesk;
-    private readonly AgentConfig _config;
+    private readonly ApiClient _api;
 
     public RemoteSessionHandler(
         ILogger<RemoteSessionHandler> logger,
         RealtimeClient realtimeClient,
         RustDeskIntegrationService rustDesk,
-        AgentConfig config)
+        ApiClient api)
     {
         _logger = logger;
         _realtimeClient = realtimeClient;
         _rustDesk = rustDesk;
-        _config = config;
+        _api = api;
 
         _realtimeClient.OnRemoteSession += HandleRemoteRequest;
+        _realtimeClient.OnRemoteChatConnect = HandleRemoteChatConnect;
     }
 
     protected override Task ExecuteAsync(CancellationToken stoppingToken) =>
@@ -73,5 +75,27 @@ public class RemoteSessionHandler : BackgroundService
             _logger.LogInformation("RustDesk iniciado para sessão {Id} (ID={RdId})",
                 payload.SessionId, _rustDesk.RustDeskId ?? "?");
         }
+    }
+
+    private async Task HandleRemoteChatConnect(RemoteChatConnectPayload payload)
+    {
+        if (string.IsNullOrWhiteSpace(payload.SessionToken))
+        {
+            _logger.LogWarning("remote_connect_request sem sessionToken (ticket={T})", payload.TicketId);
+            return;
+        }
+
+        var ok = await _api.ValidarTokenConexaoRemotaChat(payload.SessionToken);
+        if (!ok)
+        {
+            _logger.LogWarning("Token de conexão remota inválido ou expirado (ticket={T})", payload.TicketId);
+            return;
+        }
+
+        _rustDesk.GarantirEmExecucao();
+        _logger.LogInformation(
+            "RustDesk garantido após validação do token (ticket={T}, rustdeskId={Id})",
+            payload.TicketId,
+            _rustDesk.RustDeskId ?? "?");
     }
 }

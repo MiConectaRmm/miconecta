@@ -10,6 +10,7 @@ import { RequirePermissions } from '../../common/decorators/require-permissions.
 import { ChatService } from './chat.service';
 import { ChatRemetenteTipo } from '../../database/entities/chat-message.entity';
 import { SendMessageDto } from './dto/chat-message.dto';
+import { TicketIdsBodyDto } from './dto/ticket-ids-body.dto';
 
 @ApiTags('Chat')
 @Controller('chat')
@@ -20,14 +21,34 @@ export class ChatController {
 
   @Get('tickets/:ticketId/messages')
   @RequirePermissions('tickets:read')
-  @ApiOperation({ summary: 'Listar mensagens do ticket' })
+  @ApiOperation({ summary: 'Listar mensagens do ticket (cursor: before* + limit; ou offset legado)' })
   async listarMensagens(
     @Param('ticketId') ticketId: string,
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
+    @Query('beforeCreatedAt') beforeCreatedAt?: string,
+    @Query('beforeId') beforeId?: string,
   ) {
-    const messages = await this.chatService.listarMensagens(ticketId, limit || 100, offset || 0);
-    return messages.map((message) => this.normalizeMessage(message));
+    if (beforeCreatedAt && beforeId) {
+      return this.chatService.listarHistoricoCursor(ticketId, limit || 40, {
+        createdAt: beforeCreatedAt,
+        id: beforeId,
+      });
+    }
+    if (offset !== undefined && Number(offset) > 0) {
+      const items = await this.chatService.listarHistoricoFormatado(ticketId, limit || 100, Number(offset));
+      return { items, nextOlderCursor: null, hasMoreOlder: false };
+    }
+    return this.chatService.listarHistoricoCursor(ticketId, limit || 40, null);
+  }
+
+  @Post('tickets/unread-summary')
+  @RequirePermissions('tickets:read')
+  @ApiOperation({ summary: 'Contagem de mensagens não lidas por ticket (lote, até 200 ids)' })
+  async unreadSummary(@Req() req: any, @Body() dto: TicketIdsBodyDto) {
+    const tenantId = req.tenantId || req.user.tenantId;
+    const counts = await this.chatService.contagemNaoLidasPorTickets(dto.ticketIds, req.user.sub, tenantId);
+    return { counts };
   }
 
   @Post('tickets/:ticketId/messages')
@@ -53,7 +74,7 @@ export class ChatController {
       arquivoNome: dto.arquivoNome,
       arquivoTamanho: dto.arquivoTamanho,
     });
-    return this.normalizeMessage(message);
+    return this.chatService.formatMensagemCanonica(message);
   }
 
   @Put('messages/:id/read')
@@ -62,7 +83,7 @@ export class ChatController {
   async marcarComoLida(@Param('id') id: string) {
     const message = await this.chatService.marcarComoLida(id);
     if (!message) return null;
-    return this.normalizeMessage(message);
+    return this.chatService.formatMensagemCanonica(message);
   }
 
   @Put('tickets/:ticketId/read-all')
@@ -81,32 +102,4 @@ export class ChatController {
     return { ticketId, unread: count };
   }
 
-  private normalizeMessage(message: any) {
-    return {
-      id: message.id,
-      ticketId: message.ticketId,
-      deviceId: message.deviceId,
-      // Campos canônicos (EN)
-      senderType: message.remetenteTipo,
-      senderId: message.remetenteId,
-      senderName: message.remetenteNome,
-      type: message.tipo,
-      content: message.conteudo,
-      read: message.lido,
-      readAt: message.lidoEm,
-      createdAt: message.criadoEm,
-      // Campos legados (PT) para compatibilidade gradual.
-      remetenteTipo: message.remetenteTipo,
-      remetenteId: message.remetenteId,
-      remetenteNome: message.remetenteNome,
-      tipo: message.tipo,
-      conteudo: message.conteudo,
-      lido: message.lido,
-      lidoEm: message.lidoEm,
-      criadoEm: message.criadoEm,
-      arquivoUrl: message.arquivoUrl,
-      arquivoNome: message.arquivoNome,
-      arquivoTamanho: message.arquivoTamanho,
-    };
-  }
 }

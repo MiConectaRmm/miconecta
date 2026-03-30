@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import {
   Building2, Monitor, MonitorOff, AlertTriangle, CheckCircle2,
   ArrowRight, Activity, TrendingUp, Clock, RefreshCw,
@@ -24,19 +23,14 @@ interface ClientCard {
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user)
-  const router = useRouter()
+  const token = useAuthStore((s) => s.token)
+  const isLoading = useAuthStore((s) => s.isLoading)
 
   const [clientes, setClientes] = useState<ClientCard[]>([])
   const [resumoGeral, setResumoGeral] = useState({ dispositivos: 0, online: 0, offline: 0, alertas: 0 })
   const [carregando, setCarregando] = useState(true)
 
-  useEffect(() => {
-    carregar()
-    const interval = setInterval(carregar, 45000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const carregar = async () => {
+  const carregar = useCallback(async () => {
     try {
       const [tenantsRes, resumoRes, alertasRes] = await Promise.allSettled([
         tenantsApi.listar(),
@@ -116,7 +110,14 @@ export default function DashboardPage() {
     } finally {
       setCarregando(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (isLoading || !token) return
+    carregar()
+    const interval = setInterval(carregar, 45000)
+    return () => clearInterval(interval)
+  }, [isLoading, token, carregar])
 
   const statusStyles = {
     ok: { dot: 'bg-green-500', bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' },

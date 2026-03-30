@@ -5,6 +5,7 @@ import { Tenant } from '../../database/entities/tenant.entity';
 import { Organization } from '../../database/entities/organization.entity';
 import { Technician } from '../../database/entities/technician.entity';
 import { TenantsController } from './tenants.controller';
+import { ClientsController } from './clients.controller';
 import { TenantsService } from './tenants.service';
 import { AgentsModule } from '../agents/agents.module';
 
@@ -14,7 +15,7 @@ import { AgentsModule } from '../agents/agents.module';
     HttpModule,
     AgentsModule,
   ],
-  controllers: [TenantsController],
+  controllers: [TenantsController, ClientsController],
   providers: [TenantsService],
   exports: [TenantsService],
 })

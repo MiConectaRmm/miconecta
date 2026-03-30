@@ -253,6 +253,22 @@ public class ApiClient
         }
     }
 
+    /// <summary>Valida sessionToken JWT emitido por POST /tickets/:id/remote-session (exige agent auth).</summary>
+    public async Task<bool> ValidarTokenConexaoRemotaChat(string sessionToken)
+    {
+        try
+        {
+            AdicionarHeaders();
+            var response = await _http.PostAsJsonAsync("remote-sessions/agent/remote-chat-token/validate", new { sessionToken });
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao validar token de conexão remota (chat/ticket)");
+            return false;
+        }
+    }
+
     // ── v2: Chat ──
 
     public async Task<List<JsonElement>> ObterMensagensNaoLidas()

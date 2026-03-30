@@ -1,9 +1,9 @@
 <Project>
-  <!-- Fonte única da versão do agente, tray, MSI e scripts gerados pelo backend (AGENT_VERSION). -->
+  <!-- Fonte única da versão do agente, tray, MSI e backend (AGENT_VERSION). .\build-agent.ps1 sem -Version incrementa o patch automaticamente. -->
   <PropertyGroup>
-    <Version>2.0.0</Version>
-    <AssemblyVersion>2.0.0.0</AssemblyVersion>
-    <FileVersion>2.0.0.0</FileVersion>
-    <InformationalVersion>2.0.0</InformationalVersion>
+    <Version>2.0.2</Version>
+    <AssemblyVersion>2.0.2.0</AssemblyVersion>
+    <FileVersion>2.0.2.0</FileVersion>
+    <InformationalVersion>2.0.2</InformationalVersion>
   </PropertyGroup>
 </Project>

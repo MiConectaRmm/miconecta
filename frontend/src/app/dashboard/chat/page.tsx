@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef, Fragment } from 'react'
+import { useEffect, useState, useCallback, useRef, Fragment, useMemo } from 'react'
 import {
   MessageSquare, Send, Search, User, Paperclip,
   Volume2, VolumeX, RefreshCw, CheckCircle2, MonitorPlay,
   Plus, MessagesSquare, Wifi, WifiOff, Pencil, Palette,
+  Bell, X,
 } from 'lucide-react'
-import { ticketsApi, chatApi, conversationsApi, devicesApi } from '@/lib/api'
+import { ticketsApi, chatApi, conversationsApi, devicesApi, parseTicketMessagesPage } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth.store'
 import { useSocket } from '@/hooks/useSocket'
 import { useChatNotificationsStore } from '@/stores/chat-notifications.store'
@@ -14,14 +15,20 @@ import {
   INBOX_PALETTE,
   empresaLabel,
   getContactDisplayName,
-  getInboxAlias,
-  setInboxAlias,
+  getContactAliasForItem,
+  setContactAliasForItem,
   resolveInboxColor,
   setInboxColorAuto,
   setInboxColorPalette,
   setInboxColorHex,
+  mergeInboxByContact,
   type ClientColor,
 } from '@/lib/inbox-utils'
+import {
+  handleRemoteConnectRequestNotification,
+  isRemoteConnectRequestPayload,
+  type RemoteConnectToastType,
+} from '@/lib/remote-connect-ws'
 
 interface InboxItem {
   id: string
@@ -45,6 +52,14 @@ interface InboxItem {
   unread: number
   lastMessage?: string
   lastMessageAt?: string
+  /** Várias threads do mesmo contacto fundidas numa linha (lista estilo WhatsApp). */
+  mergedThreads?: InboxItem[]
+}
+
+interface ChatRemoteToast {
+  id: string
+  message: string
+  variant: 'info' | 'ticket'
 }
 
 interface ChatMessage {
@@ -57,6 +72,25 @@ interface ChatMessage {
   criadoEm: string
   arquivoUrl?: string
   arquivoNome?: string
+  /** sent | delivered | read */
+  deliveryStatus?: string
+  read?: boolean
+}
+
+const TICKET_MSG_PAGE = 40
+
+function messageTicksClass(ds?: string) {
+  const s = (ds || 'sent').toLowerCase()
+  if (s === 'read') return 'text-sky-200'
+  if (s === 'delivered') return 'text-emerald-100'
+  return 'text-white/70'
+}
+
+function MessageDeliveryTicks({ status }: { status?: string }) {
+  const s = (status || 'sent').toLowerCase()
+  if (s === 'read') return <span className={messageTicksClass(status)} aria-label="Lida">✓✓</span>
+  if (s === 'delivered') return <span className={messageTicksClass(status)} aria-label="Entregue">✓✓</span>
+  return <span className={messageTicksClass(status)} aria-label="Enviada">✓</span>
 }
 
 const prioridadeEmoji: Record<string, string> = {
@@ -74,20 +108,40 @@ function tempoRelativo(data: string): string {
 }
 
 function normalizeMessage(raw: any): ChatMessage {
+  const st = raw.senderType || raw.remetenteTipo || ''
+  const ds =
+    raw.deliveryStatus ||
+    (String(raw.status || '').toUpperCase() === 'READ' || raw.read || raw.lido
+      ? 'read'
+      : String(raw.status || '').toUpperCase() === 'DELIVERED'
+        ? 'delivered'
+        : 'sent')
   return {
     id: raw.id,
     content: raw.content || raw.conteudo || '',
-    senderType: raw.senderType || raw.remetenteTipo || '',
+    senderType: st,
     senderName: raw.senderName || raw.remetenteNome || '',
     senderId: raw.senderId || raw.senderUserId || raw.remetenteId,
     type: raw.type || raw.tipo,
     criadoEm: raw.criadoEm || raw.createdAt,
     arquivoUrl: raw.arquivoUrl,
     arquivoNome: raw.arquivoNome,
+    deliveryStatus: typeof ds === 'string' ? ds.toLowerCase() : 'sent',
+    read: Boolean(raw.read ?? raw.lido),
   }
 }
 
 function colorKeyForItem(item: InboxItem): string {
+  if (item.mergedThreads?.length) {
+    const d = item.mergedThreads.find((t) => t.deviceId)
+    return (
+      d?.deviceId ||
+      item.mergedThreads[0].organizationId ||
+      item.mergedThreads[0].ticketId ||
+      item.mergedThreads[0].conversationId ||
+      item.id
+    )
+  }
   return item.organizationId || item.deviceId || item.ticketId || item.conversationId || item.id
 }
 
@@ -103,21 +157,31 @@ type MessageGroup =
   | { kind: 'system'; items: ChatMessage[] }
   | { kind: 'user'; items: ChatMessage[]; isMine: boolean; senderLabel: string }
 
+function isMineMessage(msg: ChatMessage, userId?: string): boolean {
+  if (msg.senderType === 'system' || msg.type === 'sistema' || msg.type === 'SYSTEM') return false
+  return (
+    msg.senderType === 'technician' ||
+    msg.senderType === 'TECH' ||
+    msg.senderType === 'TECHNICIAN' ||
+    msg.senderId === userId
+  )
+}
+
 function senderGroupKey(msg: ChatMessage, userId?: string): string {
-  if (msg.senderType === 'system' || msg.type === 'sistema') return '__system__'
-  const mine = msg.senderType === 'technician' || msg.senderId === userId
+  if (msg.senderType === 'system' || msg.type === 'sistema' || msg.type === 'SYSTEM') return '__system__'
+  const mine = isMineMessage(msg, userId)
   return `${mine ? 'M' : 'C'}|${msg.senderId || msg.senderName}|${msg.senderType}`
 }
 
 function buildMessageGroups(messages: ChatMessage[], userId?: string): MessageGroup[] {
   const groups: MessageGroup[] = []
   for (const msg of messages) {
-    if (msg.senderType === 'system' || msg.type === 'sistema') {
+    if (msg.senderType === 'system' || msg.type === 'sistema' || msg.type === 'SYSTEM') {
       groups.push({ kind: 'system', items: [msg] })
       continue
     }
     const key = senderGroupKey(msg, userId)
-    const isMine = msg.senderType === 'technician' || msg.senderId === userId
+    const isMine = isMineMessage(msg, userId)
     const label = msg.senderName || (isMine ? 'Você' : 'Cliente')
     const last = groups[groups.length - 1]
     if (last?.kind === 'user' && senderGroupKey(last.items[0], userId) === key) {
@@ -127,6 +191,66 @@ function buildMessageGroups(messages: ChatMessage[], userId?: string): MessageGr
     }
   }
   return groups
+}
+
+/** Junta blocos consecutivos do mesmo lado (você / cliente) se estiverem próximos no tempo — estilo WhatsApp. */
+function mergeAdjacentSameSideByTime(groups: MessageGroup[], maxGapMs: number): MessageGroup[] {
+  const out: MessageGroup[] = []
+  for (const g of groups) {
+    if (g.kind === 'system') {
+      out.push(g)
+      continue
+    }
+    const prev = out[out.length - 1]
+    if (prev?.kind === 'user' && prev.isMine === g.isMine) {
+      const prevLast = prev.items[prev.items.length - 1]
+      const curFirst = g.items[0]
+      const gap =
+        new Date(curFirst.criadoEm).getTime() - new Date(prevLast.criadoEm).getTime()
+      if (gap >= 0 && gap <= maxGapMs) {
+        prev.items.push(...g.items)
+        continue
+      }
+    }
+    out.push({ ...g, items: [...g.items] })
+  }
+  return out
+}
+
+function buildMessageGroupsWhatsApp(messages: ChatMessage[], userId?: string): MessageGroup[] {
+  const base = buildMessageGroups(messages, userId)
+  return mergeAdjacentSameSideByTime(base, 8 * 60 * 1000)
+}
+
+function primaryThreadForSend(item: InboxItem): InboxItem {
+  const threads = item.mergedThreads?.length ? item.mergedThreads : [item]
+  const openTicket = threads.find((t) => {
+    if (!t.ticketId) return false
+    if (!t.status) return true
+    return !['resolvido', 'fechado', 'cancelado'].includes(t.status)
+  })
+  if (openTicket) return openTicket
+  const withConv = threads.find((t) => t.conversationId)
+  return withConv || threads[0]
+}
+
+function groupMatchesTab(item: InboxItem, t: 'all' | 'conversations' | 'tickets'): boolean {
+  const threads = item.mergedThreads?.length ? item.mergedThreads : [item]
+  if (t === 'all') return true
+  if (t === 'conversations') return threads.some((x) => x.kind === 'conversation')
+  return threads.some((x) => Boolean(x.ticketId) || x.kind === 'ticket')
+}
+
+function groupMatchesBusca(item: InboxItem, b: string): boolean {
+  const threads = item.mergedThreads?.length ? item.mergedThreads : [item]
+  return threads.some(
+    (i) =>
+      i.titulo.toLowerCase().includes(b) ||
+      i.cliente.toLowerCase().includes(b) ||
+      (i.empresaNome || '').toLowerCase().includes(b) ||
+      (i.deviceHostname || '').toLowerCase().includes(b) ||
+      (i.ticketNumero?.toString().includes(b) ?? false),
+  )
 }
 
 export default function InboxPage() {
@@ -146,8 +270,20 @@ export default function InboxPage() {
   const [nomeEditando, setNomeEditando] = useState(false)
   const [coresAbertas, setCoresAbertas] = useState(false)
   const [hexCustom, setHexCustom] = useState('#2EA3E6')
+  const [loadingOlder, setLoadingOlder] = useState(false)
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(() => new Set())
+  const [typingByTicket, setTypingByTicket] = useState<Record<string, string | null>>({})
+  const [peerPortalUserId, setPeerPortalUserId] = useState<string | null>(null)
+  const [chatRemoteToasts, setChatRemoteToasts] = useState<ChatRemoteToast[]>([])
+  const [remoteConnecting, setRemoteConnecting] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesScrollRef = useRef<HTMLDivElement>(null)
   const joinedRoomsRef = useRef<Set<string>>(new Set())
+  const ticketMsgCursorsRef = useRef<Record<string, { next: { createdAt: string; id: string } | null; hasMore: boolean }>>({})
+  const loadingOlderRef = useRef(false)
+  const typingStopRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const remoteAwaitRef = useRef<{ ticketId: string; timeoutId: ReturnType<typeof setTimeout> } | null>(null)
+  const lastRemoteConnectToastRef = useRef<{ key: string; at: number } | null>(null)
 
   const { socket, emit, on } = useSocket('/chat')
   const setChatTotal = useChatNotificationsStore((s) => s.setTotal)
@@ -166,6 +302,59 @@ export default function InboxPage() {
       osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.3)
     } catch {}
   }, [somAtivo])
+
+  const addChatRemoteToast = useCallback((message: string, type: RemoteConnectToastType) => {
+    const id = `${Date.now()}-${Math.random()}`
+    const variant: ChatRemoteToast['variant'] = type === 'ticket' ? 'ticket' : 'info'
+    setChatRemoteToasts((prev) => [{ id, message, variant }, ...prev].slice(0, 5))
+    setTimeout(() => {
+      setChatRemoteToasts((prev) => prev.filter((x) => x.id !== id))
+    }, 8000)
+  }, [])
+
+  const removeChatRemoteToast = useCallback((id: string) => {
+    setChatRemoteToasts((prev) => prev.filter((t) => t.id !== id))
+  }, [])
+
+  const clearRemoteConnectFallback = useCallback(() => {
+    const r = remoteAwaitRef.current
+    if (r) {
+      clearTimeout(r.timeoutId)
+      remoteAwaitRef.current = null
+    }
+  }, [])
+
+  useEffect(() => () => clearRemoteConnectFallback(), [clearRemoteConnectFallback])
+
+  const showRemoteConnectFeedback = useCallback(
+    (ticketId: string, agentOnline: boolean) => {
+      const key = `${ticketId}-${agentOnline}`
+      const now = Date.now()
+      const prev = lastRemoteConnectToastRef.current
+      if (prev && prev.key === key && now - prev.at < 2500) return
+      lastRemoteConnectToastRef.current = { key, at: now }
+      handleRemoteConnectRequestNotification(
+        { type: 'remote_connect_request', ticketId, agentOnline },
+        { addToast: addChatRemoteToast, playSound: somAtivo ? playSound : undefined },
+      )
+    },
+    [addChatRemoteToast, somAtivo, playSound],
+  )
+
+  useEffect(() => {
+    if (!socket) return
+    const off = on('atendimento:update', (data: unknown) => {
+      if (!isRemoteConnectRequestPayload(data)) return
+      const tid = data.ticketId
+      if (!tid) return
+      if (remoteAwaitRef.current?.ticketId === tid) {
+        clearTimeout(remoteAwaitRef.current.timeoutId)
+        remoteAwaitRef.current = null
+      }
+      showRemoteConnectFeedback(tid, data.agentOnline === true)
+    })
+    return () => off()
+  }, [socket, on, showRemoteConnectFeedback])
 
   const carregarInbox = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -255,6 +444,33 @@ export default function InboxPage() {
         })
       })
 
+      const ticketIdsForUnread = new Set<string>()
+      inboxItems.forEach((i) => {
+        const th = i.mergedThreads?.length ? i.mergedThreads : [i]
+        th.forEach((x) => {
+          if (x.ticketId) ticketIdsForUnread.add(x.ticketId)
+        })
+      })
+      const unreadList = Array.from(ticketIdsForUnread).slice(0, 200)
+      let unreadMap: Record<string, number> = {}
+      if (unreadList.length) {
+        try {
+          const res = await chatApi.unreadSummary(unreadList)
+          unreadMap = (res.data?.counts as Record<string, number>) || {}
+        } catch {
+          /* ignore */
+        }
+      }
+      const applyUnread = (it: InboxItem) => {
+        if (it.ticketId && unreadMap[it.ticketId] !== undefined) {
+          it.unread = unreadMap[it.ticketId]
+        }
+      }
+      inboxItems.forEach((i) => {
+        applyUnread(i)
+        i.mergedThreads?.forEach(applyUnread)
+      })
+
       inboxItems.sort((a, b) => {
         if (a.unread > 0 && b.unread === 0) return -1
         if (a.unread === 0 && b.unread > 0) return 1
@@ -281,16 +497,34 @@ export default function InboxPage() {
       setCoresAbertas(false)
       return
     }
-    setAliasDraft(getInboxAlias(activeItem.id))
+    setAliasDraft(getContactAliasForItem(activeItem))
     setNomeEditando(false)
     setCoresAbertas(false)
-  }, [activeItem?.id])
+  }, [activeItem?.id, activeItem?.deviceId, activeItem?.mergedThreads?.length])
 
   useEffect(() => {
     if (!socket) return
-    const handleConnect = () => { setWsConnected(true); emit('atendimento:join', {}) }
+    const handleConnect = () => {
+      setWsConnected(true)
+      emit('atendimento:join', {})
+      socket.emit('presence:list', {}, (res: unknown) => {
+        const r = res as { onlineUserIds?: string[] }
+        if (Array.isArray(r?.onlineUserIds)) {
+          setOnlineUserIds(new Set(r.onlineUserIds))
+        }
+      })
+    }
     const handleDisconnect = () => setWsConnected(false)
-    if (socket.connected) { setWsConnected(true); emit('atendimento:join', {}) }
+    if (socket.connected) {
+      setWsConnected(true)
+      emit('atendimento:join', {})
+      socket.emit('presence:list', {}, (res: unknown) => {
+        const r = res as { onlineUserIds?: string[] }
+        if (Array.isArray(r?.onlineUserIds)) {
+          setOnlineUserIds(new Set(r.onlineUserIds))
+        }
+      })
+    }
     socket.on('connect', handleConnect)
     socket.on('disconnect', handleDisconnect)
     return () => { socket.off('connect', handleConnect); socket.off('disconnect', handleDisconnect) }
@@ -299,18 +533,26 @@ export default function InboxPage() {
   useEffect(() => {
     if (!socket) return
 
+    const activeThreads = activeItem?.mergedThreads?.length
+      ? activeItem.mergedThreads
+      : activeItem
+        ? [activeItem]
+        : []
+    const convActive = (id: string) => activeThreads.some((t) => t.conversationId === id)
+    const ticketActive = (id: string) => activeThreads.some((t) => t.ticketId === id)
+
     const offConvMsg = on('conversation:message:new', (raw: any) => {
       const msg = normalizeMessage(raw)
       const convId = raw.conversationId
-      if (activeItem?.conversationId === convId) {
-        setMessages((prev) => prev.some((m) => m.id === msg.id) ? prev : [...prev, msg])
+      if (convActive(convId)) {
+        setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]))
       }
       setItems((prev) => prev.map((i) => {
         if (i.conversationId !== convId) return i
-        const isActive = activeItem?.conversationId === convId
+        const isActive = convActive(convId)
         return { ...i, unread: isActive ? i.unread : i.unread + 1, lastMessage: msg.content, lastMessageAt: msg.criadoEm }
       }))
-      if (msg.senderId !== user?.id && activeItem?.conversationId !== convId) {
+      if (msg.senderId !== user?.id && !convActive(convId)) {
         playSound()
         incrementUnread(`conv-${convId}`)
       }
@@ -319,15 +561,15 @@ export default function InboxPage() {
     const offTicketMsg = on('message:new', (raw: any) => {
       const msg = normalizeMessage(raw)
       const ticketId = raw.ticketId
-      if (activeItem?.ticketId === ticketId && activeItem?.kind === 'ticket') {
-        setMessages((prev) => prev.some((m) => m.id === msg.id) ? prev : [...prev, msg])
+      if (ticketActive(ticketId)) {
+        setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]))
       }
       setItems((prev) => prev.map((i) => {
         if (i.ticketId !== ticketId) return i
-        const isActive = activeItem?.ticketId === ticketId
+        const isActive = ticketActive(ticketId)
         return { ...i, unread: isActive ? i.unread : i.unread + 1, lastMessage: msg.content, lastMessageAt: msg.criadoEm }
       }))
-      if (msg.senderId !== user?.id && activeItem?.ticketId !== ticketId) {
+      if (msg.senderId !== user?.id && !ticketActive(ticketId)) {
         playSound()
         incrementUnread(`ticket-${ticketId}`)
       }
@@ -335,8 +577,107 @@ export default function InboxPage() {
 
     const offConvNew = on('conversation:new', () => { carregarInbox(true); playSound() })
 
-    return () => { offConvMsg(); offTicketMsg(); offConvNew() }
+    const offMsgStatus = on('message:status', (raw: any) => {
+      const ticketId = raw?.ticketId
+      const messageIds: string[] = Array.isArray(raw?.messageIds) ? raw.messageIds : []
+      const deliveryStatus = raw?.deliveryStatus ? String(raw.deliveryStatus).toLowerCase() : ''
+      if (!ticketId || !messageIds.length || !deliveryStatus) return
+      if (!ticketActive(ticketId)) return
+      setMessages((prev) =>
+        prev.map((m) => (messageIds.includes(m.id) ? { ...m, deliveryStatus } : m)),
+      )
+    })
+
+    const offInboxTouch = on('tickets:inbox_touch', (raw: any) => {
+      const ticketId = raw?.ticketId
+      if (!ticketId) return
+      const preview = String(raw?.lastMessage ?? '')
+      const at = raw?.lastMessageAt || new Date().toISOString()
+      setItems((prev) =>
+        prev.map((i) => {
+          const th = i.mergedThreads?.length ? i.mergedThreads : [i]
+          const hit = th.some((x) => x.ticketId === ticketId)
+          if (!hit) return i
+          return {
+            ...i,
+            lastMessage: preview || i.lastMessage,
+            lastMessageAt: at,
+            unread: ticketActive(ticketId) ? i.unread : i.unread + 1,
+          }
+        }),
+      )
+    })
+
+    const offTicketUpd = on('atendimento:ticket_updated', (raw: any) => {
+      const ticketId = raw?.ticketId
+      if (!ticketId) return
+      setItems((prev) =>
+        prev.map((i) =>
+          i.ticketId === ticketId
+            ? { ...i, status: raw?.status ?? i.status, prioridade: raw?.prioridade ?? i.prioridade }
+            : i,
+        ),
+      )
+    })
+
+    const offTicketRead = on('ticket:read', (raw: any) => {
+      const ticketId = raw?.ticketId
+      const readerId = raw?.userId
+      if (!ticketId || !ticketActive(ticketId) || readerId === user?.id) return
+      setMessages((prev) =>
+        prev.map((m) =>
+          isMineMessage(m, user?.id) ? { ...m, deliveryStatus: 'read', read: true } : m,
+        ),
+      )
+    })
+
+    const offTyping = on('typing', (raw: any) => {
+      const ticketId = raw?.ticketId
+      if (!ticketId || raw?.userId === user?.id) return
+      if (!raw?.isTyping) {
+        setTypingByTicket((prev) => {
+          const next = { ...prev }
+          delete next[ticketId]
+          return next
+        })
+        return
+      }
+      setTypingByTicket((prev) => ({ ...prev, [ticketId]: String(raw?.nome || 'Alguém') }))
+    })
+
+    return () => {
+      offConvMsg()
+      offTicketMsg()
+      offConvNew()
+      offMsgStatus()
+      offInboxTouch()
+      offTicketUpd()
+      offTicketRead()
+      offTyping()
+    }
   }, [socket, on, activeItem, user?.id, playSound, carregarInbox, incrementUnread])
+
+  useEffect(() => {
+    if (!socket) return
+    const onOn = (p: { userId?: string }) => {
+      if (!p?.userId) return
+      setOnlineUserIds((s) => new Set(s).add(p.userId!))
+    }
+    const onOff = (p: { userId?: string }) => {
+      if (!p?.userId) return
+      setOnlineUserIds((s) => {
+        const n = new Set(s)
+        n.delete(p.userId!)
+        return n
+      })
+    }
+    socket.on('presence:online', onOn)
+    socket.on('presence:offline', onOff)
+    return () => {
+      socket.off('presence:online', onOn)
+      socket.off('presence:offline', onOff)
+    }
+  }, [socket])
 
   useEffect(() => {
     if (!socket?.connected) return
@@ -352,39 +693,140 @@ export default function InboxPage() {
     })
   }, [items, socket, emit])
 
+  const loadOlderMessages = useCallback(async () => {
+    if (loadingOlderRef.current || !activeItem) return
+    const threads = activeItem.mergedThreads?.length ? activeItem.mergedThreads : [activeItem]
+    const ticketThreads = threads.filter((t) => t.ticketId)
+    if (!ticketThreads.length) return
+    const anyMore = ticketThreads.some((t) => ticketMsgCursorsRef.current[t.ticketId!]?.hasMore)
+    if (!anyMore) return
+    loadingOlderRef.current = true
+    setLoadingOlder(true)
+    const el = messagesScrollRef.current
+    const prevH = el?.scrollHeight ?? 0
+    try {
+      const prepend: ChatMessage[] = []
+      for (const t of ticketThreads) {
+        const tid = t.ticketId!
+        const cur = ticketMsgCursorsRef.current[tid]
+        if (!cur?.hasMore || !cur.next) continue
+        const res = await chatApi.mensagens(tid, TICKET_MSG_PAGE, cur.next)
+        const page = parseTicketMessagesPage(res.data)
+        ticketMsgCursorsRef.current[tid] = {
+          next: page.nextOlderCursor,
+          hasMore: page.hasMoreOlder,
+        }
+        for (const raw of page.items) {
+          prepend.push(normalizeMessage(raw as any))
+        }
+      }
+      if (prepend.length) {
+        setMessages((prev) => {
+          const byId = new Map<string, ChatMessage>()
+          for (const m of [...prepend, ...prev]) byId.set(m.id, m)
+          return Array.from(byId.values()).sort(
+            (a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime(),
+          )
+        })
+        requestAnimationFrame(() => {
+          if (el) el.scrollTop = el.scrollHeight - prevH
+        })
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      loadingOlderRef.current = false
+      setLoadingOlder(false)
+    }
+  }, [activeItem])
+
+  const onMessagesScroll = useCallback(() => {
+    const el = messagesScrollRef.current
+    if (!el || loadingOlderRef.current) return
+    if (el.scrollTop <= 56) {
+      void loadOlderMessages()
+    }
+  }, [loadOlderMessages])
+
   const selecionarItem = async (item: InboxItem) => {
     setActiveItem(item)
     setLoadingMessages(true)
     setMessages([])
+    ticketMsgCursorsRef.current = {}
+    setPeerPortalUserId(null)
+    const threads = item.mergedThreads?.length ? item.mergedThreads : [item]
     try {
-      if (item.conversationId) {
-        const res = await conversationsApi.mensagens(item.conversationId, 100)
-        const msgs = (Array.isArray(res.data) ? res.data : res.data?.items || []).map(normalizeMessage)
-        setMessages(msgs)
-        await conversationsApi.marcarLida(item.conversationId).catch(() => {})
-      } else if (item.ticketId) {
-        const res = await chatApi.mensagens(item.ticketId, 100)
-        const msgs = (Array.isArray(res.data) ? res.data : res.data?.items || []).map(normalizeMessage)
-        setMessages(msgs)
-        await chatApi.marcarTodasLidas(item.ticketId).catch(() => {})
-      }
-      setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, unread: 0 } : i))
-
-      if (item.deviceId && !item.rustdeskId) {
+      if (threads.length === 1 && threads[0].ticketId) {
         try {
-          const dres = await devicesApi.buscar(item.deviceId)
+          const tr = await ticketsApi.buscar(threads[0].ticketId)
+          const c = tr.data
+          if (c?.criadoPorTipo === 'client_user' && c?.criadoPorId) {
+            setPeerPortalUserId(String(c.criadoPorId))
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      const seen = new Set<string>()
+      const allMsgs: ChatMessage[] = []
+      for (const t of threads) {
+        if (t.conversationId) {
+          const res = await conversationsApi.mensagens(t.conversationId, 150)
+          const msgs = (Array.isArray(res.data) ? res.data : res.data?.items || []).map(normalizeMessage)
+          for (const m of msgs) {
+            if (!seen.has(m.id)) {
+              seen.add(m.id)
+              allMsgs.push(m)
+            }
+          }
+          await conversationsApi.marcarLida(t.conversationId).catch(() => {})
+        }
+        if (t.ticketId) {
+          const res = await chatApi.mensagens(t.ticketId, TICKET_MSG_PAGE)
+          const page = parseTicketMessagesPage(res.data)
+          ticketMsgCursorsRef.current[t.ticketId] = {
+            next: page.nextOlderCursor,
+            hasMore: page.hasMoreOlder,
+          }
+          const msgs = page.items.map((raw) => normalizeMessage(raw as any))
+          for (const m of msgs) {
+            if (!seen.has(m.id)) {
+              seen.add(m.id)
+              allMsgs.push(m)
+            }
+          }
+          await chatApi.marcarTodasLidas(t.ticketId).catch(() => {})
+        }
+      }
+      allMsgs.sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime())
+      setMessages(allMsgs)
+
+      const flatIds = new Set(threads.map((x) => x.id))
+      setItems((prev) => prev.map((i) => (flatIds.has(i.id) ? { ...i, unread: 0 } : i)))
+
+      const probe = threads.find((x) => x.deviceId && !x.rustdeskId) || threads[0]
+      if (probe?.deviceId && !probe.rustdeskId) {
+        try {
+          const dres = await devicesApi.buscar(probe.deviceId)
           const d = dres.data
           const rd = d?.rustdeskId
           const hn = d?.hostname
           if (rd || hn) {
-            setActiveItem((cur) =>
-              cur && cur.id === item.id
-                ? { ...cur, rustdeskId: rd || cur.rustdeskId, deviceHostname: hn || cur.deviceHostname }
-                : cur,
-            )
+            setActiveItem((cur) => {
+              if (!cur || cur.id !== item.id) return cur
+              const patch = { rustdeskId: rd || cur.rustdeskId, deviceHostname: hn || cur.deviceHostname }
+              if (!cur.mergedThreads?.length) return { ...cur, ...patch }
+              return {
+                ...cur,
+                ...patch,
+                mergedThreads: cur.mergedThreads.map((x) =>
+                  x.deviceId === probe.deviceId ? { ...x, ...patch } : x,
+                ),
+              }
+            })
             setItems((prev) =>
               prev.map((i) =>
-                i.id === item.id
+                i.deviceId === probe.deviceId
                   ? { ...i, rustdeskId: rd || i.rustdeskId, deviceHostname: hn || i.deviceHostname }
                   : i,
               ),
@@ -401,21 +843,57 @@ export default function InboxPage() {
     }
   }
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+  useEffect(() => {
+    if (loadingOlder) return
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, loadingOlder])
+
+  useEffect(() => {
+    if (!activeItem || !socket?.connected) return
+    const target = primaryThreadForSend(activeItem)
+    if (!target.ticketId) return
+    const tid = target.ticketId
+    if (!newMsg.trim()) return
+    emit('chat:typing', {
+      ticketId: tid,
+      userId: user?.id,
+      nome: user?.nome,
+      isTyping: true,
+    })
+    if (typingStopRef.current) clearTimeout(typingStopRef.current)
+    typingStopRef.current = setTimeout(() => {
+      emit('chat:typing', {
+        ticketId: tid,
+        userId: user?.id,
+        nome: user?.nome,
+        isTyping: false,
+      })
+    }, 1500)
+    return () => {
+      if (typingStopRef.current) clearTimeout(typingStopRef.current)
+      emit('chat:typing', {
+        ticketId: tid,
+        userId: user?.id,
+        nome: user?.nome,
+        isTyping: false,
+      })
+    }
+  }, [newMsg, activeItem, socket, emit, user?.id, user?.nome])
 
   const enviarMensagem = async () => {
     if (!newMsg.trim() || !activeItem) return
+    const target = primaryThreadForSend(activeItem)
     const content = newMsg.trim()
     setNewMsg('')
     try {
-      if (activeItem.conversationId && socket?.connected) {
-        emit('conversation:message', { conversationId: activeItem.conversationId, content })
-      } else if (activeItem.conversationId) {
-        await conversationsApi.enviarMensagem(activeItem.conversationId, { content })
-      } else if (activeItem.ticketId && socket?.connected) {
-        emit('message:send', { ticketId: activeItem.ticketId, content })
-      } else if (activeItem.ticketId) {
-        await chatApi.enviar(activeItem.ticketId, content)
+      if (target.conversationId && socket?.connected) {
+        emit('conversation:message', { conversationId: target.conversationId, content })
+      } else if (target.conversationId) {
+        await conversationsApi.enviarMensagem(target.conversationId, { content })
+      } else if (target.ticketId && socket?.connected) {
+        emit('message:send', { ticketId: target.ticketId, content })
+      } else if (target.ticketId) {
+        await chatApi.enviar(target.ticketId, content)
       }
     } catch (err) {
       console.error('Erro ao enviar:', err)
@@ -440,15 +918,50 @@ export default function InboxPage() {
     }
   }
 
-  const conectarRemoto = () => {
-    if (activeItem?.rustdeskId) {
-      window.open(`rustdesk://connection/new/${activeItem.rustdeskId}`, '_blank')
+  const conectarRemoto = async () => {
+    const threads = activeItem?.mergedThreads?.length ? activeItem.mergedThreads : activeItem ? [activeItem] : []
+    const ticketThread = threads.find((t) => t.ticketId && (t.rustdeskId || t.deviceId))
+    const rustdeskFallback =
+      activeItem?.mergedThreads?.find((t) => t.rustdeskId)?.rustdeskId || activeItem?.rustdeskId
+
+    try {
+      if (ticketThread?.ticketId) {
+        clearRemoteConnectFallback()
+        setRemoteConnecting(true)
+        try {
+          const { data } = await ticketsApi.solicitarRemoteSession(ticketThread.ticketId)
+          const rd =
+            (data as { rustdeskId?: string | null }).rustdeskId || ticketThread.rustdeskId || rustdeskFallback
+          const agentOnline = Boolean((data as { agentOnline?: boolean }).agentOnline)
+          const tid = ticketThread.ticketId
+          remoteAwaitRef.current = {
+            ticketId: tid,
+            timeoutId: setTimeout(() => {
+              const cur = remoteAwaitRef.current
+              if (!cur || cur.ticketId !== tid) return
+              remoteAwaitRef.current = null
+              showRemoteConnectFeedback(tid, agentOnline)
+            }, 4000),
+          }
+          if (rd) window.open(`rustdesk://connection/new/${rd}`, '_blank')
+          else alert('RustDesk não configurado neste dispositivo.')
+        } finally {
+          setRemoteConnecting(false)
+        }
+        return
+      }
+      if (rustdeskFallback) window.open(`rustdesk://connection/new/${rustdeskFallback}`, '_blank')
+    } catch (err) {
+      console.error(err)
+      clearRemoteConnectFallback()
+      setRemoteConnecting(false)
+      alert('Não foi possível preparar a sessão remota.')
     }
   }
 
   const salvarNomeContato = () => {
     if (!activeItem) return
-    setInboxAlias(activeItem.id, aliasDraft)
+    setContactAliasForItem(activeItem, aliasDraft)
     setAliasBump((n) => n + 1)
     setNomeEditando(false)
   }
@@ -456,12 +969,15 @@ export default function InboxPage() {
   const encerrarAtendimento = async () => {
     if (!activeItem) return
     if (!window.confirm('Encerrar atendimento? O ticket será resolvido e a conversa fechada, se existirem.')) return
+    const threads = activeItem.mergedThreads?.length ? activeItem.mergedThreads : [activeItem]
     try {
-      if (activeItem.ticketId && !['resolvido', 'fechado', 'cancelado'].includes(activeItem.status)) {
-        await ticketsApi.resolver(activeItem.ticketId)
-      }
-      if (activeItem.conversationId) {
-        await conversationsApi.fechar(activeItem.conversationId).catch(() => {})
+      for (const t of threads) {
+        if (t.ticketId && t.status && !['resolvido', 'fechado', 'cancelado'].includes(t.status)) {
+          await ticketsApi.resolver(t.ticketId)
+        }
+        if (t.conversationId) {
+          await conversationsApi.fechar(t.conversationId).catch(() => {})
+        }
       }
       await carregarInbox(true)
       setActiveItem(null)
@@ -470,27 +986,78 @@ export default function InboxPage() {
     }
   }
 
-  const mostrarEncerrar =
-    !!activeItem && Boolean(activeItem.ticketId || activeItem.conversationId)
-  const mostrarConectar = !!activeItem?.rustdeskId
+  const threadsAtivos = activeItem
+    ? activeItem.mergedThreads?.length
+      ? activeItem.mergedThreads
+      : [activeItem]
+    : []
+  const mostrarEncerrar = threadsAtivos.some((t) => Boolean(t.ticketId || t.conversationId))
+  const rustdeskAtivo =
+    activeItem?.mergedThreads?.find((t) => t.rustdeskId)?.rustdeskId || activeItem?.rustdeskId
+  const mostrarConectar = Boolean(rustdeskAtivo)
+
+  const primaryTicketForUi = activeItem ? primaryThreadForSend(activeItem).ticketId : null
+  const typingNome = primaryTicketForUi ? typingByTicket[primaryTicketForUi] : null
+  const peerOnline = Boolean(peerPortalUserId && onlineUserIds.has(peerPortalUserId))
 
   useEffect(() => {
-    const interval = setInterval(() => carregarInbox(true), 60000)
+    const interval = setInterval(() => carregarInbox(true), 120000)
     return () => clearInterval(interval)
   }, [carregarInbox])
 
-  const filteredItems = items.filter((i) => {
-    if (tab === 'conversations' && i.kind !== 'conversation') return false
-    if (tab === 'tickets' && i.kind !== 'ticket' && !i.ticketId) return false
+  const displayItems = useMemo(() => mergeInboxByContact(items) as InboxItem[], [items])
+
+  useEffect(() => {
+    if (!activeItem?.id) return
+    const next = displayItems.find((d) => d.id === activeItem.id)
+    if (!next) return
+    if (
+      next.lastMessageAt !== activeItem.lastMessageAt ||
+      next.unread !== activeItem.unread ||
+      next.lastMessage !== activeItem.lastMessage ||
+      (next.mergedThreads?.length || 0) !== (activeItem.mergedThreads?.length || 0)
+    ) {
+      setActiveItem(next)
+    }
+  }, [displayItems, activeItem?.id])
+
+  const filteredItems = displayItems.filter((i) => {
+    if (!groupMatchesTab(i, tab)) return false
     if (!busca) return true
-    const b = busca.toLowerCase()
-    return i.titulo.toLowerCase().includes(b) || i.cliente.toLowerCase().includes(b) ||
-           (i.empresaNome || '').toLowerCase().includes(b) ||
-           i.deviceHostname?.toLowerCase().includes(b) || i.ticketNumero?.toString().includes(b)
+    return groupMatchesBusca(i, busca.toLowerCase())
   })
 
   return (
-    <div className="flex h-[calc(100vh-120px)] overflow-hidden -mx-6">
+    <div className="relative flex h-[calc(100vh-120px)] overflow-hidden -mx-6">
+      {chatRemoteToasts.length > 0 && (
+        <div className="fixed top-4 right-4 z-[60] flex flex-col gap-2 max-w-sm">
+          {chatRemoteToasts.map((t) => (
+            <div
+              key={t.id}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg animate-slide-in-right ${
+                t.variant === 'ticket'
+                  ? 'bg-sky-50 border-sky-200 text-sky-900'
+                  : 'bg-white border-gray-200 text-gray-800'
+              }`}
+            >
+              {t.variant === 'ticket' ? (
+                <MonitorPlay className="w-4 h-4 flex-shrink-0 text-sky-600" />
+              ) : (
+                <Bell className="w-4 h-4 flex-shrink-0 text-gray-500" />
+              )}
+              <span className="text-sm flex-1">{t.message}</span>
+              <button
+                type="button"
+                onClick={() => removeChatRemoteToast(t.id)}
+                className="text-gray-400 hover:text-gray-700 p-0.5"
+                aria-label="Fechar"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       {/* LEFT: Inbox list */}
       <div className="w-80 xl:w-96 flex-shrink-0 border-r border-gray-200 flex flex-col bg-white">
         <div className="p-4 border-b border-gray-200">
@@ -562,6 +1129,11 @@ export default function InboxPage() {
                       <div className="flex items-center justify-between gap-2">
                         <p className={`text-sm truncate ${item.unread > 0 ? 'font-bold text-gray-900' : 'font-semibold text-gray-800'}`}>
                           {item.ticketNumero ? `#${item.ticketNumero} · ` : ''}{nomeLista}
+                          {item.mergedThreads && item.mergedThreads.length > 1 ? (
+                            <span className="ml-1 text-[10px] font-normal text-gray-400 whitespace-nowrap">
+                              ({item.mergedThreads.length} chats)
+                            </span>
+                          ) : null}
                         </p>
                         {item.unread > 0 && (
                           <span className="flex-shrink-0 w-5 h-5 rounded-full bg-brand-500 text-white text-[10px] font-bold flex items-center justify-center">
@@ -625,7 +1197,7 @@ export default function InboxPage() {
                       <button
                         type="button"
                         onClick={() => {
-                          setAliasDraft(getInboxAlias(activeItem.id))
+                          setAliasDraft(getContactAliasForItem(activeItem))
                           setNomeEditando(false)
                         }}
                         className="text-xs text-gray-600 hover:underline"
@@ -651,6 +1223,21 @@ export default function InboxPage() {
                   <p className="text-sm text-gray-500 truncate mt-0.5">
                     {empresaLabel(resolveEmpresaNome(activeItem, user?.tenant?.nome))}
                   </p>
+                  {(typingNome || peerPortalUserId) && (
+                    <p className="text-xs mt-0.5 min-h-[1rem]">
+                      {typingNome ? (
+                        <span className="text-brand-600 font-medium">{typingNome} está digitando…</span>
+                      ) : peerOnline ? (
+                        <span className="text-green-600 inline-flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" aria-hidden /> online
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 inline-flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-gray-300 shrink-0" aria-hidden /> offline
+                        </span>
+                      )}
+                    </p>
+                  )}
                   {(activeItem.ticketNumero || activeItem.deviceHostname) && (
                     <p className="text-xs text-gray-500 mt-1">
                       {activeItem.ticketNumero ? `Ticket #${activeItem.ticketNumero}` : ''}
@@ -672,10 +1259,19 @@ export default function InboxPage() {
                     {mostrarConectar && (
                       <button
                         type="button"
-                        onClick={conectarRemoto}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-xs font-semibold transition-colors"
+                        onClick={() => void conectarRemoto()}
+                        disabled={remoteConnecting}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-500 hover:bg-brand-600 disabled:opacity-60 disabled:pointer-events-none text-white rounded-lg text-xs font-semibold transition-colors"
                       >
-                        <MonitorPlay className="w-3.5 h-3.5" /> Conectar
+                        {remoteConnecting ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Conectando…
+                          </>
+                        ) : (
+                          <>
+                            <MonitorPlay className="w-3.5 h-3.5" /> Conectar
+                          </>
+                        )}
                       </button>
                     )}
                     {mostrarEncerrar && (
@@ -738,7 +1334,16 @@ export default function InboxPage() {
             </div>
 
             {/* Mensagens agrupadas por remetente */}
-            <div className="flex-1 overflow-y-auto px-4 py-4 bg-gray-50">
+            <div
+              ref={messagesScrollRef}
+              onScroll={onMessagesScroll}
+              className="flex-1 overflow-y-auto px-4 py-4 bg-gray-50"
+            >
+              {loadingOlder && (
+                <div className="flex justify-center py-2 text-xs text-gray-500">
+                  <RefreshCw className="w-4 h-4 animate-spin mr-2" /> Carregando mensagens anteriores…
+                </div>
+              )}
               {loadingMessages ? (
                 <div className="flex items-center justify-center py-20">
                   <RefreshCw className="w-6 h-6 text-brand-500 animate-spin" />
@@ -746,8 +1351,8 @@ export default function InboxPage() {
               ) : messages.length === 0 ? (
                 <div className="text-center py-12 text-gray-500 text-sm">Nenhuma mensagem ainda</div>
               ) : (
-                <div className="space-y-4">
-                  {buildMessageGroups(messages, user?.id).map((group, gi) => {
+                <div className="space-y-2">
+                  {buildMessageGroupsWhatsApp(messages, user?.id).map((group, gi) => {
                     if (group.kind === 'system') {
                       return (
                         <Fragment key={`sys-${group.items[0]?.id ?? gi}`}>
@@ -769,11 +1374,11 @@ export default function InboxPage() {
                       >
                         <div className={`flex flex-col max-w-[72%] ${isMine ? 'items-end' : 'items-start'}`}>
                           {!isMine && (
-                            <p className="text-xs font-medium text-gray-600 mb-1 pl-1 flex items-center gap-1">
+                            <p className="text-xs font-medium text-gray-600 mb-0.5 pl-1 flex items-center gap-1">
                               <User className="w-3 h-3 opacity-70" /> {senderLabel}
                             </p>
                           )}
-                          <div className="flex flex-col gap-0.5 w-full">
+                          <div className="flex flex-col gap-px w-full">
                             {items.map((msg, mi) => {
                               const isFirst = mi === 0
                               const isLast = mi === items.length - 1
@@ -816,14 +1421,21 @@ export default function InboxPage() {
                                   )}
                                   <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
                                   {isLast && (
-                                    <p
-                                      className={`text-[10px] mt-1 ${isMine ? 'text-brand-100' : 'text-gray-400'}`}
+                                    <div
+                                      className={`text-[10px] mt-1 flex items-center justify-end gap-1 ${isMine ? 'text-brand-100' : 'text-gray-400'}`}
                                     >
-                                      {new Date(msg.criadoEm).toLocaleTimeString('pt-BR', {
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                      })}
-                                    </p>
+                                      <span>
+                                        {new Date(msg.criadoEm).toLocaleTimeString('pt-BR', {
+                                          hour: '2-digit',
+                                          minute: '2-digit',
+                                        })}
+                                      </span>
+                                      {isMine && (
+                                        <span className="pl-0.5 text-[11px] leading-none">
+                                          <MessageDeliveryTicks status={msg.deliveryStatus} />
+                                        </span>
+                                      )}
+                                    </div>
                                   )}
                                 </div>
                               )

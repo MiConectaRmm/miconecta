@@ -204,6 +204,24 @@ export class InstallationTokenCreateDto {
   expiresAt?: string;
 }
 
+/** Body opcional para POST /clients/:id/generate-installer */
+export class GenerateClientInstallerDto {
+  @ApiPropertyOptional({ description: 'Descrição gravada no installation_tokens' })
+  @IsOptional()
+  @IsString()
+  descricao?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  expiresAt?: string;
+
+  @ApiPropertyOptional({ description: 'Organização (opcional) — preenche OrganizationId no agent.config' })
+  @IsOptional()
+  @IsString()
+  organizationId?: string;
+}
+
 export class InventoryItemDto {
   @ApiProperty({ example: 'Google Chrome' })
   @IsNotEmpty()

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Monitor, CheckCircle2, MonitorOff, Ticket, AlertTriangle, Radio } from 'lucide-react'
 import { devicesApi, ticketsApi, alertsApi, sessionsApi } from '@/lib/api'
@@ -9,7 +9,7 @@ import StatusBadge from '@/components/ui/StatusBadge'
 import { useAuthStore } from '@/stores/auth.store'
 
 export default function PortalDashboard() {
-  const { user } = useAuthStore()
+  const { user, token, isLoading } = useAuthStore()
   const [resumo, setResumo] = useState({ total: 0, online: 0, offline: 0, alerta: 0 })
   const [tickets, setTickets] = useState<any>({ abertos: 0, emAtendimento: 0, resolvidos: 0, total: 0 })
   const [alertas, setAlertas] = useState(0)
@@ -19,9 +19,7 @@ export default function PortalDashboard() {
   const [carregando, setCarregando] = useState(true)
   const canViewSessions = user?.role === 'admin_cliente' || user?.role === 'gestor'
 
-  useEffect(() => { carregar() }, [])
-
-  const carregar = async () => {
+  const carregar = useCallback(async () => {
     try {
       const promises: Promise<any>[] = [
         devicesApi.resumo(),
@@ -42,7 +40,12 @@ export default function PortalDashboard() {
       if (canViewSessions && results[5]?.status === 'fulfilled') setAlertas(results[5].value.data?.total || 0)
     } catch {}
     setCarregando(false)
-  }
+  }, [canViewSessions])
+
+  useEffect(() => {
+    if (isLoading || !token) return
+    carregar()
+  }, [isLoading, token, carregar])
 
   return (
     <div>

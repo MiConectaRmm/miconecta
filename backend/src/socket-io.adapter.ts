@@ -5,15 +5,29 @@ import { ServerOptions } from 'socket.io';
  * Timeouts e CORS alinhados ao HTTP — proxies (Fly, CDN) costumam cortar WS
  * se o ping for curto ou se o upgrade falhar antes do fallback.
  */
+function mergedCorsOrigins(): string[] | true {
+  const isProd = process.env.NODE_ENV === 'production';
+  const defaults = [
+    'https://app.maginf.com.br',
+    'https://www.app.maginf.com.br',
+    'https://miconecta-frontend.fly.dev',
+  ];
+  const fromEnv = (process.env.CORS_ORIGIN || '')
+    .split(',')
+    .map((o) => o.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+  if (!isProd && !fromEnv.length) return true;
+  return [...new Set([...defaults, ...fromEnv, ...(isProd ? [] : ['http://localhost:3000'])])];
+}
+
 export class AppSocketIoAdapter extends IoAdapter {
   createIOServer(port: number, options?: ServerOptions) {
-    const corsRaw = process.env.CORS_ORIGIN || '';
-    const origins = corsRaw.split(',').map((o) => o.trim()).filter(Boolean);
+    const originOpt = mergedCorsOrigins();
     const merged = {
       ...(options || {}),
       path: options?.path ?? '/socket.io',
       cors: {
-        origin: origins.length ? origins : true,
+        origin: originOpt === true ? true : originOpt,
         methods: ['GET', 'POST', 'OPTIONS'],
         credentials: true,
       },

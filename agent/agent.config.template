@@ -1,0 +1,22 @@
+# MIConecta Agent — template de configuração (key=value)
+# Copiado para %ProgramFiles%\MIConecta\agent.config pelo instalador ou script de provisionamento.
+# Documentação: backend AgentsService.generateInstallScript / gerarPacoteInstaladorCliente
+
+ServerUrl=https://api.exemplo.com.br/api/v1
+TenantId=
+OrganizationId=
+DeviceId=
+DeviceToken=
+ProvisionToken=
+
+RustDeskServer=
+RustDeskKey=
+
+HeartbeatIntervalSeconds=60
+CommandPollIntervalSeconds=30
+ChatPollIntervalSeconds=15
+UpdateCheckIntervalHours=6
+QueueEnabled=True
+AutoUpdateEnabled=True
+ChatEnabled=True
+ConsentEnabled=True

@@ -104,7 +104,7 @@ public partial class ChatForm : Form
 
     private void InitializeComponent()
     {
-        Text = "MIConecta Suporte";
+        Text = $"MIConecta Suporte v{TrayVersionInfo.DisplayVersion}";
         FormBorderStyle = FormBorderStyle.None;
         Size = new Size(420, 660);
         StartPosition = FormStartPosition.Manual;
@@ -181,7 +181,7 @@ public partial class ChatForm : Form
         dragFill.MouseDown += StartDrag;
         var barTitle = new Label
         {
-            Text = "  Suporte MIConecta",
+            Text = $"  Suporte MIConecta  ·  v{TrayVersionInfo.DisplayVersion}",
             Dock = DockStyle.Fill,
             TextAlign = ContentAlignment.MiddleLeft,
             ForeColor = TextMuted,

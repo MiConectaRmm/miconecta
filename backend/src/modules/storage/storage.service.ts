@@ -37,24 +37,33 @@ export class StorageService {
     @InjectRepository(FileAttachment)
     private readonly fileRepo: Repository<FileAttachment>,
   ) {
-    const endpoint = this.config.get('S3_ENDPOINT');
-    const region = this.config.get('S3_REGION', 'auto');
-    const accessKeyId = this.config.get('S3_ACCESS_KEY_ID', '');
-    const secretAccessKey = this.config.get('S3_SECRET_ACCESS_KEY', '');
-    this.bucket = this.config.get('S3_BUCKET', 'miconecta');
+    const endpoint = String(this.config.get('S3_ENDPOINT') ?? '').trim();
+    const region = String(this.config.get('S3_REGION') ?? 'auto').trim() || 'auto';
+    const accessKeyId = String(this.config.get('S3_ACCESS_KEY_ID') ?? '').trim();
+    const secretAccessKey = String(this.config.get('S3_SECRET_ACCESS_KEY') ?? '').trim();
+    this.bucket = String(this.config.get('S3_BUCKET') ?? 'miconecta').trim() || 'miconecta';
     this.localRoot = path.resolve(this.config.get('UPLOAD_DIR') || path.join(process.cwd(), 'uploads'));
 
-    if (endpoint && accessKeyId) {
+    const s3Ready = Boolean(endpoint && accessKeyId && secretAccessKey);
+    if (s3Ready) {
       this.s3 = new S3Client({
         endpoint,
         region,
         credentials: { accessKeyId, secretAccessKey },
         forcePathStyle: true,
       });
-      this.logger.log(`S3 configurado: ${endpoint}/${this.bucket}`);
+      this.logger.log(`Armazenamento R2/S3 ativo — endpoint=${endpoint} bucket=${this.bucket}`);
     } else {
       this.s3 = null;
-      this.logger.warn('S3 não configurado — usando armazenamento em disco (uploads/)');
+      this.logger.warn(
+        'S3/R2 inativo (falta S3_ENDPOINT, S3_ACCESS_KEY_ID ou S3_SECRET_ACCESS_KEY) — usando apenas disco uploads/',
+      );
+      if (this.config.get('NODE_ENV') === 'production') {
+        this.logger.error(
+          'PRODUÇÃO: ficheiros NÃO sobem para Cloudflare R2; ficam no disco efémero e somem no redeploy. ' +
+            'Defina as Fly secrets: S3_ENDPOINT, S3_REGION, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_BUCKET.',
+        );
+      }
     }
   }
 

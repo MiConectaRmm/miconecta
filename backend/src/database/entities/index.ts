@@ -17,7 +17,7 @@ export { Patch, PatchStatus, PatchSeverity } from './patch.entity';
 export { ClientUser, ClientUserRole } from './client-user.entity';
 export { Ticket, TicketStatus, TicketPrioridade, TicketOrigem, TicketSlaStatus } from './ticket.entity';
 export { TicketComment, TicketCommentTipo } from './ticket-comment.entity';
-export { ChatMessage, ChatMessageTipo, ChatRemetenteTipo } from './chat-message.entity';
+export { ChatMessage, ChatMessageTipo, ChatRemetenteTipo, ChatMessageStatus } from './chat-message.entity';
 export { RemoteSession, RemoteSessionStatus } from './remote-session.entity';
 export { RemoteSessionLog, RemoteSessionLogTipo } from './remote-session-log.entity';
 export { ConsentRecord, ConsentTipo } from './consent-record.entity';

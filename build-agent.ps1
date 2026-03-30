@@ -8,7 +8,9 @@
 #     pode remover assemblies necessários). Ver agent/Directory.Build.props.
 # Uso:
 #   .\build-agent.ps1
+#       (sem -Version: incrementa automaticamente o patch em agent/Version.props e gera MSI com essa versão)
 #   .\build-agent.ps1 -Version "2.1.0"
+#       (fixa a versão indicada e grava em Version.props)
 #   .\build-agent.ps1 -SkipClean
 # ============================================================
 
@@ -20,7 +22,27 @@ param(
 $ErrorActionPreference = "Stop"
 $Root = $PSScriptRoot
 
-# Versão padrão: agent/Version.props (mesma regra do backend AGENT_VERSION e do MSI via bind.FileVersion)
+function Update-VersionProps {
+    param(
+        [string]$PropsPath,
+        [string]$SemVer
+    )
+    $m = [regex]::Match($SemVer, '^\s*(\d+)\.(\d+)\.(\d+)\s*$')
+    if (-not $m.Success) {
+        Write-Host "ERRO: Versao invalida (use major.minor.patch): '$SemVer'" -ForegroundColor Red
+        exit 1
+    }
+    $maj, $min, $pat = $m.Groups[1].Value, $m.Groups[2].Value, $m.Groups[3].Value
+    $assemblyAndFile = "$maj.$min.$pat.0"
+    $raw = Get-Content $PropsPath -Raw -Encoding UTF8
+    $raw = [regex]::Replace($raw, '<Version>\s*[^<]+\s*</Version>', "<Version>$SemVer</Version>")
+    $raw = [regex]::Replace($raw, '<AssemblyVersion>\s*[^<]+\s*</AssemblyVersion>', "<AssemblyVersion>$assemblyAndFile</AssemblyVersion>")
+    $raw = [regex]::Replace($raw, '<FileVersion>\s*[^<]+\s*</FileVersion>', "<FileVersion>$assemblyAndFile</FileVersion>")
+    $raw = [regex]::Replace($raw, '<InformationalVersion>\s*[^<]+\s*</InformationalVersion>', "<InformationalVersion>$SemVer</InformationalVersion>")
+    [System.IO.File]::WriteAllText($PropsPath, $raw, [System.Text.UTF8Encoding]::new($false))
+}
+
+# Versão: agent/Version.props (MSI usa bind.FileVersion do .exe; MajorUpgrade precisa de versão nova a cada build)
 $VersionPropsPath = Join-Path $Root "agent\Version.props"
 if (-not (Test-Path $VersionPropsPath)) {
     Write-Host "ERRO: Nao encontrado $VersionPropsPath" -ForegroundColor Red
@@ -32,8 +54,23 @@ if ([string]::IsNullOrWhiteSpace($versionFromProps)) {
     Write-Host "ERRO: Version ausente em Version.props" -ForegroundColor Red
     exit 1
 }
+$versionFromProps = $versionFromProps.Trim()
+
 if ([string]::IsNullOrWhiteSpace($Version)) {
-    $Version = $versionFromProps.Trim()
+    $m = [regex]::Match($versionFromProps, '^(\d+)\.(\d+)\.(\d+)$')
+    if (-not $m.Success) {
+        Write-Host "ERRO: Version.props deve estar em major.minor.patch para auto-incremento (atual: '$versionFromProps')" -ForegroundColor Red
+        exit 1
+    }
+    $patch = [int]$m.Groups[3].Value
+    $patch++
+    $Version = "{0}.{1}.{2}" -f $m.Groups[1].Value, $m.Groups[2].Value, $patch
+    Update-VersionProps -PropsPath $VersionPropsPath -SemVer $Version
+    Write-Host "Versao auto-incrementada em Version.props: $versionFromProps -> $Version" -ForegroundColor DarkCyan
+} else {
+    $Version = $Version.Trim()
+    Update-VersionProps -PropsPath $VersionPropsPath -SemVer $Version
+    Write-Host "Versao fixada em Version.props: $Version" -ForegroundColor DarkCyan
 }
 $AgentProj = "$Root\agent\MIConectaAgent\MIConectaAgent.csproj"
 $TrayProj = "$Root\agent\MIConectaAgent.Tray\MIConectaAgent.Tray.csproj"
@@ -128,6 +165,9 @@ if ($LASTEXITCODE -ne 0) {
 $msiSource = "$Root\installer\wix\bin\Release\MIConectaSetup.msi"
 $msiDest = "$OutputDir\MIConectaSetup-v$Version.msi"
 Copy-Item $msiSource $msiDest -Force
+# Nome fixo para Docker/API: deploy-backend.ps1 copia deste ficheiro (sem duplicar em backend\assets)
+$msiCanonica = Join-Path $OutputDir "MIConectaSetup.msi"
+Copy-Item $msiDest $msiCanonica -Force
 
 $msiSize = [math]::Round((Get-Item $msiDest).Length / 1MB, 2)
 
@@ -137,6 +177,7 @@ Write-Host "  BUILD COMPLETO!" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "  MSI: $msiDest" -ForegroundColor White
+Write-Host "  MSI (API / deploy): $msiCanonica" -ForegroundColor White
 Write-Host "  Tamanho: $msiSize MB" -ForegroundColor White
 Write-Host ""
 Write-Host "  Instalacao interativa:" -ForegroundColor Cyan

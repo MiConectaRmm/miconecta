@@ -37,53 +37,73 @@ function onRefreshed(token: string) {
   refreshSubscribers = [];
 }
 
+function isAuthRefreshPath(config: { url?: string; baseURL?: string } | undefined): boolean {
+  if (!config?.url) return false;
+  const u = config.url.startsWith('http') ? config.url : `${config.baseURL || ''}${config.url}`;
+  return u.includes('/auth/refresh') || u.includes('/auth/login');
+}
+
 // Interceptor: refresh token on 401
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    if (error.response?.status === 401 && !originalRequest._retry && typeof window !== 'undefined') {
-      const refreshToken = localStorage.getItem('miconecta_refresh');
-      if (!refreshToken) {
-        localStorage.removeItem('miconecta_token');
-        localStorage.removeItem('miconecta_user');
-        window.location.href = '/login';
-        return Promise.reject(error);
-      }
-
-      if (isRefreshing) {
-        // Outro request já está fazendo refresh — esperar ele terminar
-        return new Promise((resolve) => {
-          subscribeTokenRefresh((newToken: string) => {
-            originalRequest.headers.Authorization = `Bearer ${newToken}`;
-            resolve(api(originalRequest));
-          });
-        });
-      }
-
-      originalRequest._retry = true;
-      isRefreshing = true;
-
-      try {
-        const { data } = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
-        const newToken = data.access_token;
-        localStorage.setItem('miconecta_token', newToken);
-        localStorage.setItem('miconecta_refresh', data.refresh_token);
-        localStorage.setItem('miconecta_user', JSON.stringify(data.user));
-        originalRequest.headers.Authorization = `Bearer ${newToken}`;
-        onRefreshed(newToken);
-        return api(originalRequest);
-      } catch {
-        localStorage.removeItem('miconecta_token');
-        localStorage.removeItem('miconecta_refresh');
-        localStorage.removeItem('miconecta_user');
-        window.location.href = '/login';
-        return Promise.reject(error);
-      } finally {
-        isRefreshing = false;
-      }
+    if (!originalRequest || error.response?.status !== 401 || originalRequest._retry || typeof window === 'undefined') {
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+    if (isAuthRefreshPath(originalRequest)) {
+      return Promise.reject(error);
+    }
+
+    const refreshToken = localStorage.getItem('miconecta_refresh');
+    if (!refreshToken) {
+      localStorage.removeItem('miconecta_token');
+      localStorage.removeItem('miconecta_user');
+      window.location.href = '/login';
+      return Promise.reject(error);
+    }
+
+    if (isRefreshing) {
+      return new Promise((resolve) => {
+        subscribeTokenRefresh((newToken: string) => {
+          originalRequest.headers = originalRequest.headers || {};
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          resolve(api(originalRequest));
+        });
+      });
+    }
+
+    originalRequest._retry = true;
+    isRefreshing = true;
+
+    try {
+      const { data } = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
+      const newToken = data.access_token;
+      if (!newToken) {
+        throw new Error('Refresh sem access_token');
+      }
+      localStorage.setItem('miconecta_token', newToken);
+      if (data.refresh_token) {
+        localStorage.setItem('miconecta_refresh', data.refresh_token);
+      }
+      if (data.user) {
+        localStorage.setItem('miconecta_user', JSON.stringify(data.user));
+        const { useAuthStore } = await import('@/stores/auth.store');
+        useAuthStore.getState().login(newToken, data.refresh_token || refreshToken, data.user);
+      }
+      originalRequest.headers = originalRequest.headers || {};
+      originalRequest.headers.Authorization = `Bearer ${newToken}`;
+      onRefreshed(newToken);
+      return api(originalRequest);
+    } catch {
+      localStorage.removeItem('miconecta_token');
+      localStorage.removeItem('miconecta_refresh');
+      localStorage.removeItem('miconecta_user');
+      window.location.href = '/login';
+      return Promise.reject(error);
+    } finally {
+      isRefreshing = false;
+    }
   },
 );
 
@@ -103,6 +123,14 @@ export const authApi = {
 };
 
 // ── Tenants / Clients ──
+/** Cliente MSP = tenant; rotas /clients/:id alinhadas ao dashboard /dashboard/clients/[id] */
+export const clientsApi = {
+  generateInstaller: (
+    tenantId: string,
+    body?: { descricao?: string; expiresAt?: string; organizationId?: string },
+  ) => api.post(`/clients/${tenantId}/generate-installer`, body ?? {}),
+};
+
 export const tenantsApi = {
   listar: () => api.get('/tenants'),
   buscar: (id: string) => api.get(`/tenants/${id}`),
@@ -201,12 +229,53 @@ export const ticketsApi = {
     api.post(`/tickets/${id}/avaliar`, { nota, comentario }),
   satisfacao: (tenantId?: string) =>
     api.get('/tickets/satisfacao', { params: tenantId ? { tenantId } : {} }),
+  solicitarRemoteSession: (id: string) => api.post(`/tickets/${id}/remote-session`),
 };
+
+/** Resposta paginada do histórico de ticket (cursor) ou legado (array). */
+export function parseTicketMessagesPage(data: unknown): {
+  items: unknown[];
+  nextOlderCursor: { createdAt: string; id: string } | null;
+  hasMoreOlder: boolean;
+} {
+  if (data == null || typeof data !== 'object') {
+    return { items: [], nextOlderCursor: null, hasMoreOlder: false };
+  }
+  const d = data as Record<string, unknown>;
+  if (Array.isArray(d.items)) {
+    const c = d.nextOlderCursor as { createdAt?: string; id?: string } | null | undefined;
+    return {
+      items: d.items,
+      nextOlderCursor:
+        c && typeof c.createdAt === 'string' && typeof c.id === 'string'
+          ? { createdAt: c.createdAt, id: c.id }
+          : null,
+      hasMoreOlder: Boolean(d.hasMoreOlder),
+    };
+  }
+  if (Array.isArray(data)) {
+    return { items: data, nextOlderCursor: null, hasMoreOlder: false };
+  }
+  return { items: [], nextOlderCursor: null, hasMoreOlder: false };
+}
 
 // ── Chat ──
 export const chatApi = {
-  mensagens: (ticketId: string, limit?: number, offset?: number) =>
-    api.get(`/chat/tickets/${ticketId}/messages`, { params: { limit, offset } }),
+  mensagens: (
+    ticketId: string,
+    limit?: number,
+    cursor?: { createdAt: string; id: string },
+    offset?: number,
+  ) =>
+    api.get(`/chat/tickets/${ticketId}/messages`, {
+      params: {
+        limit,
+        offset: offset && offset > 0 ? offset : undefined,
+        ...(cursor ? { beforeCreatedAt: cursor.createdAt, beforeId: cursor.id } : {}),
+      },
+    }),
+  unreadSummary: (ticketIds: string[]) =>
+    api.post('/chat/tickets/unread-summary', { ticketIds }),
   enviar: (ticketId: string, conteudo: string, arquivoUrl?: string, arquivoNome?: string, arquivoTamanho?: number) =>
     api.post(`/chat/tickets/${ticketId}/messages`, { conteudo, arquivoUrl, arquivoNome, arquivoTamanho }),
   marcarLida: (id: string) => api.put(`/chat/messages/${id}/read`),

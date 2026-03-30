@@ -20,6 +20,7 @@ import {
   IniciarSessaoDto,
   CancelarSessaoDto,
   LogRegistroDto,
+  ValidateRemoteChatTokenDto,
 } from './dto/remote-session.dto';
 
 @ApiTags('Remote Sessions')
@@ -192,6 +193,13 @@ export class RemoteSessionsController {
   // ══════════════════════════════════════════════════
   // ENDPOINTS AGENTE (Agent Auth — sem RBAC)
   // ══════════════════════════════════════════════════
+
+  @Post('agent/remote-chat-token/validate')
+  @UseGuards(AgentAuthGuard)
+  @ApiOperation({ summary: 'Validar sessionToken de conexão remota (chat/ticket)' })
+  async agentValidateRemoteChatToken(@Req() req: any, @Body() dto: ValidateRemoteChatTokenDto) {
+    return this.sessionsService.validarRemoteChatTokenParaAgente(dto.sessionToken, req.device.id);
+  }
 
   @Get('agent/pendentes')
   @UseGuards(AgentAuthGuard)

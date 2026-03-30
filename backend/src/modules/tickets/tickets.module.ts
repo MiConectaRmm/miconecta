@@ -6,6 +6,7 @@ import { ChatMessage } from '../../database/entities/chat-message.entity';
 import { RemoteSession } from '../../database/entities/remote-session.entity';
 import { ChatModule } from '../chat/chat.module';
 import { ConversationsModule } from '../conversations/conversations.module';
+import { RemoteSessionsModule } from '../remote-sessions/remote-sessions.module';
 import { TicketsController } from './tickets.controller';
 import { InboundChannelsController } from './inbound-channels.controller';
 import { TicketsService } from './tickets.service';
@@ -15,7 +16,12 @@ import { InboundChannelsService } from './inbound-channels.service';
 import { Tenant } from '../../database/entities/tenant.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Ticket, TicketComment, ChatMessage, RemoteSession, Tenant]), ChatModule, ConversationsModule],
+  imports: [
+    TypeOrmModule.forFeature([Ticket, TicketComment, ChatMessage, RemoteSession, Tenant]),
+    ChatModule,
+    ConversationsModule,
+    RemoteSessionsModule,
+  ],
   controllers: [TicketsController, InboundChannelsController],
   providers: [TicketsService, UnifiedTimelineService, TicketIntelligenceService, InboundChannelsService],
   exports: [TicketsService, UnifiedTimelineService, TicketIntelligenceService, InboundChannelsService],

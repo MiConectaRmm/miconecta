@@ -1,0 +1,12 @@
+# Usado quando o contexto de build é a raiz do repo (API: fly deploy . --config backend/fly.toml).
+.git
+.cursor
+**/.vscode
+**/node_modules
+frontend
+agent
+installer/wix
+installer/output/MIConectaSetup-v*.msi
+*.md
+.env
+.env.*

@@ -7,7 +7,7 @@ import {
   MonitorOff, CheckCircle2, MessageSquare, Ticket, MonitorPlay,
   AlertTriangle, Cpu, HardDrive, Activity, Download, FileCode2, Terminal, Copy, Check,
 } from 'lucide-react'
-import { tenantsApi, devicesApi, alertsApi, ticketsApi, conversationsApi, agentsApi } from '@/lib/api'
+import { tenantsApi, devicesApi, alertsApi, ticketsApi, conversationsApi, agentsApi, clientsApi } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth.store'
 import { AGENT_MSI_DOWNLOAD_URL } from '@/lib/public-config'
 
@@ -39,6 +39,7 @@ export default function ClientDetailPage() {
   const [creatingTicket, setCreatingTicket] = useState<string | null>(null)
   const [creatingChat, setCreatingChat] = useState<string | null>(null)
   const [downloadingScript, setDownloadingScript] = useState<'bat' | 'ps1' | null>(null)
+  const [generatingInstaller, setGeneratingInstaller] = useState(false)
   const [copied, setCopied] = useState(false)
 
   const [kpis, setKpis] = useState({
@@ -171,6 +172,49 @@ export default function ClientDetailPage() {
     }
   }
 
+  const downloadTextFile = (content: string, filename: string) => {
+    const blob = new Blob([content], { type: 'application/octet-stream' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  const gerarInstaladorWhiteLabel = async () => {
+    setGeneratingInstaller(true)
+    try {
+      const { data } = await clientsApi.generateInstaller(id)
+      const d = data as {
+        scripts?: { ps1?: { filename: string; content: string }; bat?: { filename: string; content: string } }
+        installationToken?: string
+        revocation?: { path: string }
+        tokenPreview?: string
+      }
+      if (d.scripts?.ps1) downloadTextFile(d.scripts.ps1.content, d.scripts.ps1.filename)
+      if (d.scripts?.bat) downloadTextFile(d.scripts.bat.content, d.scripts.bat.filename)
+      if (d.installationToken && typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(d.installationToken)
+      }
+      alert(
+        `Pacote gerado. Scripts .ps1 e .bat foram baixados.\n` +
+          (d.installationToken
+            ? 'Token de instalação copiado para a área de transferência (uso único; não partilhe).\n'
+            : '') +
+          `Revogar token: DELETE ${d.revocation?.path || '/api/v1/agents/installation-tokens/:id'} (painel ou API).`,
+      )
+    } catch {
+      alert(
+        'Não foi possível gerar o instalador. Requer perfil admin e permissão devices:write no tenant do cliente.',
+      )
+    } finally {
+      setGeneratingInstaller(false)
+    }
+  }
+
   const copyMsiUrl = () => {
     navigator.clipboard.writeText(AGENT_MSI_DOWNLOAD_URL)
     setCopied(true)
@@ -294,6 +338,26 @@ export default function ClientDetailPage() {
             title="Copiar URL"
           >
             {copied ? <Check className="w-3 h-3 text-green-600" /> : <Copy className="w-3 h-3 text-gray-500" />}
+          </button>
+        </div>
+
+        <div className="mt-4 pt-4 border-t border-brand-100">
+          <p className="text-sm text-gray-600 mb-2">
+            <strong>Token único por instalação:</strong> gera scripts já com um installation token revogável
+            (diferente dos scripts acima, que usam o token de provisionamento do tenant).
+          </p>
+          <button
+            type="button"
+            onClick={() => void gerarInstaladorWhiteLabel()}
+            disabled={generatingInstaller}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-800 disabled:opacity-50"
+          >
+            {generatingInstaller ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            Gerar instalador (white-label)
           </button>
         </div>
       </div>

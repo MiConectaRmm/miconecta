@@ -5,7 +5,7 @@ import {
   MessageSquare, Send, Search, User, Paperclip,
   Plus, RefreshCw, Wifi, WifiOff, Volume2, VolumeX,
 } from 'lucide-react'
-import { ticketsApi, chatApi, conversationsApi } from '@/lib/api'
+import { ticketsApi, chatApi, conversationsApi, parseTicketMessagesPage } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth.store'
 import { useSocket } from '@/hooks/useSocket'
 import StatusBadge from '@/components/ui/StatusBadge'
@@ -237,8 +237,9 @@ export default function PortalChatPage() {
         setMessages((Array.isArray(res.data) ? res.data : res.data?.items || []).map(normalizeMsg))
         await conversationsApi.marcarLida(item.conversationId).catch(() => {})
       } else if (item.ticketId) {
-        const res = await chatApi.mensagens(item.ticketId, 100)
-        setMessages((Array.isArray(res.data) ? res.data : res.data?.items || []).map(normalizeMsg))
+        const res = await chatApi.mensagens(item.ticketId, 60)
+        const page = parseTicketMessagesPage(res.data)
+        setMessages(page.items.map((raw) => normalizeMsg(raw)))
         await chatApi.marcarTodasLidas(item.ticketId).catch(() => {})
       }
       setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, unread: 0 } : i))

@@ -1,4 +1,8 @@
 # Produção (domínio público): https://api.maginf.com.br — painel: https://app.maginf.com.br
+#
+# Deploy com MSI a partir de installer/output (raiz do repo):
+#   .\deploy-backend.ps1
+# (Não use "fly deploy" só dentro de backend/ — o contexto Docker tem de ser a raiz.)
 app = "miconecta-backend"
 primary_region = "gru"
 
@@ -9,7 +13,7 @@ primary_region = "gru"
   memory_mb = 1024
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = "../Dockerfile.backend"
 
 [env]
   PORT = "3000"
@@ -49,3 +53,5 @@ primary_region = "gru"
     grace_period = "10s"
     interval = "15s"
     timeout = "5s"
+
+# S3 / Cloudflare R2: NÃO colocar chaves aqui — vão para o Git. Usar: fly secrets set S3_* -a miconecta-backend

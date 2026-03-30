@@ -25,6 +25,8 @@ public class RealtimeClient : BackgroundService
     public event Func<ScriptDispatchPayload, Task>? OnScriptDispatch;
     public event Func<ChatMessagePayload, Task>? OnChatMessage;
     public event Func<RemoteSessionPayload, Task>? OnRemoteSession;
+    /// <summary>Handler opcional para remote_connect_request (assinatura async não usa C# event).</summary>
+    public Func<RemoteChatConnectPayload, Task>? OnRemoteChatConnect { get; set; }
 
     public RealtimeClient(
         AgentConfig config,
@@ -224,6 +226,24 @@ public class RealtimeClient : BackgroundService
             catch (Exception ex) { _logger.LogError(ex, "Erro em remote.request"); }
         });
 
+        _socket.On("remote_connect_request", async response =>
+        {
+            try
+            {
+                var data = response.GetValue<JsonElement>();
+                var payload = new RemoteChatConnectPayload
+                {
+                    TicketId = GetStr(data, "ticketId"),
+                    SessionToken = GetStr(data, "sessionToken"),
+                };
+                _logger.LogInformation("WebSocket: remote_connect_request — ticket={Id}", payload.TicketId);
+
+                if (OnRemoteChatConnect is not null)
+                    await OnRemoteChatConnect(payload);
+            }
+            catch (Exception ex) { _logger.LogError(ex, "Erro em remote_connect_request"); }
+        });
+
         await _socket.ConnectAsync();
 
         // Aguardar conexão confirmar (timeout 15s)
@@ -331,4 +351,10 @@ public class RemoteSessionPayload
     public string SessionId { get; set; } = "";
     public string Tecnico { get; set; } = "";
     public string Motivo { get; set; } = "";
+}
+
+public class RemoteChatConnectPayload
+{
+    public string TicketId { get; set; } = "";
+    public string SessionToken { get; set; } = "";
 }

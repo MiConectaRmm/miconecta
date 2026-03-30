@@ -10,6 +10,7 @@ import { RemoteSessionsController } from './remote-sessions.controller';
 import { RemoteSessionsService } from './remote-sessions.service';
 import { GatewayModule } from '../gateway/gateway.module';
 import { ConversationsModule } from '../conversations/conversations.module';
+import { ChatModule } from '../chat/chat.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { ConversationsModule } from '../conversations/conversations.module';
     AuthModule,
     forwardRef(() => GatewayModule),
     ConversationsModule,
+    forwardRef(() => ChatModule),
   ],
   controllers: [RemoteSessionsController],
   providers: [RemoteSessionsService],

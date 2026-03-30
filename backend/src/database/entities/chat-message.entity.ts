@@ -24,6 +24,13 @@ export enum ChatRemetenteTipo {
   SYSTEM = 'system',
 }
 
+/** Ciclo de entrega da mensagem no canal do ticket (API canônica: SENT | DELIVERED | READ). */
+export enum ChatMessageStatus {
+  SENT = 'SENT',
+  DELIVERED = 'DELIVERED',
+  READ = 'READ',
+}
+
 @Entity('chat_messages')
 @Index(['ticketId', 'criadoEm'])
 export class ChatMessage {
@@ -65,6 +72,14 @@ export class ChatMessage {
 
   @Column({ name: 'lido_em', type: 'timestamp', nullable: true })
   lidoEm: Date;
+
+  @Column({
+    name: 'message_status',
+    type: 'enum',
+    enum: ChatMessageStatus,
+    default: ChatMessageStatus.SENT,
+  })
+  messageStatus: ChatMessageStatus;
 
   @CreateDateColumn({ name: 'criado_em' })
   criadoEm: Date;

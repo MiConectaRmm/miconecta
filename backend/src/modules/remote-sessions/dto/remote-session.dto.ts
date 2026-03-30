@@ -255,3 +255,11 @@ export class SessionDetailDto {
   totalLogs?: number;
   totalEvidencias?: number;
 }
+
+/** Corpo do POST agent/remote-chat-token/validate */
+export class ValidateRemoteChatTokenDto {
+  @ApiProperty({ description: 'JWT emitido por POST /tickets/:id/remote-session' })
+  @IsString()
+  @IsNotEmpty()
+  sessionToken: string;
+}

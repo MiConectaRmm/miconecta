@@ -41,7 +41,7 @@ public class TrayApplicationContext : ApplicationContext
         _trayIcon = new NotifyIcon
         {
             Icon = CarregarIcone(),
-            Text = "MIConecta - Verificando...",
+            Text = $"MIConecta v{TrayVersionInfo.DisplayVersion} - Verificando...",
             Visible = true,
             ContextMenuStrip = CriarMenu(),
         };
@@ -167,7 +167,7 @@ public class TrayApplicationContext : ApplicationContext
             _serviceRunning = sc.Status == ServiceControllerStatus.Running;
 
             var statusText = _serviceRunning ? "Online" : "Offline";
-            _trayIcon.Text = $"MIConecta - {statusText}";
+            _trayIcon.Text = $"MIConecta v{TrayVersionInfo.DisplayVersion} - {statusText}";
 
             var statusItem = _trayIcon.ContextMenuStrip?.Items["status"] as ToolStripMenuItem;
             if (statusItem != null)
@@ -178,7 +178,7 @@ public class TrayApplicationContext : ApplicationContext
         }
         catch
         {
-            _trayIcon.Text = "MIConecta - Serviço não encontrado";
+            _trayIcon.Text = $"MIConecta v{TrayVersionInfo.DisplayVersion} - Serviço não encontrado";
         }
     }
 
@@ -295,8 +295,8 @@ public class TrayApplicationContext : ApplicationContext
     private void MostrarSobre()
     {
         MessageBox.Show(
-            "MIConectaRMM Enterprise v2.0.0\n\n" +
-            "Agente de monitoramento e gerenciamento remoto.\n\n" +
+            $"MIConectaRMM Enterprise v{TrayVersionInfo.DisplayVersion}\n\n" +
+            "Bandeja e chat de suporte.\n\n" +
             "© 2026 Maginf Tecnologia\n" +
             "www.maginf.com.br",
             "Sobre MIConectaRMM",

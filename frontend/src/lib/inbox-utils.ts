@@ -100,7 +100,90 @@ export function empresaUpper(nome?: string | null): string {
   return t.toLocaleUpperCase('pt-BR')
 }
 
+/** Normaliza nome de contacto para agrupar linhas duplicadas na inbox (mesmo utilizador). */
+export function normalizeInboxContactLabel(s: string): string {
+  return s.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+export interface InboxItemLike {
+  id: string
+  kind?: string
+  conversationId?: string
+  ticketId?: string
+  titulo: string
+  cliente: string
+  contatoLabel?: string
+  deviceId?: string
+  organizationId?: string
+  tenantId?: string
+  lastMessageAt?: string
+  criadoEm: string
+  unread: number
+  lastMessage?: string
+  empresaNome?: string
+  ticketNumero?: number
+  status?: string
+  prioridade?: string
+  deviceHostname?: string
+  rustdeskId?: string
+  deviceStatus?: string
+}
+
+/**
+ * Chave estável para agrupar conversas/tickets do mesmo utilizador (uma linha na lista, estilo WhatsApp).
+ * Prioridade: deviceId → organização+contacto → tenant+contacto; sem contacto válido não agrupa.
+ */
+export function inboxGroupKey(item: InboxItemLike): string {
+  if (item.deviceId) return `d:${item.deviceId}`
+  const raw = (item.contatoLabel || item.cliente || '').trim()
+  if (!raw || raw === '—' || raw === 'N/A') return `u:${item.id}`
+  const contact = normalizeInboxContactLabel(raw)
+  if (item.organizationId) return `o:${item.organizationId}:${contact}`
+  if (item.tenantId) return `t:${item.tenantId}:${contact}`
+  return `u:${item.id}`
+}
+
 const ALIAS_PREFIX = 'miconecta-inbox-alias-'
+const ALIAS_GROUP_PREFIX = 'miconecta-inbox-alias-gk-'
+
+function sanitizedGroupKeyForStorage(gk: string): string {
+  return gk.replace(/[^a-zA-Z0-9_-]+/g, '_')
+}
+
+export type InboxAliasItem = InboxItemLike & { mergedThreads?: InboxItemLike[] }
+
+function legacyAliasKeysForItem(item: InboxAliasItem): string[] {
+  const keys = [ALIAS_PREFIX + item.id]
+  if (item.mergedThreads?.length) {
+    for (const t of item.mergedThreads) keys.push(ALIAS_PREFIX + t.id)
+  }
+  return keys
+}
+
+/** Alias por contacto (device/org/tenant), estável quando o id da linha muda após merge na inbox. */
+export function getContactAliasForItem(item: InboxAliasItem): string {
+  if (typeof window === 'undefined') return ''
+  const gk = sanitizedGroupKeyForStorage(inboxGroupKey(item))
+  const groupVal = localStorage.getItem(ALIAS_GROUP_PREFIX + gk)
+  if (groupVal) return groupVal
+  for (const k of legacyAliasKeysForItem(item)) {
+    const v = localStorage.getItem(k)
+    if (v) return v
+  }
+  return ''
+}
+
+export function setContactAliasForItem(item: InboxAliasItem, value: string) {
+  if (typeof window === 'undefined') return
+  const gk = sanitizedGroupKeyForStorage(inboxGroupKey(item))
+  const key = ALIAS_GROUP_PREFIX + gk
+  const v = value.trim()
+  if (!v) localStorage.removeItem(key)
+  else localStorage.setItem(key, v)
+  for (const lk of legacyAliasKeysForItem(item)) {
+    localStorage.removeItem(lk)
+  }
+}
 
 export function getInboxAlias(itemId: string): string {
   if (typeof window === 'undefined') return ''
@@ -121,10 +204,67 @@ export interface InboxLike {
   titulo: string
 }
 
-export function getContactDisplayName(item: InboxLike): string {
-  const alias = getInboxAlias(item.id)
+export function getContactDisplayName(item: InboxLike & Partial<InboxAliasItem>): string {
+  const alias = getContactAliasForItem(item as InboxAliasItem)
   if (alias) return alias
   if (item.contatoLabel && item.contatoLabel !== '—') return item.contatoLabel
   if (item.cliente && item.cliente !== 'N/A') return item.cliente
   return item.titulo?.trim() || 'Contato'
+}
+
+export function inboxStableRowId(groupKey: string): string {
+  return `group-${groupKey.replace(/[^a-zA-Z0-9_-]+/g, '_')}`
+}
+
+export type InboxMergedRow = InboxItemLike & { mergedThreads?: InboxItemLike[] }
+
+/**
+ * Junta várias threads (conversa/ticket) do mesmo contacto numa única linha da inbox.
+ */
+export function mergeInboxByContact(flat: InboxItemLike[]): InboxMergedRow[] {
+  const buckets = new Map<string, Map<string, InboxItemLike>>()
+  for (const it of flat) {
+    const k = inboxGroupKey(it)
+    if (!buckets.has(k)) buckets.set(k, new Map())
+    buckets.get(k)!.set(it.id, it)
+  }
+
+  const merged: InboxMergedRow[] = []
+  buckets.forEach((byId, key) => {
+    const group = Array.from(byId.values())
+    group.sort(
+      (a, b) =>
+        new Date(b.lastMessageAt || b.criadoEm).getTime() -
+        new Date(a.lastMessageAt || a.criadoEm).getTime(),
+    )
+    if (group.length === 1) {
+      merged.push({ ...group[0] })
+      return
+    }
+    const primary = group[0]
+    const unread = group.reduce((s, i) => s + (i.unread || 0), 0)
+    const lastTs = Math.max(
+      ...group.map((i) => new Date(i.lastMessageAt || i.criadoEm).getTime()),
+    )
+    const ticketLine = group.find((i) => i.ticketNumero)
+    merged.push({
+      ...primary,
+      id: inboxStableRowId(key),
+      unread,
+      lastMessage: primary.lastMessage,
+      lastMessageAt: new Date(lastTs).toISOString(),
+      ticketNumero: ticketLine?.ticketNumero ?? primary.ticketNumero,
+      mergedThreads: group,
+    })
+  })
+
+  merged.sort((a, b) => {
+    if ((a.unread || 0) > 0 && (b.unread || 0) === 0) return -1
+    if ((a.unread || 0) === 0 && (b.unread || 0) > 0) return 1
+    return (
+      new Date(b.lastMessageAt || b.criadoEm).getTime() -
+      new Date(a.lastMessageAt || a.criadoEm).getTime()
+    )
+  })
+  return merged
 }

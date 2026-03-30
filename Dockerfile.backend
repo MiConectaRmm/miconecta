@@ -1,23 +1,20 @@
+# Imagem da API MIConecta — contexto de build = raiz do repositório.
+# MSI canónico: installer/output/MIConectaSetup.msi (gerado por .\build-agent.ps1)
+# Deploy: .\deploy-backend.ps1   ou   fly deploy . --config backend/fly.toml
 FROM node:20-alpine AS base
 
-# Install dependencies only when needed
 FROM base AS deps
 WORKDIR /app
-
-COPY package*.json ./
+COPY backend/package*.json ./
 RUN npm install --only=production && npm cache clean --force
 
-# Build the source code
 FROM base AS builder
 WORKDIR /app
-
-COPY package*.json ./
+COPY backend/package*.json ./
 RUN npm install
-
-COPY . .
+COPY backend/ .
 RUN npm run build
 
-# Production image
 FROM base AS runner
 WORKDIR /app
 
@@ -26,13 +23,14 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nestjs
 
-# Create uploads directory with correct permissions
 RUN mkdir -p /app/uploads && chown -R nestjs:nodejs /app/uploads
 
 COPY --from=deps --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
-COPY --chown=nestjs:nodejs package*.json ./
-COPY --chown=nestjs:nodejs assets ./assets
+COPY --chown=nestjs:nodejs backend/package*.json ./
+RUN mkdir -p /app/assets
+COPY --chown=nestjs:nodejs backend/assets/agent-version.txt ./assets/agent-version.txt
+COPY --chown=nestjs:nodejs installer/output/MIConectaSetup.msi ./assets/MIConectaSetup.msi
 
 USER nestjs
 

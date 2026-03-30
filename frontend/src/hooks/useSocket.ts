@@ -6,6 +6,18 @@ import { io, Socket } from 'socket.io-client'
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'wss://api.maginf.com.br'
 const sockets = new Map<string, Socket>()
 
+function readStoredTenantId(): string | undefined {
+  if (typeof window === 'undefined') return undefined
+  try {
+    const raw = localStorage.getItem('miconecta_user')
+    if (!raw) return undefined
+    const u = JSON.parse(raw) as { tenantId?: string }
+    return typeof u?.tenantId === 'string' && u.tenantId ? u.tenantId : undefined
+  } catch {
+    return undefined
+  }
+}
+
 function getSocket(namespace: string) {
   const existing = sockets.get(namespace)
   if (existing) return existing
@@ -13,10 +25,11 @@ function getSocket(namespace: string) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('miconecta_token') : null
   if (!token) return null
 
+  const tenantId = readStoredTenantId()
   // Polling primeiro: muitos proxies (CDN/Fly) falham no upgrade WS imediato.
   const socket = io(`${WS_URL}${namespace}`, {
     path: '/socket.io',
-    auth: { token },
+    auth: tenantId ? { token, tenantId } : { token },
     transports: ['polling', 'websocket'],
     upgrade: true,
     rememberUpgrade: true,

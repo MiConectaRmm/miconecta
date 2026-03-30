@@ -1,5 +1,7 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger, forwardRef, Inject } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, UnauthorizedException, Logger, forwardRef, Inject } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { RemoteSession, RemoteSessionStatus, DevicePolicyType } from '../../database/entities/remote-session.entity';
@@ -10,6 +12,10 @@ import { AccessPolicyDto, AccessPolicyType } from './dto/remote-session.dto';
 import { RmmGateway } from '../gateway/rmm.gateway';
 import { ConversationsService } from '../conversations/conversations.service';
 import { Ticket } from '../../database/entities/ticket.entity';
+import { ChatGateway } from '../chat/chat.gateway';
+
+/** Claims do JWT de curta duração para conexão remota disparada pelo chat/ticket */
+const REMOTE_CHAT_JWT_TYP = 'remote_chat';
 
 /**
  * Políticas padrão por tipo de dispositivo.
@@ -74,7 +80,17 @@ export class RemoteSessionsService {
     @Inject(forwardRef(() => RmmGateway))
     private readonly gateway: RmmGateway,
     private readonly conversationsService: ConversationsService,
+    private readonly jwtService: JwtService,
+    private readonly config: ConfigService,
+    @Inject(forwardRef(() => ChatGateway))
+    private readonly chatGateway: ChatGateway,
   ) {}
+
+  private remoteChatTokenTtlSec(): number {
+    const raw = Number(this.config.get<string>('REMOTE_CHAT_TOKEN_TTL_SECONDS', '300'));
+    if (!Number.isFinite(raw)) return 300;
+    return Math.min(Math.max(Math.floor(raw), 60), 900);
+  }
 
   // ══════════════════════════════════════════════════
   // POLICY ENGINE
@@ -268,6 +284,98 @@ export class RemoteSessionsService {
     }
 
     return this.buscar(saved.id, dados.tenantId);
+  }
+
+  // ══════════════════════════════════════════════════
+  // REMOTO VIA CHAT / TICKET (RustDesk + /rmm)
+  // ══════════════════════════════════════════════════
+
+  /**
+   * Gera JWT curto, emite `remote_connect_request` no namespace /rmm para o device do ticket
+   * e notifica clientes /chat via ChatGateway (tenant room).
+   */
+  async solicitarConexaoRemotaChatTicket(params: {
+    ticketId: string;
+    tenantId: string;
+    technicianId: string;
+    technicianNome?: string;
+  }) {
+    const ticketRepo = this.deviceRepo.manager.getRepository(Ticket);
+    const ticket = await ticketRepo.findOne({ where: { id: params.ticketId } });
+    if (!ticket) throw new NotFoundException('Ticket não encontrado');
+    if (ticket.tenantId !== params.tenantId) {
+      throw new ForbiddenException('Ticket não pertence ao tenant');
+    }
+    if (!ticket.deviceId) {
+      throw new BadRequestException('Ticket sem dispositivo vinculado');
+    }
+
+    const device = await this.deviceRepo.findOne({ where: { id: ticket.deviceId } });
+    if (!device || device.tenantId !== params.tenantId) {
+      throw new BadRequestException('Dispositivo do ticket inválido');
+    }
+
+    const ttlSec = this.remoteChatTokenTtlSec();
+    const sessionToken = this.jwtService.sign(
+      {
+        typ: REMOTE_CHAT_JWT_TYP,
+        ticketId: ticket.id,
+        deviceId: device.id,
+        tenantId: ticket.tenantId,
+        technicianId: params.technicianId,
+      },
+      { expiresIn: ttlSec },
+    );
+
+    const agentOnline = this.gateway.emitToAgent(device.id, 'remote_connect_request', {
+      ticketId: ticket.id,
+      sessionToken,
+    });
+
+    try {
+      this.chatGateway.emitNotification(ticket.tenantId, {
+        type: 'remote_connect_request',
+        ticketId: ticket.id,
+        deviceId: device.id,
+        agentOnline,
+        technicianId: params.technicianId,
+        technicianNome: params.technicianNome ?? null,
+      });
+    } catch (e) {
+      this.logger.warn(`emitNotification remote_connect_request: ${e}`);
+    }
+
+    return {
+      sessionToken,
+      expiresInSeconds: ttlSec,
+      expiresAt: new Date(Date.now() + ttlSec * 1000).toISOString(),
+      ticketId: ticket.id,
+      deviceId: device.id,
+      rustdeskId: device.rustdeskId ?? null,
+      agentOnline,
+    };
+  }
+
+  /** Validação no agente (JWT + deviceId do AgentAuthGuard). */
+  validarRemoteChatTokenParaAgente(sessionToken: string, deviceId: string) {
+    let payload: { typ?: string; ticketId?: string; deviceId?: string; tenantId?: string; technicianId?: string };
+    try {
+      payload = this.jwtService.verify(sessionToken) as typeof payload;
+    } catch {
+      throw new UnauthorizedException('Token inválido ou expirado');
+    }
+    if (payload.typ !== REMOTE_CHAT_JWT_TYP) {
+      throw new UnauthorizedException('Token inválido');
+    }
+    if (payload.deviceId !== deviceId) {
+      throw new ForbiddenException('Token não é para este dispositivo');
+    }
+    return {
+      valid: true as const,
+      ticketId: payload.ticketId,
+      tenantId: payload.tenantId,
+      technicianId: payload.technicianId,
+    };
   }
 
   // ══════════════════════════════════════════════════
